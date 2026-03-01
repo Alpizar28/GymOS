@@ -1,4 +1,4 @@
-"""Anthropic API wrapper with retry logic and graceful fallback."""
+"""OpenAI API wrapper with retry logic and graceful fallback."""
 
 import logging
 from typing import Any
@@ -7,23 +7,23 @@ from src.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Lazy import to avoid crash if anthropic not installed
+# Lazy import to avoid crash if openai not installed
 _client = None
 
 
 def _get_client():
-    """Lazy-init the Anthropic client."""
+    """Lazy-init the OpenAI client."""
     global _client
     if _client is None:
-        if not settings.anthropic_api_key:
-            logger.warning("ANTHROPIC_API_KEY not set — LLM features disabled")
+        if not settings.openai_api_key:
+            logger.warning("OPENAI_API_KEY not set — LLM features disabled")
             return None
         try:
-            import anthropic
+            import openai
 
-            _client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+            _client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
         except ImportError:
-            logger.error("anthropic package not installed")
+            logger.error("openai package not installed")
             return None
     return _client
 
@@ -34,7 +34,7 @@ async def call_llm(
     max_tokens: int | None = None,
 ) -> str | None:
     """
-    Call Claude Sonnet and return the text response.
+    Call OpenAI Chat Completions and return the text response.
     Returns None if API key is missing or call fails.
     """
     client = _get_client()
@@ -42,13 +42,16 @@ async def call_llm(
         return None
 
     try:
-        response = client.messages.create(
+        response = await client.chat.completions.create(
             model=settings.llm_model,
             max_tokens=max_tokens or settings.llm_max_tokens,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0, # Better for structured output
         )
-        return response.content[0].text
+        return response.choices[0].message.content
     except Exception:
         logger.exception("LLM call failed")
         return None
@@ -62,6 +65,8 @@ async def call_llm_json(
     """Call LLM and parse response as JSON. Returns None on failure."""
     import json
 
+    # OpenAI supports json_mode, but let's keep the extraction logic 
+    # for robustness if the model still surrounds it with markdown.
     text = await call_llm(system_prompt, user_prompt, max_tokens)
     if text is None:
         return None

@@ -6,7 +6,7 @@ services:
     environment:
       - DATABASE_URL=sqlite+aiosqlite:////app/data/gym.db
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - LOG_LEVEL=INFO
     volumes:
       - gym-data:/app/data
