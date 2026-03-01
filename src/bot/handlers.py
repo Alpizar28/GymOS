@@ -211,14 +211,8 @@ async def cmd_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         async with async_session() as session:
             from sqlalchemy import select
 
-            from src.models.settings import AthleteState, WeekTemplate
-
-            # Get current state
-            state_result = await session.execute(
-                select(AthleteState).where(AthleteState.id == 1)
-            )
-            state = state_result.scalar_one_or_none()
-            original_day = state.next_day_index if state else 1
+            from src.config import settings
+            from src.models.settings import WeekTemplate
 
             # Get all template days
             template_result = await session.execute(
@@ -228,12 +222,8 @@ async def cmd_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
             plans_generated = 0
             for template in templates:
-                # Temporarily set the day index
-                if state:
-                    state.next_day_index = template.day_index
-                    await session.commit()
-
-                plan = await generate_day_plan(session)
+                # Generate plan for specific day
+                plan = await generate_day_plan(session, day_index=template.day_index)
                 if plan:
                     formatted = format_plan(plan)
                     try:
@@ -248,14 +238,9 @@ async def cmd_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         )
                     plans_generated += 1
 
-            # Restore original day index
-            if state:
-                state.next_day_index = original_day
-                await session.commit()
-
             await update.message.reply_text(
                 f"✅ {escape_md(str(plans_generated))}/6 days generated\\!\n"
-                f"View full plan at http://localhost:8000",
+                f"View full plan at {escape_md(settings.web_url)}",
                 parse_mode=ParseMode.MARKDOWN_V2,
             )
     except Exception:

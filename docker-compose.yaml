@@ -7,6 +7,7 @@ services:
       - DATABASE_URL=sqlite+aiosqlite:////app/data/gym.db
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - WEB_URL=${WEB_URL:-http://localhost:8000}
       - LOG_LEVEL=INFO
     volumes:
       - gym-data:/app/data
