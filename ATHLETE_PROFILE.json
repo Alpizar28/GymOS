@@ -1,0 +1,321 @@
+{
+  "global_metrics": {
+    "total_sessions": 327,
+    "date_range": "2024-09-11 to 2026-02-25",
+    "total_weeks": 76.0,
+    "avg_sessions_per_week": 4.3,
+    "avg_session_duration_minutes": 82.4,
+    "avg_session_volume_lbs": 19036.0,
+    "avg_weekly_volume_lbs": 81032.0,
+    "bodyweight_start_lbs": 167.6,
+    "bodyweight_end_lbs": 186.0,
+    "bodyweight_delta_lbs": 18.4
+  },
+  "frequency_patterns": {
+    "split_distribution": {
+      "push": 97,
+      "legs": 85,
+      "pull": 72,
+      "upper": 60,
+      "unknown": 11,
+      "full_body": 2
+    },
+    "dominant_split": "push",
+    "training_day_frequency": {
+      "Tuesday": 70,
+      "Wednesday": 52,
+      "Thursday": 49,
+      "Friday": 48,
+      "Monday": 47,
+      "Saturday": 44,
+      "Sunday": 17
+    },
+    "avg_rest_between_sessions_days": 1.65,
+    "median_rest_between_sessions_days": 1.18
+  },
+  "intensity_patterns": [
+    {
+      "exercise": "Lat Pulldown",
+      "session_count": 97,
+      "typical_rep_range": "8-10",
+      "avg_reps": 9.3,
+      "typical_weight_range_lbs": "150-165",
+      "max_weight_lbs": 180.0,
+      "drop_set_frequency_pct": 5.2,
+      "warmup_frequency_pct": 0.0
+    },
+    {
+      "exercise": "Machine Chest Fly",
+      "session_count": 90,
+      "typical_rep_range": "10-12",
+      "avg_reps": 11.8,
+      "typical_weight_range_lbs": "150-170",
+      "max_weight_lbs": 200.0,
+      "drop_set_frequency_pct": 4.4,
+      "warmup_frequency_pct": 0.0
+    },
+    {
+      "exercise": "Dumbbell Lateral Raise",
+      "session_count": 81,
+      "typical_rep_range": "10-15",
+      "avg_reps": 12.1,
+      "typical_weight_range_lbs": "25-30",
+      "max_weight_lbs": 35.0,
+      "drop_set_frequency_pct": 33.3,
+      "warmup_frequency_pct": 0.0
+    },
+    {
+      "exercise": "Tricep Rope Pushdown",
+      "session_count": 81,
+      "typical_rep_range": "10-12",
+      "avg_reps": 11.4,
+      "typical_weight_range_lbs": "66-99",
+      "max_weight_lbs": 132.0,
+      "drop_set_frequency_pct": 37.0,
+      "warmup_frequency_pct": 0.0
+    },
+    {
+      "exercise": "Hammer Curl",
+      "session_count": 81,
+      "typical_rep_range": "8-10",
+      "avg_reps": 9.8,
+      "typical_weight_range_lbs": "30-45",
+      "max_weight_lbs": 50.0,
+      "drop_set_frequency_pct": 4.9,
+      "warmup_frequency_pct": 0.0
+    },
+    {
+      "exercise": "Leg Extension",
+      "session_count": 78,
+      "typical_rep_range": "10-12",
+      "avg_reps": 11.0,
+      "typical_weight_range_lbs": "130-160",
+      "max_weight_lbs": 200.0,
+      "drop_set_frequency_pct": 34.6,
+      "warmup_frequency_pct": 0.0
+    },
+    {
+      "exercise": "Seated Cable Row",
+      "session_count": 61,
+      "typical_rep_range": "10-12",
+      "avg_reps": 11.6,
+      "typical_weight_range_lbs": "130-160",
+      "max_weight_lbs": 190.0,
+      "drop_set_frequency_pct": 1.6,
+      "warmup_frequency_pct": 0.0
+    },
+    {
+      "exercise": "Incline Bench Press",
+      "session_count": 52,
+      "typical_rep_range": "5-8",
+      "avg_reps": 6.1,
+      "typical_weight_range_lbs": "170-185",
+      "max_weight_lbs": 225.0,
+      "drop_set_frequency_pct": 23.1,
+      "warmup_frequency_pct": 1.9
+    },
+    {
+      "exercise": "Hip Abduction",
+      "session_count": 51,
+      "typical_rep_range": "12-12",
+      "avg_reps": 11.5,
+      "typical_weight_range_lbs": "80-100",
+      "max_weight_lbs": 147.5,
+      "drop_set_frequency_pct": 13.7,
+      "warmup_frequency_pct": 0.0
+    },
+    {
+      "exercise": "Cable Lateral Raise",
+      "session_count": 42,
+      "typical_rep_range": "12-15",
+      "avg_reps": 12.4,
+      "typical_weight_range_lbs": "22-33",
+      "max_weight_lbs": 44.0,
+      "drop_set_frequency_pct": 26.2,
+      "warmup_frequency_pct": 0.0
+    },
+    {
+      "exercise": "Incline Dumbbell Bench Press",
+      "session_count": 42,
+      "typical_rep_range": "6-10",
+      "avg_reps": 8.1,
+      "typical_weight_range_lbs": "75-80",
+      "max_weight_lbs": 80.0,
+      "drop_set_frequency_pct": 0.0,
+      "warmup_frequency_pct": 0.0
+    },
+    {
+      "exercise": "Sled Leg Press",
+      "session_count": 40,
+      "typical_rep_range": "8-10",
+      "avg_reps": 9.2,
+      "typical_weight_range_lbs": "430-450",
+      "max_weight_lbs": 500.0,
+      "drop_set_frequency_pct": 0.0,
+      "warmup_frequency_pct": 2.5
+    },
+    {
+      "exercise": "Smith Machine Incline Bench Press",
+      "session_count": 38,
+      "typical_rep_range": "5-8",
+      "avg_reps": 6.4,
+      "typical_weight_range_lbs": "160-193",
+      "max_weight_lbs": 217.0,
+      "drop_set_frequency_pct": 26.3,
+      "warmup_frequency_pct": 15.8
+    },
+    {
+      "exercise": "Chest Press",
+      "session_count": 35,
+      "typical_rep_range": "10-15",
+      "avg_reps": 12.1,
+      "typical_weight_range_lbs": "180-200",
+      "max_weight_lbs": 225.0,
+      "drop_set_frequency_pct": 31.4,
+      "warmup_frequency_pct": 0.0
+    },
+    {
+      "exercise": "Pullover Machine",
+      "session_count": 35,
+      "typical_rep_range": "12-15",
+      "avg_reps": 13.7,
+      "typical_weight_range_lbs": "121-121",
+      "max_weight_lbs": 132.0,
+      "drop_set_frequency_pct": 2.9,
+      "warmup_frequency_pct": 0.0
+    }
+  ],
+  "volume_profile": {
+    "avg_session_volume_lbs": 19036.0,
+    "std_session_volume_lbs": 6548.0,
+    "p75_session_volume_lbs": 23334.0,
+    "min_session_volume_lbs": 5440.0,
+    "max_session_volume_lbs": 38190.0,
+    "outlier_high_volume_sessions": [
+      {
+        "date": "2024-09-20",
+        "volume_lbs": 33300.0
+      },
+      {
+        "date": "2024-10-06",
+        "volume_lbs": 33540.0
+      },
+      {
+        "date": "2024-10-07",
+        "volume_lbs": 32520.0
+      },
+      {
+        "date": "2024-10-11",
+        "volume_lbs": 32885.0
+      },
+      {
+        "date": "2024-10-17",
+        "volume_lbs": 35445.0
+      },
+      {
+        "date": "2024-10-31",
+        "volume_lbs": 38190.0
+      },
+      {
+        "date": "2024-11-07",
+        "volume_lbs": 35580.0
+      },
+      {
+        "date": "2024-11-07",
+        "volume_lbs": 33647.0
+      },
+      {
+        "date": "2024-12-10",
+        "volume_lbs": 33700.0
+      },
+      {
+        "date": "2024-12-13",
+        "volume_lbs": 37932.0
+      }
+    ],
+    "outlier_threshold_lbs": 32133.0,
+    "avg_rest_after_high_volume_days": 1.66
+  },
+  "strength_profile": {
+    "estimated_profile": "hypertrophy_dominant",
+    "rep_distribution": {
+      "strength_1_5_pct": 4.7,
+      "hypertrophy_8_15_pct": 87.4,
+      "endurance_15plus_pct": 0.4,
+      "avg_global_reps": 10.3
+    },
+    "top_compound_lifts": {
+      "Sled Leg Press": {
+        "max_weight_lbs": 500.0,
+        "avg_working_weight_lbs": 431.4,
+        "session_count": 40
+      },
+      "Hip Thrust": {
+        "max_weight_lbs": 360.0,
+        "avg_working_weight_lbs": 249.1,
+        "session_count": 12
+      },
+      "Squat": {
+        "max_weight_lbs": 315.0,
+        "avg_working_weight_lbs": 244.5,
+        "session_count": 26
+      },
+      "Deadlift": {
+        "max_weight_lbs": 315.0,
+        "avg_working_weight_lbs": 281.2,
+        "session_count": 2
+      },
+      "Hack Squat": {
+        "max_weight_lbs": 280.0,
+        "avg_working_weight_lbs": 152.3,
+        "session_count": 27
+      },
+      "Romanian Deadlift": {
+        "max_weight_lbs": 263.0,
+        "avg_working_weight_lbs": 139.8,
+        "session_count": 6
+      },
+      "Smith Machine Squat": {
+        "max_weight_lbs": 245.0,
+        "avg_working_weight_lbs": 213.5,
+        "session_count": 8
+      },
+      "Bench Press": {
+        "max_weight_lbs": 240.0,
+        "avg_working_weight_lbs": 194.9,
+        "session_count": 35
+      },
+      "Incline Bench Press": {
+        "max_weight_lbs": 225.0,
+        "avg_working_weight_lbs": 177.9,
+        "session_count": 52
+      },
+      "Chest Press": {
+        "max_weight_lbs": 225.0,
+        "avg_working_weight_lbs": 196.4,
+        "session_count": 35
+      }
+    }
+  },
+  "progression_model_detected": {
+    "dominant_model": "undulating",
+    "per_exercise_signals": {
+      "Incline Bench Press": "undulating",
+      "Chest Press": "plateau_maintenance",
+      "T Bar Row": "linear_progression",
+      "Lat Pulldown": "undulating",
+      "One Arm Lat Pulldown": "undulating",
+      "Dumbbell Romanian Deadlift": "undulating",
+      "Sled Leg Press": "undulating",
+      "Seated Cable Row": "linear_progression",
+      "Smith Machine Incline Bench Press": "undulating",
+      "Incline Dumbbell Bench Press": "undulating",
+      "Hack Squat": "undulating",
+      "Hip Thrust": "undulating",
+      "Machine Shoulder Press": "undulating",
+      "Squat": "undulating",
+      "Dumbbell Bench Press": "undulating",
+      "Bench Press": "undulating"
+    }
+  }
+}

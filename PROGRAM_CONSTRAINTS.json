@@ -1,0 +1,45 @@
+{
+  "time_window": {
+    "typical_duration_minutes": "53-74",
+    "avg_duration_minutes": 82.4,
+    "shortest_effective_session_minutes": 35.0,
+    "p10_duration_minutes": 44.3,
+    "p90_duration_minutes": 85.0
+  },
+  "volume_limits": {
+    "avg_session_volume_lbs": 19036.0,
+    "safe_volume_ceiling_lbs": 25483.0,
+    "safe_volume_floor_lbs": 11160.0,
+    "optimal_session_volume_window_lbs": "14060-23334",
+    "p25_volume_lbs": 14060.0,
+    "p75_volume_lbs": 23334.0
+  },
+  "frequency_limits": {
+    "avg_sessions_per_week": 4.3,
+    "sustainable_weekly_frequency": "4-5",
+    "max_observed_weekly_sessions": 7,
+    "p90_weekly_sessions": 6,
+    "overreaching_weeks_count": 1,
+    "recovery_bandwidth_days": 1.65
+  },
+  "exercise_bias": {
+    "push_volume_pct": 60.5,
+    "pull_volume_pct": 39.5,
+    "push_pull_ratio": "1.53:1",
+    "upper_volume_pct": 66.5,
+    "lower_volume_pct": 33.5,
+    "upper_lower_ratio": "1.99:1",
+    "compound_set_pct": 44.1,
+    "isolation_set_pct": 55.9,
+    "compound_isolation_ratio": "0.79:1"
+  },
+  "fatigue_model": {
+    "sessions_with_drop_sets": 145,
+    "sessions_with_drop_sets_pct": 44.3,
+    "heavy_drop_sessions_30pct_plus": 10,
+    "global_drop_set_rate_pct": 9.1,
+    "back_to_back_muscle_overlap_count": 21,
+    "high_volume_lower_stacking_count": 1,
+    "fatigue_risk_assessment": "low"
+  }
+}
