@@ -10,7 +10,9 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     database_url: str = "sqlite+aiosqlite:///data/gym.db"
     log_level: str = "INFO"
-    web_url: str = "http://localhost:8000"
+    web_url: str = "http://localhost:3000"
+    webhook_url: str = ""  # Public HTTPS base URL for Telegram webhook
+    port: int = 8000
 
     # LLM config
     llm_model: str = "gpt-4o"

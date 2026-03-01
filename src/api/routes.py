@@ -19,6 +19,12 @@ from src.services.stats_service import get_anchor_progress, get_weekly_summary
 router = APIRouter(prefix="/api", tags=["api"])
 
 
+@router.get("/health", include_in_schema=False)
+async def health() -> dict:
+    """Healthcheck endpoint for Docker and load balancers."""
+    return {"status": "ok"}
+
+
 # --- Response Models ---
 
 
