@@ -126,7 +126,59 @@ export const api = {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         }),
+    completeSession: (workout_id: number, fatigue: number) =>
+        fetchApi<{ workout_id: number; next_day_index: number }>("/today/complete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ workout_id, fatigue }),
+        }),
+    getWeekPlan: () => fetchApi<WeekDay[]>("/week"),
+    generateWeek: () => fetchApi<WeekDay[]>("/week/generate", { method: "POST" }),
+    getAlternatives: (exerciseName: string) =>
+        fetchApi<AlternativeExercise[]>(`/exercises/${encodeURIComponent(exerciseName)}/alternatives`),
+    getProtections: () => fetchApi<ProtectionRule[]>("/protection"),
+    addProtection: (muscle_group: string, severity: number) =>
+        fetchApi<ProtectionRule>("/protection", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ muscle_group, severity }),
+        }),
+    removeProtection: (muscle_group: string) =>
+        fetchApi<{ removed: string }>(`/protection/${encodeURIComponent(muscle_group)}`, {
+            method: "DELETE",
+        }),
 };
+
+// --- Week Types ---
+
+export interface WeekDay {
+    day_index: number;
+    name: string;
+    focus: string;
+    has_plan: boolean;
+    plan: PlanData | null;
+}
+
+// --- Swap Types ---
+
+export interface AlternativeExercise {
+    id: number;
+    name: string;
+    primary_muscle: string;
+    movement_pattern: string;
+    is_anchor: boolean;
+    avg_weight: number;
+    total_sets: number;
+}
+
+// --- Protection Types ---
+
+export interface ProtectionRule {
+    muscle_group: string;
+    severity: number;
+    factor: number;
+    active: boolean;
+}
 
 // --- Today Logger Types ---
 

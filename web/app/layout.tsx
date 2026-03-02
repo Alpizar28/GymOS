@@ -9,10 +9,12 @@ export const metadata: Metadata = {
 
 const navLinks = [
   { href: "/today", label: "Today", icon: "🏋️" },
+  { href: "/week", label: "Week", icon: "📅" },
   { href: "/", label: "Dashboard", icon: "📊" },
   { href: "/workouts", label: "Workouts", icon: "📝" },
   { href: "/progress", label: "Progress", icon: "📈" },
   { href: "/library", label: "Library", icon: "📚" },
+  { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 
 export default function RootLayout({

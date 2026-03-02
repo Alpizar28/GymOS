@@ -6,12 +6,10 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Type-safe settings from .env file."""
 
-    telegram_bot_token: str = ""
     openai_api_key: str = ""
     database_url: str = "sqlite+aiosqlite:///data/gym.db"
     log_level: str = "INFO"
     web_url: str = "http://localhost:3000"
-    webhook_url: str = ""  # Public HTTPS base URL for Telegram webhook
     port: int = 8000
 
     # LLM config

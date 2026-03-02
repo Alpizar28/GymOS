@@ -465,3 +465,168 @@ async def get_week_template() -> list[dict]:
             }
             for t in result.scalars().all()
         ]
+
+
+# ─── Complete Session (advance day + fatigue) ─────────────────────────────────
+
+
+class CompleteSessionRequest(BaseModel):
+    workout_id: int
+    fatigue: float  # 1-10
+
+
+@router.post("/today/complete")
+async def complete_today_session(payload: CompleteSessionRequest) -> dict:
+    """
+    Mark today's session as complete, save fatigue rating, and advance the day index.
+    Mirrors what /done did in the Telegram bot.
+    """
+    from src.models.feedback import SessionFeedback
+
+    async with async_session() as session:
+        # Verify workout exists
+        workout = await session.get(Workout, payload.workout_id)
+        if not workout:
+            raise HTTPException(status_code=404, detail="Workout not found")
+
+        # Save fatigue feedback
+        feedback = SessionFeedback(
+            workout_id=payload.workout_id,
+            fatigue=payload.fatigue,
+        )
+        session.add(feedback)
+
+        # Advance athlete state
+        state_result = await session.execute(select(AthleteState).where(AthleteState.id == 1))
+        state = state_result.scalar_one_or_none()
+        if state:
+            state.next_day_index = (state.next_day_index % 6) + 1
+            state.fatigue_score = round(state.fatigue_score * 0.7 + payload.fatigue * 0.3, 1)
+            session.add(state)
+
+        await session.commit()
+        return {
+            "workout_id": payload.workout_id,
+            "next_day_index": state.next_day_index if state else 1,
+            "fatigue_saved": payload.fatigue,
+        }
+
+
+# ─── Week Plan ────────────────────────────────────────────────────────────────
+
+
+@router.get("/week")
+async def get_week_plan() -> list[dict]:
+    """
+    Return a 6-day plan. Each day is served from PlanDay cache if available,
+    otherwise returns the week template metadata for that day.
+    """
+    async with async_session() as session:
+        templates_result = await session.execute(
+            select(WeekTemplate).order_by(WeekTemplate.day_index)
+        )
+        templates = templates_result.scalars().all()
+
+        # Get the last generated plan per day_name from PlanDay cache
+        plans_result = await session.execute(
+            select(PlanDay).order_by(desc(PlanDay.id))
+        )
+        plans_by_day: dict[str, dict] = {}
+        for p in plans_result.scalars().all():
+            content = json.loads(p.content_json)
+            day_name = content.get("day_name", "")
+            if day_name and day_name not in plans_by_day:
+                plans_by_day[day_name] = content
+
+        week = []
+        for t in templates:
+            plan = plans_by_day.get(t.name)
+            week.append({
+                "day_index": t.day_index,
+                "name": t.name,
+                "focus": t.focus,
+                "has_plan": plan is not None,
+                "plan": plan,
+            })
+        return week
+
+
+@router.post("/week/generate")
+async def generate_week() -> list[dict]:
+    """Generate all 6 days of the week plan sequentially."""
+    async with async_session() as session:
+        templates_result = await session.execute(
+            select(WeekTemplate).order_by(WeekTemplate.day_index)
+        )
+        templates = templates_result.scalars().all()
+
+    days = []
+    for template in templates:
+        async with async_session() as session:
+            plan = await generate_day_plan(session, day_index=template.day_index)
+            if plan:
+                days.append({"day_index": template.day_index, "name": template.name, "plan": plan})
+    return days
+
+
+# ─── Exercise Alternatives (Swap) ─────────────────────────────────────────────
+
+
+@router.get("/exercises/{exercise_name}/alternatives")
+async def get_exercise_alternatives(exercise_name: str, limit: int = 5) -> list[dict]:
+    """Find swap candidates for a given exercise name."""
+    from src.services.swap_service import find_swap_candidates
+
+    async with async_session() as session:
+        # Find exercise by name
+        result = await session.execute(
+            select(Exercise).where(Exercise.name_canonical.ilike(exercise_name)).limit(1)
+        )
+        exercise = result.scalar_one_or_none()
+        if not exercise:
+            raise HTTPException(status_code=404, detail=f"Exercise '{exercise_name}' not found")
+
+        candidates = await find_swap_candidates(session, exercise.id, limit=limit)
+        return candidates
+
+
+# ─── Protection Manager ────────────────────────────────────────────────────────
+
+
+class ProtectionRequest(BaseModel):
+    muscle_group: str
+    severity: int = 5  # 1-10
+
+
+@router.get("/protection")
+async def list_protections() -> list[dict]:
+    """List all active muscle group protections."""
+    from src.services.protection_service import get_active_protections
+
+    async with async_session() as session:
+        return await get_active_protections(session)
+
+
+@router.post("/protection")
+async def add_protection(payload: ProtectionRequest) -> dict:
+    """Activate protection mode for a muscle group."""
+    from src.services.protection_service import activate_protection
+
+    async with async_session() as session:
+        result = await activate_protection(session, payload.muscle_group, payload.severity)
+        await session.commit()
+        return result
+
+
+@router.delete("/protection/{muscle_group}")
+async def remove_protection(muscle_group: str) -> dict:
+    """Deactivate protection mode for a muscle group."""
+    from src.services.protection_service import deactivate_protection
+
+    async with async_session() as session:
+        removed = await deactivate_protection(session, muscle_group)
+        await session.commit()
+        if not removed:
+            raise HTTPException(status_code=404, detail=f"No active protection for '{muscle_group}'")
+        return {"removed": muscle_group}
+
