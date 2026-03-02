@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 # Conversation states
 WAITING_FATIGUE = 1
+WAITING_LOG = 2
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -67,14 +68,10 @@ async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("❌ Error generating plan\\. Check logs\\.", parse_mode=ParseMode.MARKDOWN_V2)
 
 
-async def cmd_log(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def cmd_log(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Handle /log — record a workout from text.
-
-    Usage: /log
-    Bench Press 185x6x3
-    Machine Chest Fly 170x12, 160x12
-    Lateral Raise 30x12x4
+    If no text follows the command, enter conversation mode.
     """
     text = update.message.text
     if text:
@@ -87,11 +84,29 @@ async def cmd_log(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "`Exercise Name WEIGHTxREPSxSETS`\n"
             "Example:\n"
             "`Bench Press 185x6x3`\n"
-            "`Chest Fly 170x12, 160x12`",
+            "`Chest Fly 170x12, 160x12`\n\n"
+            "_I'll wait for your next message\\._",
             parse_mode=ParseMode.MARKDOWN_V2,
         )
-        return
+        return WAITING_LOG
 
+    # If text was provided directly with the command
+    result = await _process_and_store_log(update, context, text)
+    return ConversationHandler.END
+
+
+async def handle_log_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle follow-up text for workout logging."""
+    text = update.message.text
+    if not text:
+        return WAITING_LOG
+
+    await _process_and_store_log(update, context, text)
+    return ConversationHandler.END
+
+
+async def _process_and_store_log(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str) -> None:
+    """Core logic to parse, store and respond to a log."""
     try:
         async with async_session() as session:
             workout = await log_workout(session, text)
@@ -129,9 +144,8 @@ async def cmd_log(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 ]
                 prog_text = format_progression_results(prog_data)
                 await update.message.reply_text(prog_text, parse_mode=ParseMode.MARKDOWN_V2)
-
     except Exception:
-        logger.exception("Error in /log")
+        logger.exception("Error in _process_and_store_log")
         await update.message.reply_text("❌ Error logging workout\\.", parse_mode=ParseMode.MARKDOWN_V2)
 
 
@@ -390,6 +404,18 @@ def register_handlers(app: Application) -> None:
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("swap", cmd_swap))
     app.add_handler(CommandHandler("pain", cmd_pain))
+
+    # /log conversation
+    log_conv = ConversationHandler(
+        entry_points=[CommandHandler("log", cmd_log)],
+        states={
+            WAITING_LOG: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_log_input)
+            ],
+        },
+        fallbacks=[CommandHandler("log", cmd_log)],
+    )
+    app.add_handler(log_conv)
 
     # /done conversation (waits for fatigue input)
     done_conv = ConversationHandler(
