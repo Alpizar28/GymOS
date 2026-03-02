@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from "react";
 import {
     api,
     type TodayPlan,
-    type TodayExercise,
     type TodaySet,
     type SetLogEntry,
     type ExerciseLogEntry,
@@ -13,18 +12,27 @@ import {
 
 // ---------- Types ----------
 
-interface ActualSet extends SetLogEntry { }
-
-interface ExerciseState {
-    exercise: TodayExercise;
-    open: boolean;
-    sets: ActualSet[];
+interface ActualSet extends SetLogEntry {
+    // mutable UI-only set
 }
 
-// ---------- Utils ----------
+interface ExerciseState {
+    name: string;
+    is_anchor: boolean;
+    notes: string;
+    plannedSets: TodaySet[];  // from plan
+    sets: ActualSet[];         // mutable actual sets
+    open: boolean;
+}
 
-function initSets(sets: TodaySet[]): ActualSet[] {
-    return sets.map((s) => ({
+// ---------- Helpers ----------
+
+function newActualSet(index: number): ActualSet {
+    return { index, actual_weight: null, actual_reps: null, actual_rir: null, completed: false };
+}
+
+function initSets(plannedSets: TodaySet[]): ActualSet[] {
+    return plannedSets.map((s) => ({
         index: s.index,
         actual_weight: s.weight_lbs,
         actual_reps: s.target_reps,
@@ -39,10 +47,48 @@ function setTypeBorder(type: string) {
     return "border-l-violet-500";
 }
 
-function setTypeBadge(type: string) {
-    if (type === "warmup") return <span className="text-amber-400 text-xs font-semibold uppercase">Warmup</span>;
-    if (type === "drop") return <span className="text-red-400 text-xs font-semibold uppercase">Drop</span>;
-    return <span className="text-violet-400 text-xs font-semibold uppercase">Work</span>;
+// ---------- Add Exercise Modal ----------
+
+function AddExerciseModal({
+    onAdd,
+    onClose,
+}: {
+    onAdd: (name: string) => void;
+    onClose: () => void;
+}) {
+    const [query, setQuery] = useState("");
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-sm shadow-2xl">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+                    <h3 className="font-semibold text-white">Add Exercise</h3>
+                    <button onClick={onClose} className="text-zinc-500 hover:text-white text-xl">✕</button>
+                </div>
+                <div className="p-5 space-y-4">
+                    <input
+                        autoFocus
+                        type="text"
+                        placeholder="Exercise name…"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" && query.trim()) {
+                                onAdd(query.trim());
+                            }
+                        }}
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    />
+                    <button
+                        onClick={() => query.trim() && onAdd(query.trim())}
+                        className="w-full py-2.5 bg-violet-600 text-white font-semibold rounded-lg hover:bg-violet-500 transition text-sm"
+                    >
+                        ➕ Add to Workout
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 // ---------- Swap Modal ----------
@@ -60,9 +106,7 @@ function SwapModal({
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.getAlternatives(exerciseName)
-            .then(setAlts)
-            .finally(() => setLoading(false));
+        api.getAlternatives(exerciseName).then(setAlts).finally(() => setLoading(false));
     }, [exerciseName]);
 
     return (
@@ -93,7 +137,7 @@ function SwapModal({
                                 </div>
                                 <div className="text-right text-xs text-zinc-600">
                                     {alt.avg_weight > 0 && <p>{alt.avg_weight} lb avg</p>}
-                                    {alt.total_sets > 0 && <p>{alt.total_sets} sets history</p>}
+                                    {alt.total_sets > 0 && <p>{alt.total_sets} sets</p>}
                                 </div>
                             </button>
                         ))
@@ -104,7 +148,7 @@ function SwapModal({
     );
 }
 
-// ---------- Complete Session Modal ----------
+// ---------- Complete Modal ----------
 
 function CompleteSessionModal({
     workoutId,
@@ -117,15 +161,13 @@ function CompleteSessionModal({
 }) {
     const [fatigue, setFatigue] = useState(5);
     const [saving, setSaving] = useState(false);
-    const fatigueLabel = fatigue <= 3 ? "Easy 💪" : fatigue <= 6 ? "Moderate 😤" : fatigue <= 8 ? "Hard 😓" : "Destroyed 💀";
+    const label = fatigue <= 3 ? "Easy 💪" : fatigue <= 6 ? "Moderate 😤" : fatigue <= 8 ? "Hard 😓" : "Destroyed 💀";
 
     async function handleComplete() {
         setSaving(true);
         try {
             const res = await api.completeSession(workoutId, fatigue);
             onComplete(res.next_day_index);
-        } catch {
-            onClose();
         } finally {
             setSaving(false);
         }
@@ -141,35 +183,20 @@ function CompleteSessionModal({
                 <div className="p-6 space-y-5">
                     <div>
                         <div className="flex justify-between text-sm mb-2">
-                            <span className="text-zinc-400">Fatigue level</span>
-                            <span className="font-bold text-white">{fatigue}/10 — {fatigueLabel}</span>
+                            <span className="text-zinc-400">Fatigue</span>
+                            <span className="font-bold text-white">{fatigue}/10 — {label}</span>
                         </div>
-                        <input
-                            type="range"
-                            min={1}
-                            max={10}
-                            value={fatigue}
+                        <input type="range" min={1} max={10} value={fatigue}
                             onChange={(e) => setFatigue(parseInt(e.target.value))}
-                            className="w-full accent-violet-500"
-                        />
+                            className="w-full accent-violet-500" />
                         <div className="flex justify-between text-xs text-zinc-700 mt-1">
-                            <span>1 Easy</span>
-                            <span>10 Destroyed</span>
+                            <span>1 Easy</span><span>10 Destroyed</span>
                         </div>
                     </div>
-
                     <div className="grid grid-cols-2 gap-3">
-                        <button
-                            onClick={onClose}
-                            className="py-2.5 rounded-lg bg-zinc-800 text-zinc-400 text-sm hover:bg-zinc-700 transition"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleComplete}
-                            disabled={saving}
-                            className="py-2.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-50"
-                        >
+                        <button onClick={onClose} className="py-2.5 rounded-lg bg-zinc-800 text-zinc-400 text-sm hover:bg-zinc-700 transition">Cancel</button>
+                        <button onClick={handleComplete} disabled={saving}
+                            className="py-2.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-semibold text-sm hover:opacity-90 transition disabled:opacity-50">
                             {saving ? "Saving..." : "Done! →"}
                         </button>
                     </div>
@@ -181,56 +208,66 @@ function CompleteSessionModal({
 
 // ---------- Set Row ----------
 
-interface SetRowProps {
-    planned: TodaySet;
+function SetRow({
+    planned,
+    actual,
+    onChange,
+    onRemove,
+    autoSave,
+}: {
+    planned: TodaySet | null;
     actual: ActualSet;
     onChange: (updated: ActualSet) => void;
+    onRemove: () => void;
     autoSave: () => void;
-}
-
-function SetRow({ planned, actual, onChange, autoSave }: SetRowProps) {
+}) {
     const update = (fields: Partial<ActualSet>) => onChange({ ...actual, ...fields });
+    const setType = planned?.set_type ?? "normal";
 
     return (
-        <tr className={`border-l-2 ${setTypeBorder(planned.set_type)} bg-zinc-900/40 hover:bg-zinc-900/70 transition-colors`}>
-            <td className="px-3 py-2 text-center">{setTypeBadge(planned.set_type)}</td>
-            <td className="px-3 py-2 text-center text-zinc-500 font-mono text-sm">{planned.weight_lbs ?? "—"} lb</td>
-            <td className="px-3 py-2 text-center text-zinc-500 font-mono text-sm">{planned.target_reps ?? "—"}</td>
-            <td className="px-3 py-2 text-center text-zinc-500 font-mono text-sm">{planned.rir_target ?? "—"}</td>
+        <tr className={`border-l-2 ${setTypeBorder(setType)} bg-zinc-900/40 hover:bg-zinc-900/70 transition-colors group`}>
+            <td className="px-3 py-2 text-center">
+                {setType === "warmup"
+                    ? <span className="text-amber-400 text-xs font-semibold uppercase">Warmup</span>
+                    : setType === "drop"
+                        ? <span className="text-red-400 text-xs font-semibold uppercase">Drop</span>
+                        : <span className="text-violet-400 text-xs font-semibold uppercase">Work</span>}
+            </td>
+            {/* Planned values */}
+            <td className="px-3 py-2 text-center text-zinc-600 font-mono text-sm">{planned?.weight_lbs ?? "—"}</td>
+            <td className="px-3 py-2 text-center text-zinc-600 font-mono text-sm">{planned?.target_reps ?? "—"}</td>
+            <td className="px-3 py-2 text-center text-zinc-600 font-mono text-sm">{planned?.rir_target ?? "—"}</td>
+            {/* Actual inputs */}
             <td className="px-2 py-2">
-                <input
-                    type="number" step="2.5"
-                    value={actual.actual_weight ?? ""}
+                <input type="number" step="2.5" value={actual.actual_weight ?? ""}
                     onChange={(e) => update({ actual_weight: e.target.value ? parseFloat(e.target.value) : null })}
                     className="w-20 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1 text-sm font-mono text-center text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
-                    placeholder="lb"
-                />
+                    placeholder="lb" />
             </td>
             <td className="px-2 py-2">
-                <input
-                    type="number"
-                    value={actual.actual_reps ?? ""}
+                <input type="number" value={actual.actual_reps ?? ""}
                     onChange={(e) => update({ actual_reps: e.target.value ? parseInt(e.target.value) : null })}
                     className="w-16 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1 text-sm font-mono text-center text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
-                    placeholder="reps"
-                />
+                    placeholder="reps" />
             </td>
             <td className="px-2 py-2">
-                <input
-                    type="number" min="0" max="5"
-                    value={actual.actual_rir ?? ""}
+                <input type="number" min="0" max="5" value={actual.actual_rir ?? ""}
                     onChange={(e) => update({ actual_rir: e.target.value ? parseInt(e.target.value) : null })}
                     className="w-14 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1 text-sm font-mono text-center text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
-                    placeholder="RIR"
-                />
+                    placeholder="RIR" />
             </td>
             <td className="px-3 py-2 text-center">
-                <input
-                    type="checkbox"
-                    checked={actual.completed}
+                <input type="checkbox" checked={actual.completed}
                     onChange={(e) => { update({ completed: e.target.checked }); setTimeout(autoSave, 200); }}
-                    className="w-5 h-5 rounded accent-violet-500 cursor-pointer"
-                />
+                    className="w-5 h-5 rounded accent-violet-500 cursor-pointer" />
+            </td>
+            {/* Remove set */}
+            <td className="px-2 py-2 text-center">
+                <button onClick={onRemove}
+                    title="Remove set"
+                    className="opacity-0 group-hover:opacity-100 transition text-zinc-600 hover:text-red-400 text-lg leading-none">
+                    ×
+                </button>
             </td>
         </tr>
     );
@@ -238,73 +275,97 @@ function SetRow({ planned, actual, onChange, autoSave }: SetRowProps) {
 
 // ---------- Exercise Accordion ----------
 
-interface ExerciseAccordionProps {
+function ExerciseAccordion({
+    state,
+    onToggle,
+    onSetChange,
+    onAddSet,
+    onRemoveSet,
+    onRemoveExercise,
+    onSwap,
+    autoSave,
+}: {
     state: ExerciseState;
     onToggle: () => void;
     onSetChange: (setIdx: number, updated: ActualSet) => void;
+    onAddSet: () => void;
+    onRemoveSet: (setIdx: number) => void;
+    onRemoveExercise: () => void;
     onSwap: () => void;
     autoSave: () => void;
-}
-
-function ExerciseAccordion({ state, onToggle, onSetChange, onSwap, autoSave }: ExerciseAccordionProps) {
-    const { exercise, open, sets } = state;
+}) {
+    const { open, sets, plannedSets } = state;
     const completedCount = sets.filter((s) => s.completed).length;
     const totalCount = sets.length;
     const isFullyDone = completedCount === totalCount && totalCount > 0;
 
     return (
         <div className={`rounded-xl border transition-all duration-200 ${isFullyDone ? "border-emerald-600/50 bg-emerald-950/20" : "border-zinc-700/50 bg-zinc-800/50"}`}>
-            <div className="flex items-center px-5 py-4">
-                <button onClick={onToggle} className="flex-1 flex items-center gap-3 text-left">
-                    <span className="text-lg">{exercise.is_anchor ? "🔴" : "⚪"}</span>
-                    <div>
-                        <p className="font-semibold text-white">{exercise.name}</p>
-                        {exercise.is_anchor && <span className="text-xs font-semibold text-red-400 uppercase tracking-wider">Anchor</span>}
+            {/* Header */}
+            <div className="flex items-center px-5 py-4 gap-2">
+                <button onClick={onToggle} className="flex-1 flex items-center gap-3 text-left min-w-0">
+                    <span className="text-lg flex-shrink-0">{state.is_anchor ? "🔴" : "⚪"}</span>
+                    <div className="min-w-0">
+                        <p className="font-semibold text-white truncate">{state.name}</p>
+                        {state.is_anchor && <span className="text-xs font-semibold text-red-400 uppercase tracking-wider">Anchor</span>}
                     </div>
                 </button>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={onSwap}
-                        title="Find alternatives"
-                        className="px-2 py-1 text-xs rounded-lg bg-zinc-700/50 text-zinc-400 hover:text-violet-300 hover:bg-violet-900/30 transition"
-                    >
-                        🔄 Swap
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button onClick={onSwap} title="Find alternatives"
+                        className="px-2 py-1 text-xs rounded-lg bg-zinc-700/50 text-zinc-400 hover:text-violet-300 hover:bg-violet-900/30 transition">
+                        🔄
+                    </button>
+                    <button onClick={onRemoveExercise} title="Remove exercise"
+                        className="px-2 py-1 text-xs rounded-lg bg-zinc-700/50 text-zinc-400 hover:text-red-400 hover:bg-red-900/30 transition">
+                        🗑️
                     </button>
                     <div className={`px-3 py-1 rounded-full text-xs font-semibold ${isFullyDone ? "bg-emerald-600/25 text-emerald-400" : completedCount > 0 ? "bg-violet-600/20 text-violet-300" : "bg-zinc-700/50 text-zinc-500"}`}>
                         {isFullyDone ? "✓ " : ""}{completedCount}/{totalCount}
                     </div>
-                    <button onClick={onToggle} className={`text-zinc-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}>▾</button>
+                    <button onClick={onToggle} className={`text-zinc-400 transition-transform duration-200 px-1 ${open ? "rotate-180" : ""}`}>▾</button>
                 </div>
             </div>
 
+            {/* Body */}
             {open && (
                 <div className="px-5 pb-4 overflow-x-auto">
-                    {exercise.notes && <p className="text-xs text-zinc-500 italic mb-3">💡 {exercise.notes}</p>}
-                    <table className="w-full text-sm min-w-[580px]">
+                    {state.notes && <p className="text-xs text-zinc-500 italic mb-3">💡 {state.notes}</p>}
+                    <table className="w-full text-sm min-w-[620px]">
                         <thead>
                             <tr className="text-zinc-500 text-xs uppercase tracking-wider border-b border-zinc-700/50">
                                 <th className="px-3 py-2 text-center">Type</th>
-                                <th className="px-3 py-2 text-center text-zinc-600">Plan lb</th>
-                                <th className="px-3 py-2 text-center text-zinc-600">Plan rep</th>
-                                <th className="px-3 py-2 text-center text-zinc-600">Plan RIR</th>
+                                <th className="px-3 py-2 text-center text-zinc-700">Plan lb</th>
+                                <th className="px-3 py-2 text-center text-zinc-700">Plan rep</th>
+                                <th className="px-3 py-2 text-center text-zinc-700">Plan RIR</th>
                                 <th className="px-3 py-2 text-center">Actual lb</th>
                                 <th className="px-3 py-2 text-center">Actual rep</th>
-                                <th className="px-3 py-2 text-center">RIR</th>
+                                <th className="px-3 py-2 text-center">Actual RIR</th>
                                 <th className="px-3 py-2 text-center">✓</th>
+                                <th className="px-2 py-2"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-800/50">
-                            {exercise.sets.map((planned, i) => (
+                            {sets.map((actual, i) => (
                                 <SetRow
                                     key={i}
-                                    planned={planned}
-                                    actual={sets[i]}
+                                    planned={plannedSets[i] ?? null}
+                                    actual={actual}
                                     onChange={(updated) => onSetChange(i, updated)}
+                                    onRemove={() => onRemoveSet(i)}
                                     autoSave={autoSave}
                                 />
                             ))}
                         </tbody>
                     </table>
+
+                    {/* Add Set */}
+                    <button
+                        onClick={onAddSet}
+                        className="mt-3 flex items-center gap-2 text-xs text-zinc-500 hover:text-violet-400 transition px-1 py-1.5"
+                    >
+                        <span className="w-5 h-5 rounded-full border border-zinc-600 hover:border-violet-500 flex items-center justify-center text-base leading-none">+</span>
+                        Add set
+                    </button>
                 </div>
             )}
         </div>
@@ -325,6 +386,7 @@ export default function TodayPage() {
     const [completed, setCompleted] = useState(false);
     const [nextDay, setNextDay] = useState<number | null>(null);
     const [swapFor, setSwapFor] = useState<string | null>(null);
+    const [showAddExercise, setShowAddExercise] = useState(false);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
@@ -332,44 +394,76 @@ export default function TodayPage() {
         api.getTodayPlan()
             .then((data) => {
                 setPlan(data);
-                setExercises(data.exercises.map((ex) => ({ exercise: ex, open: false, sets: initSets(ex.sets) })));
+                setExercises(data.exercises.map((ex) => ({
+                    name: ex.name,
+                    is_anchor: ex.is_anchor,
+                    notes: ex.notes,
+                    plannedSets: ex.sets,
+                    sets: initSets(ex.sets),
+                    open: false,
+                })));
             })
             .catch((e) => setError(e.message))
             .finally(() => setLoading(false));
     }, []);
 
+    // ── Exercise mutations ──────────────────────────────────────────────────────
+
     const toggleExercise = (idx: number) =>
         setExercises((prev) => prev.map((e, i) => i === idx ? { ...e, open: !e.open } : e));
+
+    const removeExercise = (idx: number) =>
+        setExercises((prev) => prev.filter((_, i) => i !== idx));
+
+    const addExercise = (name: string) => {
+        setExercises((prev) => [
+            ...prev,
+            { name, is_anchor: false, notes: "", plannedSets: [], sets: [newActualSet(0)], open: true },
+        ]);
+        setShowAddExercise(false);
+        showToast(`➕ Added ${name}`);
+    };
+
+    const swapExercise = (idx: number, alt: AlternativeExercise) => {
+        setExercises((prev) => prev.map((e, i) =>
+            i === idx ? { ...e, name: alt.name, is_anchor: alt.is_anchor } : e
+        ));
+        setSwapFor(null);
+        showToast(`🔄 Swapped to ${alt.name}`);
+    };
+
+    // ── Set mutations ───────────────────────────────────────────────────────────
 
     const updateSet = (exIdx: number, setIdx: number, updated: ActualSet) =>
         setExercises((prev) =>
             prev.map((e, i) => i === exIdx ? { ...e, sets: e.sets.map((s, si) => si === setIdx ? updated : s) } : e)
         );
 
-    const swapExercise = (exIdx: number, alt: AlternativeExercise) => {
+    const addSet = (exIdx: number) =>
         setExercises((prev) =>
             prev.map((e, i) =>
                 i === exIdx
-                    ? {
-                        ...e,
-                        exercise: {
-                            ...e.exercise,
-                            name: alt.name,
-                            is_anchor: alt.is_anchor,
-                        },
-                    }
+                    ? { ...e, sets: [...e.sets, newActualSet(e.sets.length)] }
                     : e
             )
         );
-        setSwapFor(null);
-        showToast(`🔄 Swapped to ${alt.name}`);
-    };
+
+    const removeSet = (exIdx: number, setIdx: number) =>
+        setExercises((prev) =>
+            prev.map((e, i) =>
+                i === exIdx
+                    ? { ...e, sets: e.sets.filter((_, si) => si !== setIdx).map((s, si) => ({ ...s, index: si })) }
+                    : e
+            )
+        );
+
+    // ── Save / Complete ─────────────────────────────────────────────────────────
 
     const buildPayload = useCallback(() => {
         if (!plan) return null;
         const exEntries: ExerciseLogEntry[] = exercises
             .filter((e) => e.sets.some((s) => s.completed))
-            .map((e) => ({ name: e.exercise.name, sets: e.sets.filter((s) => s.completed) }));
+            .map((e) => ({ name: e.name, sets: e.sets.filter((s) => s.completed) }));
         return { day_name: plan.day_name, exercises: exEntries };
     }, [plan, exercises]);
 
@@ -385,21 +479,25 @@ export default function TodayPage() {
             setSavedId(res.workout_id);
             if (!silent) showToast(`✅ Saved as Workout #${res.workout_id}`);
         } catch {
-            if (!silent) showToast("❌ Save failed. Try again.");
+            if (!silent) showToast("❌ Save failed.");
         } finally {
             if (!silent) setSaving(false);
         }
     }, [buildPayload]);
 
+    // ── Derived stats ───────────────────────────────────────────────────────────
+
     const totalSets = exercises.reduce((n, e) => n + e.sets.length, 0);
     const completedSets = exercises.reduce((n, e) => n + e.sets.filter((s) => s.completed).length, 0);
     const completedVolume = exercises.reduce(
         (n, e) => n + e.sets.filter((s) => s.completed && s.actual_weight && s.actual_reps)
-            .reduce((v, s) => v + (s.actual_weight! * s.actual_reps!), 0),
+            .reduce((v, s) => v + s.actual_weight! * s.actual_reps!, 0),
         0
     );
 
-    const swapIndex = swapFor !== null ? exercises.findIndex((e) => e.exercise.name === swapFor) : -1;
+    const swapIndex = swapFor !== null ? exercises.findIndex((e) => e.name === swapFor) : -1;
+
+    // ── Render ──────────────────────────────────────────────────────────────────
 
     if (loading) return (
         <div className="flex items-center justify-center h-64 gap-3 text-zinc-500">
@@ -431,22 +529,18 @@ export default function TodayPage() {
 
     return (
         <div className="max-w-3xl mx-auto">
-            {/* Swap Modal */}
+            {/* Modals */}
             {swapFor !== null && swapIndex >= 0 && (
-                <SwapModal
-                    exerciseName={swapFor}
-                    onClose={() => setSwapFor(null)}
-                    onSwap={(alt) => swapExercise(swapIndex, alt)}
-                />
+                <SwapModal exerciseName={swapFor} onClose={() => setSwapFor(null)}
+                    onSwap={(alt) => swapExercise(swapIndex, alt)} />
             )}
-
-            {/* Complete Modal */}
             {showComplete && savedId !== null && (
-                <CompleteSessionModal
-                    workoutId={savedId}
+                <CompleteSessionModal workoutId={savedId}
                     onComplete={(nd) => { setCompleted(true); setNextDay(nd); setShowComplete(false); }}
-                    onClose={() => setShowComplete(false)}
-                />
+                    onClose={() => setShowComplete(false)} />
+            )}
+            {showAddExercise && (
+                <AddExerciseModal onAdd={addExercise} onClose={() => setShowAddExercise(false)} />
             )}
 
             {/* Header */}
@@ -456,22 +550,21 @@ export default function TodayPage() {
                     <p className="text-zinc-500 text-sm mt-1">
                         🏋️ {plan!.day_name.replace(/_/g, " ")} &nbsp;·&nbsp;
                         ⏱ ~{plan!.estimated_duration_min} min &nbsp;·&nbsp;
-                        📊 {plan!.total_sets} sets
+                        📊 {totalSets} sets
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <button
-                        onClick={() => save(false)}
-                        disabled={saving || completedSets === 0}
-                        className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-semibold rounded-lg hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
+                    <button onClick={() => setShowAddExercise(true)}
+                        className="px-4 py-2.5 border border-zinc-700 text-zinc-300 font-semibold rounded-lg hover:border-violet-500 hover:text-violet-300 transition text-sm">
+                        ➕ Exercise
+                    </button>
+                    <button onClick={() => save(false)} disabled={saving || completedSets === 0}
+                        className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-semibold rounded-lg hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed text-sm">
                         {saving ? "⏳ Saving..." : `💾 Save (${completedSets})`}
                     </button>
                     {savedId !== null && (
-                        <button
-                            onClick={() => setShowComplete(true)}
-                            className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-semibold rounded-lg hover:opacity-90 transition"
-                        >
+                        <button onClick={() => setShowComplete(true)}
+                            className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-semibold rounded-lg hover:opacity-90 transition text-sm">
                             ✅ Complete
                         </button>
                     )}
@@ -481,32 +574,42 @@ export default function TodayPage() {
             {/* Progress bar */}
             <div className="mb-6">
                 <div className="flex justify-between text-xs text-zinc-500 mb-1">
-                    <span>{completedSets} / {totalSets} sets</span>
+                    <span>{completedSets} / {totalSets} sets completed</span>
                     <span>{totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0}%</span>
                 </div>
                 <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
-                    <div
-                        className="h-full bg-gradient-to-r from-violet-500 to-emerald-500 rounded-full transition-all duration-500"
-                        style={{ width: `${totalSets > 0 ? (completedSets / totalSets) * 100 : 0}%` }}
-                    />
+                    <div className="h-full bg-gradient-to-r from-violet-500 to-emerald-500 rounded-full transition-all duration-500"
+                        style={{ width: `${totalSets > 0 ? (completedSets / totalSets) * 100 : 0}%` }} />
                 </div>
             </div>
 
             {/* Exercises */}
             <div className="space-y-3">
+                {exercises.length === 0 && (
+                    <div className="text-center py-12 text-zinc-600">
+                        <p className="text-lg mb-2">No exercises yet</p>
+                        <button onClick={() => setShowAddExercise(true)}
+                            className="text-sm text-violet-400 hover:text-violet-300 transition">
+                            ➕ Add your first exercise
+                        </button>
+                    </div>
+                )}
                 {exercises.map((exState, i) => (
                     <ExerciseAccordion
-                        key={i}
+                        key={`${exState.name}-${i}`}
                         state={exState}
                         onToggle={() => toggleExercise(i)}
                         onSetChange={(si, updated) => updateSet(i, si, updated)}
-                        onSwap={() => setSwapFor(exState.exercise.name)}
+                        onAddSet={() => addSet(i)}
+                        onRemoveSet={(si) => removeSet(i, si)}
+                        onRemoveExercise={() => removeExercise(i)}
+                        onSwap={() => setSwapFor(exState.name)}
                         autoSave={() => save(true)}
                     />
                 ))}
             </div>
 
-            {/* Summary */}
+            {/* Session Summary */}
             {completedSets > 0 && (
                 <div className="mt-8 p-5 bg-gradient-to-br from-zinc-800/80 to-zinc-900/80 border border-zinc-700/50 rounded-xl">
                     <h3 className="font-semibold text-zinc-300 mb-3">📊 Session Summary</h3>
@@ -533,7 +636,7 @@ export default function TodayPage() {
             )}
 
             {toast && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 bg-zinc-800 border border-zinc-600 rounded-xl shadow-2xl text-sm font-medium text-white">
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 bg-zinc-800 border border-zinc-600 rounded-xl shadow-2xl text-sm font-medium text-white transition-all duration-300">
                     {toast}
                 </div>
             )}
