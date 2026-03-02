@@ -99,26 +99,41 @@ async def handle_log_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     """Handle follow-up text for workout logging."""
     text = update.message.text
     if not text:
+        logger.warning("Received empty text in WAITING_LOG")
         return WAITING_LOG
 
+    logger.info("Received workout text for user %s", update.effective_user.id)
+    # Send immediate feedback to avoid silence
+    processing_msg = await update.message.reply_text("⏳ _Processing your workout log\\._", parse_mode=ParseMode.MARKDOWN_V2)
+
     await _process_and_store_log(update, context, text)
+
+    # Cleanup the processing message if processing finished
+    try:
+        await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=processing_msg.message_id)
+    except Exception:
+        pass
+
     return ConversationHandler.END
 
 
 async def _process_and_store_log(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str) -> None:
     """Core logic to parse, store and respond to a log."""
+    logger.info("Starting log processing for text: %s...", text[:50])
     try:
         async with async_session() as session:
             workout = await log_workout(session, text)
 
             if workout is None:
+                logger.warning("Log parser returned None for text")
                 await update.message.reply_text(
-                    "❌ Could not parse workout\\. Check format\\.",
+                    "❌ Could not parse workout\\. Check format\\ (Exercise Name WEIGHTxREPSxSETS)\\.",
                     parse_mode=ParseMode.MARKDOWN_V2,
                 )
                 return
 
             exercises_count = len(workout.exercises) if workout.exercises else 0
+            logger.info("Workout %d created with %d exercises", workout.id, exercises_count)
             confirmation = format_log_confirmation(workout.id, exercises_count)
 
             # Update progression for anchors
@@ -128,6 +143,7 @@ async def _process_and_store_log(update: Update, context: ContextTypes.DEFAULT_T
             # Store workout_id for /done
             if context.user_data is not None:
                 context.user_data["last_workout_id"] = workout.id
+                logger.info("Stored last_workout_id %d in user_data", workout.id)
 
             await update.message.reply_text(confirmation, parse_mode=ParseMode.MARKDOWN_V2)
 
