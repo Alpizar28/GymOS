@@ -9,12 +9,14 @@ services:
       - DATABASE_URL=sqlite+aiosqlite:////app/data/gym.db
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - WEBHOOK_URL=${WEBHOOK_URL} # e.g. https://api.gymos.com
-      - WEB_URL=${WEB_URL} # e.g. https://gymos.com
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - WEB_URL=${WEB_URL}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - PORT=8000
     volumes:
-      - gym-data:/app/data # Persistent SQLite
+      - gym-data:/app/data
+    expose:
+      - "8000" # Tells Traefik which port to proxy
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1" ]
       interval: 15s
@@ -32,7 +34,9 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - BACKEND_URL=http://backend:8000 # Internal Docker network
+      - BACKEND_URL=http://backend:8000
+    expose:
+      - "3000" # Tells Traefik which port to proxy
     depends_on:
       backend:
         condition: service_healthy
@@ -45,4 +49,4 @@ networks:
 
 volumes:
   gym-data:
-    driver: local # Data survives container restarts and redeployments
+    driver: local
