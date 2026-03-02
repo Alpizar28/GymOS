@@ -132,7 +132,15 @@ async def _process_and_store_log(update: Update, context: ContextTypes.DEFAULT_T
                 )
                 return
 
-            exercises_count = len(workout.exercises) if workout.exercises else 0
+            from sqlalchemy import select, func
+            from src.models.workouts import WorkoutExercise
+
+            # Avoid lazy-loading workout.exercises (async error)
+            res = await session.execute(
+                select(func.count()).select_from(WorkoutExercise).where(WorkoutExercise.workout_id == workout.id)
+            )
+            exercises_count = res.scalar() or 0
+
             logger.info("Workout %d created with %d exercises", workout.id, exercises_count)
             confirmation = format_log_confirmation(workout.id, exercises_count)
 
