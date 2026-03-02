@@ -5,9 +5,20 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "GymOS — Training System",
   description: "Personal gym training dashboard with progression tracking and plan generation",
+  viewport: "width=device-width, initial-scale=1, viewport-fit=cover",
 };
 
-const navLinks = [
+// Bottom tab bar (mobile) — 5 most-used items
+const bottomTabs = [
+  { href: "/today", label: "Today", icon: "🏋️" },
+  { href: "/week", label: "Week", icon: "📅" },
+  { href: "/", label: "Home", icon: "📊" },
+  { href: "/progress", label: "Progress", icon: "📈" },
+  { href: "/settings", label: "Settings", icon: "⚙️" },
+];
+
+// Top nav (desktop only)
+const topNavLinks = [
   { href: "/today", label: "Today", icon: "🏋️" },
   { href: "/week", label: "Week", icon: "📅" },
   { href: "/", label: "Dashboard", icon: "📊" },
@@ -31,16 +42,20 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
           rel="stylesheet"
         />
+        {/* Prevent double-tap zoom on buttons/inputs */}
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className="font-[Inter] antialiased bg-zinc-950 text-zinc-100 min-h-screen">
-        {/* Navigation */}
-        <nav className="fixed top-0 left-0 right-0 z-50 bg-zinc-950/85 backdrop-blur-xl border-b border-zinc-800/60">
+        {/* ── Desktop top nav (hidden on mobile) ── */}
+        <nav className="hidden sm:block fixed top-0 left-0 right-0 z-50 bg-zinc-950/85 backdrop-blur-xl border-b border-zinc-800/60">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center h-16 gap-6">
             <span className="text-xl font-bold bg-gradient-to-r from-violet-500 to-indigo-400 bg-clip-text text-transparent">
               🏋️ GymOS
             </span>
             <ul className="flex gap-1">
-              {navLinks.map((link) => (
+              {topNavLinks.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
@@ -55,10 +70,28 @@ export default function RootLayout({
           </div>
         </nav>
 
-        {/* Main content */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-24 pb-12">
+        {/* ── Main content ── */}
+        {/* mobile: pt-4 pb-24 (space for bottom nav); desktop: pt-24 pb-12 */}
+        <main className="max-w-2xl sm:max-w-7xl mx-auto px-4 sm:px-6 pt-4 sm:pt-24 pb-28 sm:pb-12">
           {children}
         </main>
+
+        {/* ── Mobile bottom tab bar (hidden on desktop) ── */}
+        <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-800/60"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+          <div className="flex">
+            {bottomTabs.map((tab) => (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                className="flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-zinc-500 active:text-violet-400 touch-manipulation"
+              >
+                <span className="text-2xl leading-none">{tab.icon}</span>
+                <span className="text-[10px] font-semibold tracking-wide">{tab.label}</span>
+              </Link>
+            ))}
+          </div>
+        </nav>
       </body>
     </html>
   );
