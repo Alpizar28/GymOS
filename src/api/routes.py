@@ -351,7 +351,77 @@ async def log_today_workout(payload: TodayLogRequest) -> dict:
                 s.completed = set_entry.completed
 
         await session.commit()
-        return {"workout_id": workout.id, "created": created}
+
+        # ── PR Detection ──────────────────────────────────────────
+        prs: list[dict] = []
+        for ex_entry in payload.exercises:
+            ex_result2 = await session.execute(
+                select(Exercise).where(Exercise.name_canonical.ilike(ex_entry.name)).limit(1)
+            )
+            exercise2 = ex_result2.scalar_one_or_none()
+            if not exercise2:
+                continue
+
+            stats_result = await session.execute(
+                select(ExerciseStats).where(ExerciseStats.exercise_id == exercise2.id)
+            )
+            stats = stats_result.scalar_one_or_none()
+            hist_max_weight = stats.max_weight if stats else 0
+            hist_max_e1rm = stats.max_weight * (1 + (stats.avg_reps or 5) / 30) if stats and stats.max_weight else 0
+
+            for s in ex_entry.sets:
+                if not s.actual_weight or not s.actual_reps:
+                    continue
+                e1rm = round(s.actual_weight * (1 + s.actual_reps / 30), 1)
+
+                if s.actual_weight > (hist_max_weight or 0):
+                    prs.append({"exercise": ex_entry.name, "type": "weight", "value": s.actual_weight})
+                    break
+                if e1rm > (hist_max_e1rm or 0):
+                    prs.append({"exercise": ex_entry.name, "type": "e1rm", "value": e1rm})
+                    break
+
+        return {"workout_id": workout.id, "created": created, "prs": prs}
+
+
+@router.get("/exercises/{exercise_name}/last-session")
+async def get_last_exercise_session(exercise_name: str) -> list[dict]:
+    """Return the sets from the most recent workout session that included this exercise."""
+    async with async_session() as session:
+        ex_result = await session.execute(
+            select(Exercise).where(Exercise.name_canonical.ilike(exercise_name)).limit(1)
+        )
+        exercise = ex_result.scalar_one_or_none()
+        if not exercise:
+            return []
+
+        # Most recent WorkoutExercise for this exercise
+        we_result = await session.execute(
+            select(WorkoutExercise)
+            .join(Workout, WorkoutExercise.workout_id == Workout.id)
+            .where(WorkoutExercise.exercise_id == exercise.id)
+            .order_by(desc(Workout.date), desc(WorkoutExercise.id))
+            .limit(1)
+        )
+        we = we_result.scalar_one_or_none()
+        if not we:
+            return []
+
+        sets_result = await session.execute(
+            select(WorkoutSet)
+            .where(WorkoutSet.workout_exercise_id == we.id)
+            .order_by(WorkoutSet.id)
+        )
+        return [
+            {
+                "weight": s.actual_weight or s.weight,
+                "reps": s.actual_reps or s.reps,
+                "rir": s.actual_rir or s.rir,
+                "set_type": s.set_type,
+            }
+            for s in sets_result.scalars().all()
+            if (s.actual_weight or s.weight)  # skip empty sets
+        ]
 
 
 # --- Exercises / Library ---

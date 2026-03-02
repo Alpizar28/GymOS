@@ -121,7 +121,7 @@ export const api = {
     getWeeklyStats: () => fetchApi<WeeklyStats>("/stats/weekly"),
     getTodayPlan: () => fetchApi<TodayPlan>("/today"),
     logToday: (payload: TodayLogPayload) =>
-        fetchApi<{ workout_id: number; created: boolean }>("/today/log", {
+        fetchApi<{ workout_id: number; created: boolean; prs: PrRecord[] }>("/today/log", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
@@ -136,6 +136,8 @@ export const api = {
     generateWeek: () => fetchApi<WeekDay[]>("/week/generate", { method: "POST" }),
     getAlternatives: (exerciseName: string) =>
         fetchApi<AlternativeExercise[]>(`/exercises/${encodeURIComponent(exerciseName)}/alternatives`),
+    getLastSession: (exerciseName: string) =>
+        fetchApi<LastSessionSet[]>(`/exercises/${encodeURIComponent(exerciseName)}/last-session`),
     getProtections: () => fetchApi<ProtectionRule[]>("/protection"),
     addProtection: (muscle_group: string, severity: number) =>
         fetchApi<ProtectionRule>("/protection", {
@@ -148,6 +150,23 @@ export const api = {
             method: "DELETE",
         }),
 };
+
+// --- PR Record Type ---
+
+export interface PrRecord {
+    exercise: string;
+    type: "weight" | "e1rm";
+    value: number;
+}
+
+// --- Last Session Types ---
+
+export interface LastSessionSet {
+    weight: number | null;
+    reps: number | null;
+    rir: number | null;
+    set_type: string;
+}
 
 // --- Week Types ---
 
