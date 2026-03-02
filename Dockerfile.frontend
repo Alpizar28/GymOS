@@ -1,16 +1,18 @@
-# Frontend Dockerfile (Next.js)
+# Frontend Dockerfile (Next.js) — multi-stage build
 FROM node:20-slim AS builder
 
 WORKDIR /app
+
+# Accept BACKEND_URL at build time so next.config.ts rewrites are evaluated correctly
+ARG BACKEND_URL=http://backend:8000
+ENV BACKEND_URL=${BACKEND_URL}
 
 # Install dependencies
 COPY web/package*.json ./
 RUN npm install
 
-# Copy source and build
+# Copy source and build with BACKEND_URL baked in
 COPY web/ ./
-# We pass the backend URL at build time if needed, 
-# but for Coolify/Docker internal networking, we can use the service name in rewrites.
 RUN npm run build
 
 FROM node:20-slim AS runner
