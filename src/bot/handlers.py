@@ -416,7 +416,6 @@ def register_handlers(app: Application) -> None:
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("today", cmd_today))
     app.add_handler(CommandHandler("week", cmd_week))
-    app.add_handler(CommandHandler("log", cmd_log))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("swap", cmd_swap))
     app.add_handler(CommandHandler("pain", cmd_pain))
