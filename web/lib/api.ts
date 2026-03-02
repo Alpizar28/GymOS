@@ -119,4 +119,55 @@ export const api = {
     getExercises: () => fetchApi<ExerciseItem[]>("/exercises"),
     getProgress: () => fetchApi<AnchorProgress[]>("/progress"),
     getWeeklyStats: () => fetchApi<WeeklyStats>("/stats/weekly"),
+    getTodayPlan: () => fetchApi<TodayPlan>("/today"),
+    logToday: (payload: TodayLogPayload) =>
+        fetchApi<{ workout_id: number; created: boolean }>("/today/log", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        }),
 };
+
+// --- Today Logger Types ---
+
+export interface TodayPlan {
+    plan_id: number;
+    day_name: string;
+    estimated_duration_min: number | null;
+    total_sets: number | null;
+    exercises: TodayExercise[];
+}
+
+export interface TodayExercise {
+    name: string;
+    is_anchor: boolean;
+    notes: string;
+    sets: TodaySet[];
+}
+
+export interface TodaySet {
+    index: number;
+    set_type: string; // "warmup" | "normal" | "drop"
+    weight_lbs: number | null;
+    target_reps: number | null;
+    rir_target: number | null;
+    rest_seconds: number | null;
+}
+
+export interface SetLogEntry {
+    index: number;
+    actual_weight: number | null;
+    actual_reps: number | null;
+    actual_rir: number | null;
+    completed: boolean;
+}
+
+export interface ExerciseLogEntry {
+    name: string;
+    sets: SetLogEntry[];
+}
+
+export interface TodayLogPayload {
+    day_name: string;
+    exercises: ExerciseLogEntry[];
+}

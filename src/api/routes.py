@@ -216,6 +216,144 @@ async def get_workout(workout_id: int) -> WorkoutDetail:
         )
 
 
+# --- Today's Workout Logger ---
+
+
+class SetLogEntry(BaseModel):
+    index: int
+    actual_weight: float | None = None
+    actual_reps: int | None = None
+    actual_rir: int | None = None
+    completed: bool = False
+
+
+class ExerciseLogEntry(BaseModel):
+    name: str
+    sets: list[SetLogEntry]
+
+
+class TodayLogRequest(BaseModel):
+    day_name: str
+    exercises: list[ExerciseLogEntry]
+
+
+@router.get("/today")
+async def get_today_plan() -> dict:
+    """Return today's latest generated plan for the interactive logger UI."""
+    async with async_session() as session:
+        plan_result = await session.execute(
+            select(PlanDay).order_by(desc(PlanDay.id)).limit(1)
+        )
+        plan_day = plan_result.scalar_one_or_none()
+        if not plan_day:
+            raise HTTPException(
+                status_code=404,
+                detail="No plan generated yet. Use /today in Telegram or 'Generate Today' on Dashboard.",
+            )
+
+        content = json.loads(plan_day.content_json)
+        return {
+            "plan_id": plan_day.id,
+            "day_name": content.get("day_name", ""),
+            "estimated_duration_min": content.get("estimated_duration_min"),
+            "total_sets": content.get("total_sets"),
+            "exercises": [
+                {
+                    "name": ex["name"],
+                    "is_anchor": ex.get("is_anchor", False),
+                    "notes": ex.get("notes", ""),
+                    "sets": [
+                        {
+                            "index": si,
+                            "set_type": s.get("set_type", "normal"),
+                            "weight_lbs": s.get("weight_lbs"),
+                            "target_reps": s.get("target_reps"),
+                            "rir_target": s.get("rir_target"),
+                            "rest_seconds": s.get("rest_seconds"),
+                        }
+                        for si, s in enumerate(ex.get("sets", []))
+                    ],
+                }
+                for ex in content.get("exercises", [])
+            ],
+        }
+
+
+@router.post("/today/log")
+async def log_today_workout(payload: TodayLogRequest) -> dict:
+    """
+    Idempotently save/update today's workout log from the web UI.
+    Creates a new Workout for today or updates the existing one.
+    """
+    today = date.today()
+    async with async_session() as session:
+        existing = await session.execute(
+            select(Workout)
+            .where(Workout.date == today)
+            .where(Workout.template_day_name == payload.day_name)
+            .limit(1)
+        )
+        workout = existing.scalar_one_or_none()
+        created = workout is None
+
+        if created:
+            workout = Workout(date=today, template_day_name=payload.day_name)
+            session.add(workout)
+            await session.flush()
+
+        for ex_entry in payload.exercises:
+            ex_result = await session.execute(
+                select(Exercise).where(
+                    Exercise.name_canonical.ilike(ex_entry.name)
+                ).limit(1)
+            )
+            exercise = ex_result.scalar_one_or_none()
+            if not exercise:
+                continue
+
+            we_result = await session.execute(
+                select(WorkoutExercise)
+                .where(WorkoutExercise.workout_id == workout.id)
+                .where(WorkoutExercise.exercise_id == exercise.id)
+            )
+            we = we_result.scalar_one_or_none()
+            if not we:
+                we = WorkoutExercise(
+                    workout_id=workout.id, exercise_id=exercise.id, order_index=0
+                )
+                session.add(we)
+                await session.flush()
+
+            existing_sets_result = await session.execute(
+                select(WorkoutSet)
+                .where(WorkoutSet.workout_exercise_id == we.id)
+                .order_by(WorkoutSet.id)
+            )
+            existing_sets = existing_sets_result.scalars().all()
+
+            for set_entry in ex_entry.sets:
+                idx = set_entry.index
+                if idx < len(existing_sets):
+                    s = existing_sets[idx]
+                else:
+                    s = WorkoutSet(workout_exercise_id=we.id, set_type="normal")
+                    session.add(s)
+
+                if set_entry.actual_weight is not None:
+                    s.actual_weight = set_entry.actual_weight
+                    s.weight = set_entry.actual_weight
+                if set_entry.actual_reps is not None:
+                    s.actual_reps = set_entry.actual_reps
+                    s.reps = set_entry.actual_reps
+                if set_entry.actual_rir is not None:
+                    s.actual_rir = set_entry.actual_rir
+                    s.rir = set_entry.actual_rir
+                s.completed = set_entry.completed
+
+        await session.commit()
+        return {"workout_id": workout.id, "created": created}
+
+
 # --- Exercises / Library ---
 
 

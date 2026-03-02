@@ -60,10 +60,22 @@ class WorkoutSet(Base):
     set_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default="normal"
     )  # normal/warmup/drop
-    weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # --- Planned values (from plan generator, copied at log time) ---
+    weight: Mapped[float | None] = mapped_column(Float, nullable=True)  # kept for bot compat
     reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    rir: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Reps In Reserve
-    seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)  # for timed exercises
+    rir: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    planned_weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    planned_reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    planned_rir: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # --- Actual logged values (filled by web UI or bot /done) ---
+    actual_weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    actual_reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    actual_rir: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    completed: Mapped[bool] = mapped_column(Integer, nullable=False, default=False)
 
     workout_exercise: Mapped["WorkoutExercise"] = relationship(
         "WorkoutExercise", back_populates="sets"

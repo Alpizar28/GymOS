@@ -238,6 +238,15 @@ async def update_anchor_after_workout(
             top_set_rir=top_set.rir,
             recent_rep_counts=recent_rep_counts,
         )
+
+        # NO_DATA means no RIR was logged — skip silently, don't update target
+        if progression.action == ProgressionAction.NO_DATA:
+            logger.debug(
+                "Skipping progression for %s: no RIR data in this set",
+                exercise.name_canonical,
+            )
+            continue
+
         results.append(progression)
 
         # Apply progression to target
