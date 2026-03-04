@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 // Bottom tab bar (mobile) — 5 most-used items
 const bottomTabs = [
   { href: "/today", label: "Today", icon: "🏋️" },
-  { href: "/week", label: "Week", icon: "📅" },
+  { href: "/calendar", label: "Calendar", icon: "🗓️" },
   { href: "/", label: "Home", icon: "📊" },
   { href: "/progress", label: "Progress", icon: "📈" },
   { href: "/settings", label: "Settings", icon: "⚙️" },
@@ -21,6 +21,7 @@ const bottomTabs = [
 const topNavLinks = [
   { href: "/today", label: "Today", icon: "🏋️" },
   { href: "/week", label: "Week", icon: "📅" },
+  { href: "/calendar", label: "Calendar", icon: "🗓️" },
   { href: "/", label: "Dashboard", icon: "📊" },
   { href: "/workouts", label: "Workouts", icon: "📝" },
   { href: "/progress", label: "Progress", icon: "📈" },

@@ -45,6 +45,7 @@ def build_generate_day_prompt(
     exercise_subset: list[dict],
     constraints: dict,
     fatigue_score: float,
+    progression_hints: list[dict],
 ) -> str:
     """Build the user prompt for GenerateDayPlan."""
     import json
@@ -64,6 +65,9 @@ def build_generate_day_prompt(
 ## Available Exercises (pick from these ONLY)
 {json.dumps(exercise_subset, indent=2)}
 
+## Progression Hints (use when selecting weights/reps/sets)
+{json.dumps(progression_hints, indent=2)}
+
 ## Constraints
 - Session duration: {constraints.get('typical_duration_minutes', '60-90')} min
 - Volume window: {constraints.get('optimal_session_volume_window_lbs', '14000-23000')} lbs
@@ -74,7 +78,8 @@ def build_generate_day_prompt(
 2. Add 3-5 accessory exercises matching the day's focus
 3. Keep total volume within the safe window
 4. If fatigue > 7, reduce total sets by 20%
-5. Include 1-2 warmup sets for compound anchors"""
+5. Include 1-2 warmup sets for compound anchors
+6. Apply progression hints where available (increase weight/reps/sets if suggested)"""
 
 
 VALIDATE_PLAN_SYSTEM = """You are a training plan validator.

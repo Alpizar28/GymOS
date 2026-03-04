@@ -5,8 +5,9 @@ import re
 from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException
+from fastapi import Query
 from pydantic import BaseModel
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 
 from src.database import async_session
 from src.models.exercises import Exercise, ExerciseStats
@@ -17,6 +18,7 @@ from src.models.workouts import Workout, WorkoutExercise, WorkoutSet
 from src.services.plan_generator import generate_day_plan
 from src.services.recommendation_service import suggest_day
 from src.services.stats_service import get_anchor_progress, get_weekly_summary
+from src.services.workout_logger import log_manual_workout
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -57,6 +59,26 @@ class DayOptionCreate(BaseModel):
     name: str | None = None
     focus: str
     rules: dict
+
+
+class ManualSet(BaseModel):
+    weight: float | None = None
+    reps: int | None = None
+    rir: int | None = None
+    set_type: str | None = None
+
+
+class ManualExercise(BaseModel):
+    name: str
+    sets: list[ManualSet]
+
+
+class ManualWorkoutRequest(BaseModel):
+    date: str
+    day_name: str | None = None
+    notes: str | None = None
+    text: str | None = None
+    exercises: list[ManualExercise] | None = None
 
 
 class ExerciseResponse(BaseModel):
@@ -632,6 +654,87 @@ async def get_day_recommendation() -> DayRecommendationResponse:
     async with async_session() as session:
         rec = await suggest_day(session)
         return DayRecommendationResponse(**rec)
+
+
+@router.get("/calendar")
+async def get_calendar(
+    from_date: str = Query(..., alias="from"),
+    to_date: str = Query(..., alias="to"),
+) -> list[dict]:
+    """Get workouts grouped by day within a date range."""
+    start = date.fromisoformat(from_date)
+    end = date.fromisoformat(to_date)
+    if end < start:
+        raise HTTPException(status_code=400, detail="Invalid date range")
+
+    async with async_session() as session:
+        result = await session.execute(
+            select(
+                Workout.id,
+                Workout.date,
+                Workout.template_day_name,
+                Workout.duration_min,
+                func.count(WorkoutSet.id).label("set_count"),
+                func.sum(
+                    func.coalesce(WorkoutSet.actual_weight, WorkoutSet.weight)
+                    * func.coalesce(WorkoutSet.actual_reps, WorkoutSet.reps)
+                ).label("volume"),
+            )
+            .join(WorkoutExercise, WorkoutExercise.workout_id == Workout.id)
+            .join(WorkoutSet, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
+            .where(Workout.date >= start, Workout.date <= end)
+            .where(WorkoutSet.set_type == "normal")
+            .group_by(Workout.id)
+            .order_by(Workout.date.desc())
+        )
+
+        workouts_by_date: dict[date, list[dict]] = {}
+        for row in result.all():
+            workouts_by_date.setdefault(row.date, []).append({
+                "id": row.id,
+                "date": row.date.isoformat(),
+                "day_name": row.template_day_name,
+                "duration_min": row.duration_min,
+                "total_sets": int(row.set_count or 0),
+                "total_volume_lbs": float(row.volume or 0),
+            })
+
+        days = []
+        current = start
+        while current <= end:
+            days.append({
+                "date": current.isoformat(),
+                "workouts": workouts_by_date.get(current, []),
+            })
+            current += timedelta(days=1)
+
+        return days
+
+
+@router.post("/workouts/manual")
+async def create_manual_workout(payload: ManualWorkoutRequest) -> dict:
+    """Create a workout on a specific date (backfill)."""
+    if not payload.text and not payload.exercises:
+        raise HTTPException(status_code=400, detail="Provide text or exercises")
+
+    try:
+        workout_date = date.fromisoformat(payload.date)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid date") from exc
+
+    async with async_session() as session:
+        workout = await log_manual_workout(
+            session=session,
+            workout_date=workout_date,
+            template_day_name=payload.day_name,
+            notes=payload.notes,
+            text=payload.text,
+            exercises=[e.dict() for e in payload.exercises] if payload.exercises else None,
+        )
+        if workout is None:
+            raise HTTPException(status_code=400, detail="Unable to parse workout")
+        await session.commit()
+        return {"workout_id": workout.id}
 
 
 # ─── Complete Session (advance day + fatigue) ─────────────────────────────────

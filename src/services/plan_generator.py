@@ -18,6 +18,7 @@ from src.models.exercises import Exercise, ExerciseStats
 from src.models.plans import Plan, PlanDay
 from src.models.progression import AnchorTarget
 from src.models.settings import AthleteState, Setting, WeekTemplate
+from src.services.progression_hint_service import build_progression_hints
 from src.services.recommendation_service import suggest_day
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ async def get_exercises_for_day(
     exercises = []
     for exercise, stats in result.all():
         exercises.append({
+            "id": exercise.id,
             "name": exercise.name_canonical,
             "primary_muscle": exercise.primary_muscle,
             "type": exercise.type,
@@ -162,6 +164,14 @@ async def generate_day_plan(
     anchor_targets = await get_anchor_targets_for_day(session, day_rules)
     exercise_subset = await get_exercises_for_day(session, day_rules)
     constraints = await get_constraints(session)
+    progression_hints = await build_progression_hints(
+        session,
+        [e["id"] for e in exercise_subset if e.get("id")],
+    )
+    exercise_subset = [
+        {k: v for k, v in ex.items() if k != "id"}
+        for ex in exercise_subset
+    ]
 
     # Flatten constraints for prompt
     flat_constraints = {}
@@ -180,6 +190,7 @@ async def generate_day_plan(
         exercise_subset=exercise_subset,
         constraints=flat_constraints,
         fatigue_score=fatigue,
+        progression_hints=progression_hints,
     )
 
     # Call LLM

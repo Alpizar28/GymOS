@@ -70,6 +70,40 @@ export interface DayOptionCreate {
     rules: Record<string, unknown>;
 }
 
+export interface CalendarWorkoutSummary {
+    id: number;
+    date: string;
+    day_name: string | null;
+    duration_min: number | null;
+    total_sets: number;
+    total_volume_lbs: number;
+}
+
+export interface CalendarDay {
+    date: string;
+    workouts: CalendarWorkoutSummary[];
+}
+
+export interface ManualSet {
+    weight: number | null;
+    reps: number | null;
+    rir: number | null;
+    set_type?: string | null;
+}
+
+export interface ManualExercise {
+    name: string;
+    sets: ManualSet[];
+}
+
+export interface ManualWorkoutPayload {
+    date: string;
+    day_name?: string | null;
+    notes?: string | null;
+    text?: string | null;
+    exercises?: ManualExercise[] | null;
+}
+
 export interface WorkoutSummary {
     id: number;
     date: string;
@@ -141,6 +175,14 @@ export const api = {
     getDayRecommendation: () => fetchApi<DayRecommendation>("/day-recommendation"),
     createDayOption: (payload: DayOptionCreate) =>
         fetchApi<DayOption>("/day-options", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        }),
+    getCalendar: (from: string, to: string) =>
+        fetchApi<CalendarDay[]>(`/calendar?from=${from}&to=${to}`),
+    createManualWorkout: (payload: ManualWorkoutPayload) =>
+        fetchApi<{ workout_id: number }>("/workouts/manual", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),

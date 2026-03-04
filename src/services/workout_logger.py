@@ -184,6 +184,100 @@ async def log_workout(
     return workout
 
 
+async def log_manual_workout(
+    session: AsyncSession,
+    workout_date: date,
+    template_day_name: str | None,
+    notes: str | None,
+    text: str | None = None,
+    exercises: list[dict] | None = None,
+) -> Workout | None:
+    """Create a workout from free text or structured exercise data."""
+    workout = Workout(
+        date=workout_date,
+        template_day_name=template_day_name,
+        notes=notes,
+    )
+    session.add(workout)
+    await session.flush()
+
+    exercises_logged = 0
+    unmatched: list[str] = []
+
+    if text:
+        lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
+        for idx, line in enumerate(lines):
+            parsed = parse_exercise_line(line)
+            if parsed is None:
+                unmatched.append(line)
+                continue
+            exercise_name, sets_data = parsed
+            exercise = await find_exercise_by_name(session, exercise_name)
+            if exercise is None:
+                unmatched.append(exercise_name)
+                continue
+
+            we = WorkoutExercise(
+                workout_id=workout.id,
+                exercise_id=exercise.id,
+                order_index=idx,
+            )
+            session.add(we)
+            await session.flush()
+
+            for set_data in sets_data:
+                workout_set = WorkoutSet(
+                    workout_exercise_id=we.id,
+                    set_type=set_data["set_type"],
+                    actual_weight=set_data["weight"],
+                    actual_reps=set_data["reps"],
+                    actual_rir=set_data.get("rir"),
+                    completed=True,
+                )
+                session.add(workout_set)
+
+            exercises_logged += 1
+
+    if exercises:
+        start_index = exercises_logged
+        for offset, entry in enumerate(exercises):
+            exercise = await find_exercise_by_name(session, entry["name"])
+            if exercise is None:
+                unmatched.append(entry["name"])
+                continue
+
+            we = WorkoutExercise(
+                workout_id=workout.id,
+                exercise_id=exercise.id,
+                order_index=start_index + offset,
+            )
+            session.add(we)
+            await session.flush()
+
+            for set_data in entry.get("sets", []):
+                workout_set = WorkoutSet(
+                    workout_exercise_id=we.id,
+                    set_type=set_data.get("set_type", "normal"),
+                    actual_weight=set_data.get("weight"),
+                    actual_reps=set_data.get("reps"),
+                    actual_rir=set_data.get("rir"),
+                    completed=True,
+                )
+                session.add(workout_set)
+
+            exercises_logged += 1
+
+    await session.flush()
+    logger.info(
+        "Manual workout %d: %d exercises, %d unmatched",
+        workout.id,
+        exercises_logged,
+        len(unmatched),
+    )
+
+    return workout
+
+
 async def complete_workout(
     session: AsyncSession,
     workout_id: int,
