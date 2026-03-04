@@ -1,6 +1,7 @@
 """FastAPI REST API for the web dashboard."""
 
 import json
+import re
 from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException
@@ -14,6 +15,7 @@ from src.models.progression import AnchorTarget
 from src.models.settings import AthleteState, WeekTemplate
 from src.models.workouts import Workout, WorkoutExercise, WorkoutSet
 from src.services.plan_generator import generate_day_plan
+from src.services.recommendation_service import suggest_day
 from src.services.stats_service import get_anchor_progress, get_weekly_summary
 
 router = APIRouter(prefix="/api", tags=["api"])
@@ -38,6 +40,23 @@ class DashboardResponse(BaseModel):
     state: AthleteStateResponse
     last_plan: dict | None
     weekly_stats: dict
+    recommendation: dict | None = None
+
+
+class DayRecommendationResponse(BaseModel):
+    day_name: str
+    reason: str
+
+
+class DayOptionResponse(BaseModel):
+    name: str
+    focus: str
+
+
+class DayOptionCreate(BaseModel):
+    name: str | None = None
+    focus: str
+    rules: dict
 
 
 class ExerciseResponse(BaseModel):
@@ -114,6 +133,8 @@ async def get_dashboard() -> DashboardResponse:
         # Weekly stats
         stats = await get_weekly_summary(session)
 
+        recommendation = await suggest_day(session)
+
         return DashboardResponse(
             state=AthleteStateResponse(
                 next_day_index=state.next_day_index if state else 1,
@@ -122,6 +143,7 @@ async def get_dashboard() -> DashboardResponse:
             ),
             last_plan=last_plan,
             weekly_stats=stats,
+            recommendation=recommendation,
         )
 
 
@@ -132,6 +154,20 @@ async def api_generate_today() -> dict:
         plan = await generate_day_plan(session)
         if plan is None:
             raise HTTPException(status_code=500, detail="Failed to generate plan")
+        return plan
+
+
+class GenerateDayRequest(BaseModel):
+    day_name: str
+
+
+@router.post("/generate-day")
+async def api_generate_day(payload: GenerateDayRequest) -> dict:
+    """Generate a plan for a specific day name."""
+    async with async_session() as session:
+        plan = await generate_day_plan(session, day_name=payload.day_name)
+        if plan is None:
+            raise HTTPException(status_code=404, detail="Day template not found")
         return plan
 
 
@@ -248,7 +284,7 @@ async def get_today_plan() -> dict:
         if not plan_day:
             raise HTTPException(
                 status_code=404,
-                detail="No plan generated yet. Use /today in Telegram or 'Generate Today' on Dashboard.",
+                detail="No plan generated yet. Choose a day in /today or generate from the Dashboard.",
             )
 
         content = json.loads(plan_day.content_json)
@@ -524,7 +560,9 @@ async def get_week_template() -> list[dict]:
     """Get the 6-day training split."""
     async with async_session() as session:
         result = await session.execute(
-            select(WeekTemplate).order_by(WeekTemplate.day_index)
+            select(WeekTemplate)
+            .where(WeekTemplate.day_index <= 6)
+            .order_by(WeekTemplate.day_index)
         )
         return [
             {
@@ -535,6 +573,65 @@ async def get_week_template() -> list[dict]:
             }
             for t in result.scalars().all()
         ]
+
+
+@router.get("/day-options")
+async def get_day_options() -> list[DayOptionResponse]:
+    """Get all available day templates for manual selection."""
+    async with async_session() as session:
+        result = await session.execute(select(WeekTemplate).order_by(WeekTemplate.day_index))
+        return [
+            DayOptionResponse(name=t.name, focus=t.focus)
+            for t in result.scalars().all()
+        ]
+
+
+def _normalize_template_name(name: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9_ ]+", "", name.strip())
+    return re.sub(r"\s+", "_", cleaned)
+
+
+@router.post("/day-options")
+async def create_day_option(payload: DayOptionCreate) -> DayOptionResponse:
+    """Create a custom day template."""
+    if not payload.focus.strip():
+        raise HTTPException(status_code=400, detail="Focus is required")
+
+    raw_name = payload.name.strip() if payload.name else payload.focus
+    name = _normalize_template_name(raw_name)
+    if not name:
+        raise HTTPException(status_code=400, detail="Invalid template name")
+
+    rules = payload.rules or {}
+    if not rules.get("required_patterns") and not rules.get("primary_muscles"):
+        raise HTTPException(status_code=400, detail="Provide required_patterns or primary_muscles")
+
+    async with async_session() as session:
+        existing = await session.execute(select(WeekTemplate).where(WeekTemplate.name == name))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail="Template already exists")
+
+        max_index_result = await session.execute(select(WeekTemplate.day_index))
+        max_index = max([idx for (idx,) in max_index_result.all()] or [0])
+
+        template = WeekTemplate(
+            day_index=max_index + 1,
+            name=name,
+            focus=payload.focus.strip(),
+            rules_json=json.dumps(rules),
+        )
+        session.add(template)
+        await session.commit()
+
+    return DayOptionResponse(name=name, focus=payload.focus.strip())
+
+
+@router.get("/day-recommendation")
+async def get_day_recommendation() -> DayRecommendationResponse:
+    """Get the recommended training day based on recent history."""
+    async with async_session() as session:
+        rec = await suggest_day(session)
+        return DayRecommendationResponse(**rec)
 
 
 # ─── Complete Session (advance day + fatigue) ─────────────────────────────────
@@ -593,7 +690,9 @@ async def get_week_plan() -> list[dict]:
     """
     async with async_session() as session:
         templates_result = await session.execute(
-            select(WeekTemplate).order_by(WeekTemplate.day_index)
+            select(WeekTemplate)
+            .where(WeekTemplate.day_index <= 6)
+            .order_by(WeekTemplate.day_index)
         )
         templates = templates_result.scalars().all()
 
@@ -626,7 +725,9 @@ async def generate_week() -> list[dict]:
     """Generate all 6 days of the week plan sequentially."""
     async with async_session() as session:
         templates_result = await session.execute(
-            select(WeekTemplate).order_by(WeekTemplate.day_index)
+            select(WeekTemplate)
+            .where(WeekTemplate.day_index <= 6)
+            .order_by(WeekTemplate.day_index)
         )
         templates = templates_result.scalars().all()
 
@@ -699,4 +800,3 @@ async def remove_protection(muscle_group: str) -> dict:
         if not removed:
             raise HTTPException(status_code=404, detail=f"No active protection for '{muscle_group}'")
         return {"removed": muscle_group}
-

@@ -88,6 +88,98 @@ WEEK_TEMPLATE = [
             "max_sets": 18,
         }),
     },
+    {
+        "day_index": 7,
+        "name": "Pecho_Hombro_Tricep",
+        "focus": "Pecho, hombro y tricep con prioridad en press y deltoides",
+        "rules_json": json.dumps({
+            "anchors": ["Bench Press", "Incline Bench Press", "Machine Shoulder Press"],
+            "required_patterns": ["horizontal_push", "vertical_push"],
+            "optional_patterns": ["lateral_raise"],
+            "primary_muscles": ["chest", "front_delts", "side_delts", "triceps"],
+            "max_exercises": 7,
+            "max_sets": 24,
+        }),
+    },
+    {
+        "day_index": 8,
+        "name": "Espalda_Biceps",
+        "focus": "Espalda y biceps con tirones verticales y horizontales",
+        "rules_json": json.dumps({
+            "anchors": ["Lat Pulldown", "Seated Cable Row", "T Bar Row"],
+            "required_patterns": ["vertical_pull", "horizontal_pull"],
+            "optional_patterns": [],
+            "primary_muscles": ["lats", "upper_back", "biceps", "rear_delts"],
+            "max_exercises": 7,
+            "max_sets": 24,
+        }),
+    },
+    {
+        "day_index": 9,
+        "name": "Cuadriceps",
+        "focus": "Cuadriceps dominante con sentadillas y extensiones",
+        "rules_json": json.dumps({
+            "anchors": ["Squat", "Sled Leg Press", "Hack Squat"],
+            "required_patterns": ["squat"],
+            "optional_patterns": ["unilateral"],
+            "primary_muscles": ["quads"],
+            "max_exercises": 6,
+            "max_sets": 22,
+        }),
+    },
+    {
+        "day_index": 10,
+        "name": "Femorales_Nalga",
+        "focus": "Femorales y gluteos con hinge y curl",
+        "rules_json": json.dumps({
+            "anchors": ["Romanian Deadlift", "Hip Thrust"],
+            "required_patterns": ["hinge"],
+            "optional_patterns": ["unilateral"],
+            "primary_muscles": ["hamstrings", "glutes"],
+            "max_exercises": 6,
+            "max_sets": 22,
+        }),
+    },
+    {
+        "day_index": 11,
+        "name": "Pierna",
+        "focus": "Pierna completa (cuadriceps + femorales)",
+        "rules_json": json.dumps({
+            "anchors": ["Squat", "Sled Leg Press", "Romanian Deadlift"],
+            "required_patterns": ["squat", "hinge"],
+            "optional_patterns": ["unilateral"],
+            "primary_muscles": ["quads", "hamstrings", "glutes", "calves"],
+            "max_exercises": 7,
+            "max_sets": 26,
+        }),
+    },
+    {
+        "day_index": 12,
+        "name": "Brazo",
+        "focus": "Biceps, triceps y hombro con enfasis en deltoides",
+        "rules_json": json.dumps({
+            "anchors": ["Machine Shoulder Press"],
+            "required_patterns": ["lateral_raise", "vertical_push"],
+            "optional_patterns": ["horizontal_pull", "vertical_pull", "horizontal_push"],
+            "primary_muscles": ["biceps", "triceps", "front_delts", "side_delts", "rear_delts"],
+            "max_exercises": 7,
+            "max_sets": 26,
+            "allow_drop_sets": True,
+        }),
+    },
+    {
+        "day_index": 13,
+        "name": "Pecho_Espalda",
+        "focus": "Pecho y espalda balanceado con empujes y jalones",
+        "rules_json": json.dumps({
+            "anchors": ["Bench Press", "Seated Cable Row", "Lat Pulldown"],
+            "required_patterns": ["horizontal_push", "horizontal_pull"],
+            "optional_patterns": ["vertical_pull"],
+            "primary_muscles": ["chest", "lats", "upper_back"],
+            "max_exercises": 7,
+            "max_sets": 24,
+        }),
+    },
 ]
 
 # Default rule profiles by exercise type
@@ -173,13 +265,31 @@ async def import_program_constraints(session: AsyncSession, path: Path) -> int:
 
 
 async def seed_week_template(session: AsyncSession) -> int:
-    """Insert the 6-day training split. Returns number of days inserted."""
+    """Insert training templates. Returns number of days inserted."""
     for day in WEEK_TEMPLATE:
         template = WeekTemplate(**day)
         session.add(template)
     await session.flush()
     logger.info("Seeded %d week template days", len(WEEK_TEMPLATE))
     return len(WEEK_TEMPLATE)
+
+
+async def ensure_week_template(session: AsyncSession) -> int:
+    """Insert missing templates by name. Returns number of days inserted."""
+    result = await session.execute(select(WeekTemplate.name))
+    existing = {name for (name,) in result.all()}
+    inserted = 0
+
+    for day in WEEK_TEMPLATE:
+        if day["name"] in existing:
+            continue
+        session.add(WeekTemplate(**day))
+        inserted += 1
+
+    if inserted:
+        await session.flush()
+        logger.info("Inserted %d missing week templates", inserted)
+    return inserted
 
 
 async def seed_athlete_state(session: AsyncSession) -> None:

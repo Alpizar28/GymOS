@@ -40,6 +40,9 @@ async def init_db() -> None:
     # Auto-seed if DB is empty (first boot in production Docker)
     await _auto_seed_if_empty()
 
+    # Ensure new templates exist in existing DBs
+    await _ensure_templates()
+
 
 async def _auto_seed_if_empty() -> None:
     """
@@ -85,3 +88,12 @@ async def _auto_seed_if_empty() -> None:
         "Auto-seed complete: %s",
         ", ".join(f"{k}={v}" for k, v in results.items()),
     )
+
+
+async def _ensure_templates() -> None:
+    from src.services.import_service import ensure_week_template
+
+    async with async_session() as session:
+        inserted = await ensure_week_template(session)
+        if inserted:
+            await session.commit()

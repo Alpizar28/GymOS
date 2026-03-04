@@ -10,6 +10,9 @@ import {
     type AlternativeExercise,
     type LastSessionSet,
     type PrRecord,
+    type DayOption,
+    type DayRecommendation,
+    type DayOptionCreate,
 } from "@/lib/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -49,6 +52,79 @@ function setColors(type: string) {
 }
 
 function e1rm(w: number, r: number) { return Math.round(w * (1 + r / 30)); }
+
+const DAY_LABELS: Record<string, string> = {
+    Push_Heavy: "Push Heavy",
+    Pull_Heavy: "Pull Heavy",
+    Quads_Heavy: "Quads Heavy",
+    Upper_Complement: "Upper Complement",
+    Arms_Shoulders: "Arms & Shoulders",
+    Posterior_Heavy: "Posterior Heavy",
+    Pecho_Hombro_Tricep: "Pecho, hombro y tricep",
+    Espalda_Biceps: "Espalda y biceps",
+    Cuadriceps: "Cuadriceps",
+    Femorales_Nalga: "Femorales y nalga",
+    Pierna: "Pierna",
+    Brazo: "Brazo (hombro enfasis)",
+    Pecho_Espalda: "Pecho y espalda",
+};
+
+function formatDayName(name: string) {
+    return DAY_LABELS[name] ?? name.replace(/_/g, " ");
+}
+
+const PATTERN_OPTIONS = [
+    "horizontal_push",
+    "vertical_push",
+    "horizontal_pull",
+    "vertical_pull",
+    "squat",
+    "hinge",
+    "unilateral",
+    "lateral_raise",
+    "core",
+    "cardio",
+];
+
+const MUSCLE_OPTIONS = [
+    "chest",
+    "lats",
+    "upper_back",
+    "biceps",
+    "triceps",
+    "front_delts",
+    "side_delts",
+    "rear_delts",
+    "quads",
+    "hamstrings",
+    "glutes",
+    "calves",
+    "core",
+];
+
+function TogglePill({
+    label,
+    active,
+    onClick,
+}: {
+    label: string;
+    active: boolean;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
+                active
+                    ? "bg-violet-600/30 text-violet-200 border-violet-500/40"
+                    : "bg-zinc-800 text-zinc-500 border-zinc-700/60"
+            }`}
+        >
+            {label}
+        </button>
+    );
+}
 
 // ─── Rest Timer ───────────────────────────────────────────────────────────────
 
@@ -150,6 +226,198 @@ function AddExerciseModal({ onAdd, onClose }: { onAdd: (name: string) => void; o
                         className="w-full py-3.5 bg-violet-600 text-white font-bold rounded-xl active:opacity-80 touch-manipulation text-base">
                         ➕ Add to Workout
                     </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function CreateTemplateModal({
+    onCreate,
+    onClose,
+}: {
+    onCreate: (payload: DayOptionCreate) => void;
+    onClose: () => void;
+}) {
+    const [name, setName] = useState("");
+    const [focus, setFocus] = useState("");
+    const [anchors, setAnchors] = useState("");
+    const [requiredPatterns, setRequiredPatterns] = useState<string[]>([]);
+    const [optionalPatterns, setOptionalPatterns] = useState<string[]>([]);
+    const [primaryMuscles, setPrimaryMuscles] = useState<string[]>([]);
+    const [maxExercises, setMaxExercises] = useState(6);
+    const [maxSets, setMaxSets] = useState(20);
+    const [allowDropSets, setAllowDropSets] = useState(false);
+    const [error, setError] = useState("");
+
+    const toggle = (list: string[], value: string, setter: (v: string[]) => void) => {
+        setter(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+    };
+
+    const handleCreate = () => {
+        if (!focus.trim()) {
+            setError("Define un focus para el template.");
+            return;
+        }
+        if (requiredPatterns.length === 0 && primaryMuscles.length === 0) {
+            setError("Selecciona al menos un pattern requerido o musculo principal.");
+            return;
+        }
+        setError("");
+        const payload: DayOptionCreate = {
+            name: name.trim() || undefined,
+            focus: focus.trim(),
+            rules: {
+                anchors: anchors
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+                required_patterns: requiredPatterns,
+                optional_patterns: optionalPatterns,
+                primary_muscles: primaryMuscles,
+                max_exercises: maxExercises,
+                max_sets: maxSets,
+                allow_drop_sets: allowDropSets,
+            },
+        };
+        onCreate(payload);
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm">
+            <div className="bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-gradient-to-r from-zinc-900 to-zinc-950">
+                    <div>
+                        <h3 className="font-semibold text-white">Crear Template</h3>
+                        <p className="text-xs text-zinc-500 mt-1">Define patrones, musculos y limites</p>
+                    </div>
+                    <button onClick={onClose} className="text-zinc-500 text-2xl w-10 h-10 flex items-center justify-center">✕</button>
+                </div>
+                <div className="p-5 space-y-5 overflow-y-auto pb-8">
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+                        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-3">Identidad</p>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-xs text-zinc-500 mb-2">Nombre interno (opcional)</label>
+                                <input
+                                    type="text"
+                                    placeholder="Ej: Espalda_Anchor"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-zinc-500 mb-2">Focus</label>
+                                <input
+                                    type="text"
+                                    placeholder="Ej: Espalda y biceps con enfasis en dorsales"
+                                    value={focus}
+                                    onChange={(e) => setFocus(e.target.value)}
+                                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-zinc-500 mb-2">Anchors (separados por coma)</label>
+                                <input
+                                    type="text"
+                                    placeholder="Bench Press, Lat Pulldown"
+                                    value={anchors}
+                                    onChange={(e) => setAnchors(e.target.value)}
+                                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+                        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-3">Patrones</p>
+                        <div>
+                            <label className="block text-xs text-zinc-500 mb-2">Required patterns</label>
+                            <div className="flex flex-wrap gap-2">
+                                {PATTERN_OPTIONS.map((p) => (
+                                    <TogglePill
+                                        key={p}
+                                        label={p}
+                                        active={requiredPatterns.includes(p)}
+                                        onClick={() => toggle(requiredPatterns, p, setRequiredPatterns)}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                        <div className="mt-4">
+                            <label className="block text-xs text-zinc-500 mb-2">Optional patterns</label>
+                            <div className="flex flex-wrap gap-2">
+                                {PATTERN_OPTIONS.map((p) => (
+                                    <TogglePill
+                                        key={p}
+                                        label={p}
+                                        active={optionalPatterns.includes(p)}
+                                        onClick={() => toggle(optionalPatterns, p, setOptionalPatterns)}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+                        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-3">Musculos</p>
+                        <label className="block text-xs text-zinc-500 mb-2">Primary muscles</label>
+                        <div className="flex flex-wrap gap-2">
+                            {MUSCLE_OPTIONS.map((m) => (
+                                <TogglePill
+                                    key={m}
+                                    label={m}
+                                    active={primaryMuscles.includes(m)}
+                                    onClick={() => toggle(primaryMuscles, m, setPrimaryMuscles)}
+                                />
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+                        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 mb-3">Limites</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs text-zinc-500 mb-2">Max exercises</label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    value={maxExercises}
+                                    onChange={(e) => setMaxExercises(parseInt(e.target.value || "0", 10))}
+                                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-zinc-500 mb-2">Max sets</label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    value={maxSets}
+                                    onChange={(e) => setMaxSets(parseInt(e.target.value || "0", 10))}
+                                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white"
+                                />
+                            </div>
+                        </div>
+                        <label className="flex items-center gap-3 text-sm text-zinc-300 mt-4">
+                            <input
+                                type="checkbox"
+                                checked={allowDropSets}
+                                onChange={(e) => setAllowDropSets(e.target.checked)}
+                                className="accent-violet-500"
+                            />
+                            Permitir drop sets
+                        </label>
+                    </div>
+                    <button
+                        onClick={handleCreate}
+                        className="w-full py-3.5 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-bold rounded-xl active:opacity-80 touch-manipulation text-base"
+                    >
+                        Crear template
+                    </button>
+                    {error && (
+                        <p className="text-xs text-amber-400 mt-3">⚠️ {error}</p>
+                    )}
                 </div>
             </div>
         </div>
@@ -408,6 +676,11 @@ export default function TodayPage() {
     const [exercises, setExercises] = useState<ExerciseState[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [dayOptions, setDayOptions] = useState<DayOption[]>([]);
+    const [recommendation, setRecommendation] = useState<DayRecommendation | null>(null);
+    const [selectedDay, setSelectedDay] = useState("");
+    const [generating, setGenerating] = useState(false);
+    const [creatingTemplate, setCreatingTemplate] = useState(false);
     const [saving, setSaving] = useState(false);
     const [savedId, setSavedId] = useState<number | null>(null);
     const [toast, setToast] = useState("");
@@ -423,19 +696,99 @@ export default function TodayPage() {
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
-    useEffect(() => {
-        api.getTodayPlan()
-            .then((data) => {
-                setPlan(data);
-                setExercises(data.exercises.map((ex) => ({
-                    name: ex.name, is_anchor: ex.is_anchor, notes: ex.notes,
-                    plannedSets: ex.sets, sets: initSets(ex.sets),
-                    open: false, lastSession: null,
-                })));
-            })
-            .catch((e) => setError(e.message))
-            .finally(() => setLoading(false));
+    const applyPlan = useCallback((data: TodayPlan) => {
+        setPlan(data);
+        setExercises(data.exercises.map((ex) => ({
+            name: ex.name, is_anchor: ex.is_anchor, notes: ex.notes,
+            plannedSets: ex.sets, sets: initSets(ex.sets),
+            open: false, lastSession: null,
+        })));
     }, []);
+
+    const loadDayMeta = useCallback(async () => {
+        const [options, rec] = await Promise.all([
+            api.getDayOptions(),
+            api.getDayRecommendation(),
+        ]);
+        setDayOptions(options);
+        setRecommendation(rec);
+        const initial = rec?.day_name || options[0]?.name || "";
+        setSelectedDay((prev) => prev || initial);
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function load() {
+            setLoading(true);
+            try {
+                await loadDayMeta();
+                if (cancelled) return;
+            } catch (e: unknown) {
+                if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load options");
+            }
+
+            try {
+                const data = await api.getTodayPlan();
+                if (!cancelled) {
+                    applyPlan(data);
+                    setSelectedDay(data.day_name);
+                }
+            } catch {
+                // No plan generated yet
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        }
+        load();
+        return () => { cancelled = true; };
+    }, [applyPlan, loadDayMeta]);
+
+    const handleGenerate = async () => {
+        if (!selectedDay) return;
+        setGenerating(true);
+        try {
+            const planData = await api.generateDay(selectedDay);
+            setSavedId(null);
+            setCompleted(false);
+            setNextDay(null);
+            applyPlan({
+                plan_id: 0,
+                day_name: planData.day_name,
+                estimated_duration_min: planData.estimated_duration_min,
+                total_sets: planData.total_sets,
+                exercises: planData.exercises.map((ex) => ({
+                    name: ex.name,
+                    is_anchor: ex.is_anchor,
+                    notes: ex.notes || "",
+                    sets: ex.sets.map((s, i) => ({
+                        index: i,
+                        set_type: s.set_type,
+                        weight_lbs: s.weight_lbs,
+                        target_reps: s.target_reps,
+                        rir_target: s.rir_target ?? null,
+                        rest_seconds: s.rest_seconds ?? null,
+                    })),
+                })),
+            });
+            showToast(`⚡ Plan generado: ${formatDayName(planData.day_name)}`);
+        } catch (e: unknown) {
+            showToast(e instanceof Error ? e.message : "Generation failed");
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+    const handleCreateTemplate = async (payload: DayOptionCreate) => {
+        try {
+            const created = await api.createDayOption(payload);
+            await loadDayMeta();
+            setSelectedDay(created.name);
+            setCreatingTemplate(false);
+            showToast(`✅ Template creado: ${formatDayName(created.name)}`);
+        } catch (e: unknown) {
+            showToast(e instanceof Error ? e.message : "Failed to create template");
+        }
+    };
 
     // Lazy-load last session when accordion opens
     const handleToggle = (idx: number) => {
@@ -501,7 +854,8 @@ export default function TodayPage() {
 
     const save = useCallback(async (silent = false) => {
         const payload = buildPayload();
-        if (!payload || payload.exercises.length === 0) { if (!silent) showToast("Complete at least one set first."); return; }
+        if (!payload) { if (!silent) showToast("Genera un plan primero."); return; }
+        if (payload.exercises.length === 0) { if (!silent) showToast("Complete at least one set first."); return; }
         if (!silent) setSaving(true);
         try {
             const res = await api.logToday(payload);
@@ -567,83 +921,173 @@ export default function TodayPage() {
             {showAddExercise && <AddExerciseModal onAdd={addExercise} onClose={() => setShowAddExercise(false)} />}
             {prs.length > 0 && <PrBanner prs={prs} onDismiss={() => { setPrs([]); showToast(`✅ Saved as Workout #${savedId}`); }} />}
             {restTimer !== null && <RestTimer seconds={restTimer} onDismiss={() => setRestTimer(null)} />}
+            {creatingTemplate && (
+                <CreateTemplateModal
+                    onCreate={handleCreateTemplate}
+                    onClose={() => setCreatingTemplate(false)}
+                />
+            )}
 
             {/* Header */}
-            <div className="mb-4">
-                <h1 className="text-2xl font-bold tracking-tight">Today</h1>
-                <p className="text-zinc-500 text-sm mt-0.5">{plan!.day_name.replace(/_/g, " ")} · ~{plan!.estimated_duration_min} min</p>
-            </div>
-
-            {/* Progress bar */}
-            <div className="mb-5">
-                <div className="flex justify-between text-xs text-zinc-500 mb-1.5">
-                    <span>{completedSets}/{totalSets} sets</span>
-                    <span>{totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0}%</span>
-                </div>
-                <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-violet-500 to-emerald-500 rounded-full transition-all duration-500"
-                        style={{ width: `${totalSets > 0 ? (completedSets / totalSets) * 100 : 0}%` }} />
-                </div>
-            </div>
-
-            {/* Action bar */}
-            <div className="flex gap-2 mb-5">
-                <button onClick={() => setShowAddExercise(true)}
-                    className="flex-1 py-3 border border-zinc-700 text-zinc-300 font-semibold rounded-xl active:bg-zinc-800 touch-manipulation text-sm">
-                    ➕ Exercise
-                </button>
-                <button onClick={() => save(false)} disabled={saving || completedSets === 0}
-                    className="flex-1 py-3 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-bold rounded-xl active:opacity-80 disabled:opacity-40 touch-manipulation text-sm">
-                    {saving ? "Saving..." : `💾 Save (${completedSets})`}
-                </button>
-                {savedId !== null && (
-                    <button onClick={() => setShowComplete(true)}
-                        className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-bold rounded-xl active:opacity-80 touch-manipulation text-sm">
-                        ✅ Done
-                    </button>
-                )}
-            </div>
-
-            {/* Exercises */}
-            <div className="space-y-3">
-                {exercises.length === 0 && (
-                    <div className="text-center py-16 text-zinc-600">
-                        <p className="text-lg mb-3">No exercises yet</p>
-                        <button onClick={() => setShowAddExercise(true)} className="px-6 py-3 border border-zinc-700 rounded-xl text-zinc-400 touch-manipulation">➕ Add Exercise</button>
-                    </div>
-                )}
-                {exercises.map((ex, i) => (
-                    <ExerciseAccordion
-                        key={`${ex.name}-${i}`}
-                        state={ex}
-                        onToggle={() => handleToggle(i)}
-                        onSetChange={(si, u) => updateSet(i, si, u)}
-                        onAddSet={() => addSet(i)}
-                        onRemoveSet={(si) => removeSet(i, si)}
-                        onDuplicateSet={(si) => duplicateSet(i, si)}
-                        onRemoveExercise={() => removeExercise(i)}
-                        onSwap={() => setSwapFor(ex.name)}
-                        onSetComplete={(secs) => startRestTimer(secs)}
-                    />
-                ))}
-            </div>
-
-            {/* Summary */}
-            {completedSets > 0 && (
-                <div className="mt-6 p-5 bg-zinc-800/60 border border-zinc-700/50 rounded-2xl">
-                    <h3 className="font-semibold text-zinc-300 mb-4">📊 Summary</h3>
-                    <div className="grid grid-cols-3 gap-3 text-center">
-                        <div><p className="text-3xl font-bold text-white">{completedSets}</p><p className="text-xs text-zinc-500 mt-1">Sets</p></div>
-                        <div><p className="text-3xl font-bold text-white">{exercises.filter((e) => e.sets.some((s) => s.completed)).length}</p><p className="text-xs text-zinc-500 mt-1">Exercises</p></div>
-                        <div>
-                            <p className="text-3xl font-bold text-white">
-                                {completedVolume > 0 ? `${Math.round(completedVolume / 1000 * 10) / 10}k` : "—"}
+            <div className="mb-5 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(139,92,246,0.15),_transparent_60%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(99,102,241,0.15)]">
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">GymOS</p>
+                        <h1 className="text-2xl font-bold tracking-tight">Today</h1>
+                        {plan ? (
+                            <p className="text-zinc-400 text-sm mt-1">
+                                {formatDayName(plan.day_name)} · ~{plan.estimated_duration_min} min
                             </p>
-                            <p className="text-xs text-zinc-500 mt-1">lbs vol</p>
+                        ) : (
+                            <p className="text-zinc-500 text-sm mt-1">Elige que entrenar hoy</p>
+                        )}
+                    </div>
+                    {plan && (
+                        <div className="hidden sm:flex flex-col items-end">
+                            <span className="text-xs text-zinc-500">Sets</span>
+                            <span className="text-xl font-bold text-white">{totalSets}</span>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Day selector */}
+            <div className="mb-6 rounded-2xl border border-zinc-700/50 bg-gradient-to-br from-zinc-900/70 to-zinc-950/80 p-5 shadow-[0_10px_40px_rgba(0,0,0,0.35)]">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                        <p className="text-sm text-zinc-400">Que entrenar hoy</p>
+                        {recommendation?.day_name && (
+                            <p className="text-xs text-zinc-600 mt-1">
+                                Recomendado: <span className="text-zinc-300 font-semibold">{formatDayName(recommendation.day_name)}</span>
+                            </p>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {recommendation?.reason && (
+                            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                {recommendation.reason}
+                            </span>
+                        )}
+                        {recommendation?.day_name && (
+                            <button
+                                onClick={() => setSelectedDay(recommendation.day_name)}
+                                className="text-xs px-2.5 py-1 rounded-full border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500"
+                            >
+                                Usar recomendado
+                            </button>
+                        )}
+                    </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex-1">
+                        <select
+                            value={selectedDay}
+                            onChange={(e) => setSelectedDay(e.target.value)}
+                            className="w-full bg-zinc-900/70 border border-zinc-700 rounded-xl px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        >
+                            <option value="" disabled>Selecciona un dia</option>
+                            {dayOptions.map((opt) => (
+                                <option key={opt.name} value={opt.name}>{formatDayName(opt.name)}</option>
+                            ))}
+                        </select>
+                        {selectedDay && dayOptions.find((o) => o.name === selectedDay)?.focus && (
+                            <p className="text-xs text-zinc-600 mt-2">
+                                {dayOptions.find((o) => o.name === selectedDay)?.focus}
+                            </p>
+                        )}
+                    </div>
+                    <div className="flex flex-col gap-2 sm:w-48">
+                        <button
+                            onClick={handleGenerate}
+                            disabled={!selectedDay || generating}
+                            className="px-5 py-3 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-violet-500/25 hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
+                        >
+                            {generating ? "⏳ Generando..." : plan ? "Regenerar plan" : "Generar plan"}
+                        </button>
+                        <button
+                            onClick={() => setCreatingTemplate(true)}
+                            className="px-5 py-2.5 bg-zinc-900 text-zinc-300 font-semibold rounded-xl border border-zinc-700 hover:bg-zinc-800/60"
+                        >
+                            ➕ Template
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {plan && (
+                <>
+                    {/* Progress bar */}
+                    <div className="mb-5">
+                        <div className="flex justify-between text-xs text-zinc-500 mb-1.5">
+                            <span>{completedSets}/{totalSets} sets</span>
+                            <span>{totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0}%</span>
+                        </div>
+                        <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-violet-500 to-emerald-500 rounded-full transition-all duration-500"
+                                style={{ width: `${totalSets > 0 ? (completedSets / totalSets) * 100 : 0}%` }} />
                         </div>
                     </div>
-                    {savedId && <p className="text-center text-xs text-emerald-400 mt-4">✅ Workout #{savedId}</p>}
-                </div>
+
+                    {/* Action bar */}
+                    <div className="flex gap-2 mb-5">
+                        <button onClick={() => setShowAddExercise(true)}
+                            className="flex-1 py-3 border border-zinc-700 text-zinc-300 font-semibold rounded-xl active:bg-zinc-800 touch-manipulation text-sm">
+                            ➕ Exercise
+                        </button>
+                        <button onClick={() => save(false)} disabled={saving || completedSets === 0}
+                            className="flex-1 py-3 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-bold rounded-xl active:opacity-80 disabled:opacity-40 touch-manipulation text-sm">
+                            {saving ? "Saving..." : `💾 Save (${completedSets})`}
+                        </button>
+                        {savedId !== null && (
+                            <button onClick={() => setShowComplete(true)}
+                                className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-bold rounded-xl active:opacity-80 touch-manipulation text-sm">
+                                ✅ Done
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Exercises */}
+                    <div className="space-y-3">
+                        {exercises.length === 0 && (
+                            <div className="text-center py-16 text-zinc-600">
+                                <p className="text-lg mb-3">No exercises yet</p>
+                                <button onClick={() => setShowAddExercise(true)} className="px-6 py-3 border border-zinc-700 rounded-xl text-zinc-400 touch-manipulation">➕ Add Exercise</button>
+                            </div>
+                        )}
+                        {exercises.map((ex, i) => (
+                            <ExerciseAccordion
+                                key={`${ex.name}-${i}`}
+                                state={ex}
+                                onToggle={() => handleToggle(i)}
+                                onSetChange={(si, u) => updateSet(i, si, u)}
+                                onAddSet={() => addSet(i)}
+                                onRemoveSet={(si) => removeSet(i, si)}
+                                onDuplicateSet={(si) => duplicateSet(i, si)}
+                                onRemoveExercise={() => removeExercise(i)}
+                                onSwap={() => setSwapFor(ex.name)}
+                                onSetComplete={(secs) => startRestTimer(secs)}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Summary */}
+                    {completedSets > 0 && (
+                        <div className="mt-6 p-5 bg-zinc-800/60 border border-zinc-700/50 rounded-2xl">
+                            <h3 className="font-semibold text-zinc-300 mb-4">📊 Summary</h3>
+                            <div className="grid grid-cols-3 gap-3 text-center">
+                                <div><p className="text-3xl font-bold text-white">{completedSets}</p><p className="text-xs text-zinc-500 mt-1">Sets</p></div>
+                                <div><p className="text-3xl font-bold text-white">{exercises.filter((e) => e.sets.some((s) => s.completed)).length}</p><p className="text-xs text-zinc-500 mt-1">Exercises</p></div>
+                                <div>
+                                    <p className="text-3xl font-bold text-white">
+                                        {completedVolume > 0 ? `${Math.round(completedVolume / 1000 * 10) / 10}k` : "—"}
+                                    </p>
+                                    <p className="text-xs text-zinc-500 mt-1">lbs vol</p>
+                                </div>
+                            </div>
+                            {savedId && <p className="text-center text-xs text-emerald-400 mt-4">✅ Workout #{savedId}</p>}
+                        </div>
+                    )}
+                </>
             )}
 
             {toast && (

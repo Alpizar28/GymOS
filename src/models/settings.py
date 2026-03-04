@@ -18,7 +18,7 @@ class Setting(Base):
 
 
 class WeekTemplate(Base):
-    """6-day training split definition."""
+    """Training template definition."""
 
     __tablename__ = "week_template"
 

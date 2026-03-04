@@ -4,7 +4,7 @@ import json
 import logging
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.llm.client import call_llm_json
@@ -18,6 +18,7 @@ from src.models.exercises import Exercise, ExerciseStats
 from src.models.plans import Plan, PlanDay
 from src.models.progression import AnchorTarget
 from src.models.settings import AthleteState, Setting, WeekTemplate
+from src.services.recommendation_service import suggest_day
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +39,16 @@ async def get_exercises_for_day(
     required = set(day_rules.get("required_patterns", []))
     optional = set(day_rules.get("optional_patterns", []))
     all_patterns = required | optional
+    primary_muscles = set(day_rules.get("primary_muscles", []))
+
+    filters = [Exercise.movement_pattern.in_(all_patterns) | Exercise.is_anchor.is_(True)]
+    if primary_muscles:
+        filters.append(Exercise.primary_muscle.in_(primary_muscles))
 
     result = await session.execute(
         select(Exercise, ExerciseStats)
         .outerjoin(ExerciseStats, Exercise.id == ExerciseStats.exercise_id)
-        .where(Exercise.movement_pattern.in_(all_patterns) | Exercise.is_anchor.is_(True))
+        .where(or_(*filters))
     )
 
     exercises = []
@@ -106,6 +112,7 @@ async def get_constraints(session: AsyncSession) -> dict:
 async def generate_day_plan(
     session: AsyncSession,
     day_index: int | None = None,
+    day_name: str | None = None,
 ) -> dict | None:
     """
     Generate a training plan for a specific day.
@@ -118,18 +125,35 @@ async def generate_day_plan(
     6. Store in plan_days
     """
     # Get current state if no explicit day
-    if day_index is None:
-        state_result = await session.execute(select(AthleteState).where(AthleteState.id == 1))
-        state = state_result.scalar_one_or_none()
-        day_index = state.next_day_index if state else 1
-        fatigue = state.fatigue_score if state else 0.0
+    if day_index is None and day_name is None:
+        suggestion = await suggest_day(session)
+        if suggestion.get("day_name"):
+            day_name = suggestion["day_name"]
+            fatigue = 0.0
+        else:
+            state_result = await session.execute(select(AthleteState).where(AthleteState.id == 1))
+            state = state_result.scalar_one_or_none()
+            day_index = state.next_day_index if state else 1
+            fatigue = state.fatigue_score if state else 0.0
     else:
         fatigue = 0.0
 
     # Load template
-    template = await get_day_template(session, day_index)
+    if day_name:
+        template_result = await session.execute(
+            select(WeekTemplate).where(WeekTemplate.name == day_name)
+        )
+        template = template_result.scalar_one_or_none()
+    else:
+        if day_index is None:
+            logger.error("No template index available")
+            return None
+        template = await get_day_template(session, day_index)
     if template is None:
-        logger.error("No template found for day index %d", day_index)
+        if day_name:
+            logger.error("No template found for day name %s", day_name)
+        else:
+            logger.error("No template found for day index %d", day_index)
         return None
 
     day_rules = json.loads(template.rules_json)

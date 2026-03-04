@@ -57,9 +57,30 @@ function PlanExerciseCard({ exercise }: { exercise: PlanExercise }) {
   );
 }
 
+const DAY_LABELS: Record<string, string> = {
+  Push_Heavy: "Push Heavy",
+  Pull_Heavy: "Pull Heavy",
+  Quads_Heavy: "Quads Heavy",
+  Upper_Complement: "Upper Complement",
+  Arms_Shoulders: "Arms & Shoulders",
+  Posterior_Heavy: "Posterior Heavy",
+  Pecho_Hombro_Tricep: "Pecho, hombro y tricep",
+  Espalda_Biceps: "Espalda y biceps",
+  Cuadriceps: "Cuadriceps",
+  Femorales_Nalga: "Femorales y nalga",
+  Pierna: "Pierna",
+  Brazo: "Brazo (hombro enfasis)",
+  Pecho_Espalda: "Pecho y espalda",
+};
+
+function formatDayName(name: string) {
+  return DAY_LABELS[name] ?? name.replace(/_/g, " ");
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [generatingRec, setGeneratingRec] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -77,6 +98,20 @@ export default function DashboardPage() {
       setError(e instanceof Error ? e.message : "Generation failed");
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function handleGenerateRecommended() {
+    if (!data?.recommendation?.day_name) return;
+    setGeneratingRec(true);
+    try {
+      await api.generateDay(data.recommendation.day_name);
+      const fresh = await api.getDashboard();
+      setData(fresh);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Generation failed");
+    } finally {
+      setGeneratingRec(false);
     }
   }
 
@@ -106,16 +141,46 @@ export default function DashboardPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-violet-500/25 hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
-        >
-          {generating ? "⏳ Generating..." : "⚡ Generate Today"}
-        </button>
+      <div className="mb-6 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(16,185,129,0.12)]">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">GymOS</p>
+            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-sm text-zinc-500 mt-1">Tu resumen semanal y plan del dia</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {data.recommendation?.day_name && (
+              <button
+                onClick={handleGenerateRecommended}
+                disabled={generatingRec}
+                className="px-4 py-2.5 bg-emerald-600/20 text-emerald-300 font-semibold rounded-lg border border-emerald-500/30 hover:bg-emerald-600/30 transition-all duration-200 disabled:opacity-50"
+              >
+                {generatingRec
+                  ? "⏳ Generating..."
+                  : `✅ ${formatDayName(data.recommendation.day_name)}`}
+              </button>
+            )}
+            <button
+              onClick={handleGenerate}
+              disabled={generating}
+              className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-violet-500/25 hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
+            >
+              {generating ? "⏳ Generating..." : "⚡ Generate Today"}
+            </button>
+          </div>
+        </div>
       </div>
+
+      {data.recommendation?.day_name && (
+        <div className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+          <p className="text-sm text-emerald-300 font-semibold">
+            Recomendado hoy: {formatDayName(data.recommendation.day_name)}
+          </p>
+          {data.recommendation.reason && (
+            <p className="text-xs text-emerald-200/70 mt-1">{data.recommendation.reason}</p>
+          )}
+        </div>
+      )}
 
       {/* State Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">

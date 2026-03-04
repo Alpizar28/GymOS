@@ -10,6 +10,7 @@ export interface DashboardData {
     state: AthleteState;
     last_plan: PlanData | null;
     weekly_stats: WeeklyStats;
+    recommendation?: DayRecommendation;
 }
 
 export interface WeeklyStats {
@@ -51,6 +52,22 @@ export interface PlanSet {
     target_reps: number;
     rir_target?: number;
     rest_seconds?: number;
+}
+
+export interface DayRecommendation {
+    day_name: string;
+    reason: string;
+}
+
+export interface DayOption {
+    name: string;
+    focus: string;
+}
+
+export interface DayOptionCreate {
+    name?: string;
+    focus: string;
+    rules: Record<string, unknown>;
 }
 
 export interface WorkoutSummary {
@@ -114,6 +131,20 @@ async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
     getDashboard: () => fetchApi<DashboardData>("/dashboard"),
     generateToday: () => fetchApi<PlanData>("/generate-today", { method: "POST" }),
+    generateDay: (day_name: string) =>
+        fetchApi<PlanData>("/generate-day", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ day_name }),
+        }),
+    getDayOptions: () => fetchApi<DayOption[]>("/day-options"),
+    getDayRecommendation: () => fetchApi<DayRecommendation>("/day-recommendation"),
+    createDayOption: (payload: DayOptionCreate) =>
+        fetchApi<DayOption>("/day-options", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        }),
     getWorkouts: (limit = 30) => fetchApi<WorkoutSummary[]>(`/workouts?limit=${limit}`),
     getWorkout: (id: number) => fetchApi<WorkoutDetail>(`/workouts/${id}`),
     getExercises: () => fetchApi<ExerciseItem[]>("/exercises"),
