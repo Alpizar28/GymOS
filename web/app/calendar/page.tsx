@@ -11,6 +11,29 @@ import {
 
 const WEEKDAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+const QUICK_TEMPLATES = [
+  "Pecho_Hombro_Tricep",
+  "Espalda_Biceps",
+  "Pierna",
+  "Brazo",
+  "Pecho_Espalda",
+  "Cuadriceps",
+  "Femorales_Nalga",
+];
+
+function formatDayName(name: string) {
+  const map: Record<string, string> = {
+    Pecho_Hombro_Tricep: "Pecho + Hombro + Tricep",
+    Espalda_Biceps: "Espalda + Biceps",
+    Pierna: "Pierna",
+    Brazo: "Brazo",
+    Pecho_Espalda: "Pecho + Espalda",
+    Cuadriceps: "Cuadriceps",
+    Femorales_Nalga: "Femorales + Nalga",
+  };
+  return map[name] ?? name.replace(/_/g, " ");
+}
+
 function startOfWeek(d: Date) {
   const date = new Date(d);
   const day = (date.getDay() + 6) % 7;
@@ -191,6 +214,17 @@ function ManualWorkoutModal({
         </div>
 
         <div className="p-5 space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {QUICK_TEMPLATES.map((t) => (
+              <button
+                key={t}
+                onClick={() => setDayName(t)}
+                className="px-3 py-2 rounded-full text-xs font-semibold border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500"
+              >
+                {formatDayName(t)}
+              </button>
+            ))}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-zinc-500 mb-2">Dia</label>
@@ -372,6 +406,23 @@ export default function CalendarPage() {
     setSelectedWorkout(detail);
   }
 
+  const weekTotals = useMemo(() => {
+    const totals = days.reduce(
+      (acc, day) => {
+        const daySets = day.workouts.reduce((n, w) => n + (w.total_sets || 0), 0);
+        const dayVolume = day.workouts.reduce((n, w) => n + (w.total_volume_lbs || 0), 0);
+        acc.sets += daySets;
+        acc.volume += dayVolume;
+        acc.sessions += day.workouts.length;
+        acc.dayTotals.push({ sets: daySets, volume: dayVolume });
+        return acc;
+      },
+      { sets: 0, volume: 0, sessions: 0, dayTotals: [] as { sets: number; volume: number }[] }
+    );
+    const maxVolume = Math.max(1, ...totals.dayTotals.map((d) => d.volume));
+    return { ...totals, maxVolume };
+  }, [days]);
+
   return (
     <div className="max-w-2xl mx-auto">
       <WorkoutModal workout={selectedWorkout} onClose={() => setSelectedWorkout(null)} />
@@ -416,6 +467,22 @@ export default function CalendarPage() {
             </button>
           </div>
         </div>
+        <div className="grid grid-cols-3 gap-3 mt-5">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+            <p className="text-xs text-zinc-500">Sesiones</p>
+            <p className="text-xl font-bold text-white">{weekTotals.sessions}</p>
+          </div>
+          <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+            <p className="text-xs text-zinc-500">Sets</p>
+            <p className="text-xl font-bold text-white">{weekTotals.sets}</p>
+          </div>
+          <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+            <p className="text-xs text-zinc-500">Volumen</p>
+            <p className="text-xl font-bold text-white">
+              {Math.round(weekTotals.volume).toLocaleString()}
+            </p>
+          </div>
+        </div>
       </div>
 
       {loading ? (
@@ -424,50 +491,66 @@ export default function CalendarPage() {
           Loading...
         </div>
       ) : (
-        <div className="space-y-3">
-          {days.map((day, i) => (
-            <div key={day.date} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-xs text-zinc-500">{WEEKDAY[i]}</p>
-                  <p className="text-lg font-semibold">{day.date}</p>
+        <div className="grid grid-cols-1 gap-3">
+          {days.map((day, i) => {
+            const dayTotalVolume = day.workouts.reduce((n, w) => n + (w.total_volume_lbs || 0), 0);
+            const dayTotalSets = day.workouts.reduce((n, w) => n + (w.total_sets || 0), 0);
+            const pct = Math.min(100, Math.round((dayTotalVolume / weekTotals.maxVolume) * 100));
+            return (
+              <div key={day.date} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-xs text-zinc-500">{WEEKDAY[i]}</p>
+                    <p className="text-lg font-semibold">{day.date}</p>
+                    <p className="text-xs text-zinc-600">
+                      {dayTotalSets} sets · {Math.round(dayTotalVolume).toLocaleString()} lbs
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedDay(day.date)}
+                    className="px-3 py-2 text-xs rounded-lg border border-zinc-700 text-zinc-400"
+                  >
+                    + Add
+                  </button>
                 </div>
-                <button
-                  onClick={() => setSelectedDay(day.date)}
-                  className="px-3 py-2 text-xs rounded-lg border border-zinc-700 text-zinc-400"
-                >
-                  + Add
-                </button>
-              </div>
-              {day.workouts.length === 0 ? (
-                <p className="text-sm text-zinc-600">No workout logged</p>
-              ) : (
-                <div className="space-y-2">
-                  {day.workouts.map((w) => (
-                    <button
-                      key={w.id}
-                      onClick={() => openWorkout(w.id)}
-                      className="w-full text-left rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-zinc-200">
-                            {w.day_name?.replace(/_/g, " ") || "Workout"}
-                          </p>
-                          <p className="text-xs text-zinc-600">
-                            {w.total_sets} sets · {Math.round(w.total_volume_lbs).toLocaleString()} lbs
-                          </p>
+
+                <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden mb-4">
+                  <div
+                    className="h-full bg-gradient-to-r from-sky-500 to-emerald-400 rounded-full"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+
+                {day.workouts.length === 0 ? (
+                  <p className="text-sm text-zinc-600">No workout logged</p>
+                ) : (
+                  <div className="space-y-2">
+                    {day.workouts.map((w) => (
+                      <button
+                        key={w.id}
+                        onClick={() => openWorkout(w.id)}
+                        className="w-full text-left rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-zinc-200">
+                              {w.day_name?.replace(/_/g, " ") || "Workout"}
+                            </p>
+                            <p className="text-xs text-zinc-600">
+                              {w.total_sets} sets · {Math.round(w.total_volume_lbs).toLocaleString()} lbs
+                            </p>
+                          </div>
+                          {w.duration_min && (
+                            <span className="text-xs text-zinc-500">{w.duration_min} min</span>
+                          )}
                         </div>
-                        {w.duration_min && (
-                          <span className="text-xs text-zinc-500">{w.duration_min} min</span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
