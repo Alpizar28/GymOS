@@ -12,6 +12,7 @@ import json
 import sys
 from datetime import datetime, timedelta
 from collections import defaultdict, Counter
+from pathlib import Path
 from typing import Any
 
 # ─── PARSING ─────────────────────────────────────────────────────────────
@@ -802,7 +803,8 @@ def analyze(sessions: list[dict]) -> dict[str, Any]:
 # ─── MAIN ────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    filepath = "/home/pablo/gym/jose_alpizar_structured.txt"
+    _data_dir = Path(__file__).resolve().parent.parent / "data"
+    filepath = str(_data_dir / "jose_alpizar_structured.txt")
     print(f"Parsing {filepath}...", file=sys.stderr)
 
     sessions = parse_structured_file(filepath)

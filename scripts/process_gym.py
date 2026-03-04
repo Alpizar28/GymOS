@@ -21,8 +21,11 @@ from datetime import datetime
 from pathlib import Path
 
 
-INPUT_FILE = "/home/pablo/gym/jose_alpizar_data.csv"
-OUTPUT_FILE = "/home/pablo/gym/jose_alpizar_training_log.md"
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+_DATA_DIR = _SCRIPTS_DIR.parent / "data"
+
+INPUT_FILE = str(_DATA_DIR / "jose_alpizar_data.csv")
+OUTPUT_FILE = str(_DATA_DIR / "jose_alpizar_training_log.md")
 
 
 def clean_val(v: str) -> str | None:

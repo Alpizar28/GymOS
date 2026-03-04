@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 # Default paths relative to project root
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PATHS = {
-    "athlete_profile": PROJECT_ROOT / "ATHLETE_PROFILE.json",
-    "exercise_library": PROJECT_ROOT / "EXERCISE_LIBRARY.json",
-    "program_constraints": PROJECT_ROOT / "PROGRAM_CONSTRAINTS.json",
+    "athlete_profile": PROJECT_ROOT / "data" / "ATHLETE_PROFILE.json",
+    "exercise_library": PROJECT_ROOT / "data" / "EXERCISE_LIBRARY.json",
+    "program_constraints": PROJECT_ROOT / "data" / "PROGRAM_CONSTRAINTS.json",
 }
 
 

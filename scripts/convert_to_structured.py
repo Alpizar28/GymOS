@@ -11,8 +11,10 @@ import re
 from pathlib import Path
 from datetime import datetime
 
-INPUT  = "/home/pablo/gym/jose_alpizar_training_log.md"
-OUTPUT = "/home/pablo/gym/jose_alpizar_structured.txt"
+_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+
+INPUT  = str(_DATA_DIR / "jose_alpizar_training_log.md")
+OUTPUT = str(_DATA_DIR / "jose_alpizar_structured.txt")
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
