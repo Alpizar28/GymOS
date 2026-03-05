@@ -10,6 +10,7 @@ import {
   type CalendarDay,
   type WorkoutDetail,
 } from "@/lib/api";
+import { LibraryIcon, ProfileIcon, ShieldIcon, StatsIcon } from "@/components/icons";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -46,10 +47,10 @@ const MUSCLE_GROUPS = [
 ];
 
 const SECTIONS = [
-  { id: "personal",   label: "Datos" },
-  { id: "stats",      label: "Stats" },
-  { id: "library",    label: "Ejercicios" },
-  { id: "protection", label: "Proteccion" },
+  { id: "personal",   label: "Datos", icon: ProfileIcon },
+  { id: "stats",      label: "Stats", icon: StatsIcon },
+  { id: "library",    label: "Ejercicios", icon: LibraryIcon },
+  { id: "protection", label: "Proteccion", icon: ShieldIcon },
 ] as const;
 
 type SectionId = typeof SECTIONS[number]["id"];
@@ -810,6 +811,7 @@ export default function ProfilePage() {
                 : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50 hover:text-zinc-300"
             }`}
           >
+            <s.icon className="h-3.5 w-3.5" />
             {s.label}
           </button>
         ))}

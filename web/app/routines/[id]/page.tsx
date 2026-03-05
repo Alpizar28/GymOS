@@ -10,6 +10,7 @@ import {
   type RoutineExerciseTemplate,
   type RoutineSetTemplate,
 } from "@/lib/api";
+import { TrashIcon } from "@/components/icons";
 
 const SET_TYPE_OPTIONS = [
   { value: "warmup", label: "W" },
@@ -451,7 +452,7 @@ export default function RoutineDetailPage() {
                           onClick={() => removeSet(exIdx, setIdx)}
                           className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs"
                         >
-                          🗑
+                          <TrashIcon className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </div>

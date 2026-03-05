@@ -2,20 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { api, type WeekDay, type PlanExercise } from "@/lib/api";
+import { ClockIcon, StatsIcon, WeightIcon } from "@/components/icons";
 
 const LOCK_ICONS: Record<string, string> = {
-    Push_Heavy: "PH",
-    Push_Light: "PL",
-    Pull_Heavy: "RH",
-    Pull_Light: "RL",
-    Legs_Heavy: "LH",
-    Legs_Light: "LL",
+    Push_Heavy: "P",
+    Push_Light: "P",
+    Pull_Heavy: "R",
+    Pull_Light: "R",
+    Legs_Heavy: "L",
+    Legs_Light: "L",
 };
 
 function DayCard({ day, onGenerate, loading }: { day: WeekDay; onGenerate: () => void; loading: boolean }) {
     const [open, setOpen] = useState(false);
     const focusParts = day.focus.split(",").map((f) => f.trim());
-    const icon = LOCK_ICONS[day.name] ?? "--";
+    const icon = LOCK_ICONS[day.name] ?? "-";
+    const iconTone = day.name.includes("Heavy") ? "text-red-300 border-red-500/40 bg-red-500/15" : "text-zinc-300 border-zinc-700 bg-zinc-800/60";
 
     return (
         <div
@@ -27,7 +29,7 @@ function DayCard({ day, onGenerate, loading }: { day: WeekDay; onGenerate: () =>
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4">
                 <div className="flex items-center gap-3">
-                    <span className="text-xl">{icon}</span>
+                    <span className={`inline-flex h-6 w-6 items-center justify-center rounded-md border text-xs font-semibold ${iconTone}`}>{icon}</span>
                     <div>
                         <p className="font-semibold text-white">
                             Day {day.day_index} — {day.name.replace(/_/g, " ")}
@@ -62,10 +64,10 @@ function DayCard({ day, onGenerate, loading }: { day: WeekDay; onGenerate: () =>
             {open && day.plan && (
                 <div className="px-5 pb-4 border-t border-zinc-700/30 pt-3">
                     <div className="flex items-center gap-3 text-xs text-zinc-500 mb-3">
-                        <span>~{day.plan.estimated_duration_min} min</span>
-                        <span>{day.plan.total_sets} sets</span>
+                        <span className="inline-flex items-center gap-1"><ClockIcon className="h-3.5 w-3.5" />~{day.plan.estimated_duration_min} min</span>
+                        <span className="inline-flex items-center gap-1"><StatsIcon className="h-3.5 w-3.5" />{day.plan.total_sets} sets</span>
                         {day.plan.estimated_volume_lbs > 0 && (
-                            <span>~{Math.round(day.plan.estimated_volume_lbs).toLocaleString()} lbs</span>
+                            <span className="inline-flex items-center gap-1"><WeightIcon className="h-3.5 w-3.5" />~{Math.round(day.plan.estimated_volume_lbs).toLocaleString()} lbs</span>
                         )}
                     </div>
                     <div className="space-y-1">
