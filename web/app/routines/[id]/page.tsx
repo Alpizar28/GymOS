@@ -11,10 +11,28 @@ import {
   type RoutineSetTemplate,
 } from "@/lib/api";
 
-function setLabel(setType: string, index: number) {
+const SET_TYPE_OPTIONS = [
+  { value: "warmup", label: "W" },
+  { value: "approach", label: "A" },
+  { value: "working", label: "E" },
+] as const;
+
+function normalizeSetType(setType: string) {
+  if (setType === "normal") return "working";
+  return setType;
+}
+
+function setLabel(sets: RoutineSetTemplate[], index: number) {
+  const setType = normalizeSetType(sets[index]?.set_type || "working");
   if (setType === "warmup") return "W";
-  if (setType === "drop") return "D";
-  return String(index + 1);
+  if (setType === "approach") return "A";
+  let workingIndex = 0;
+  for (let i = 0; i <= index; i += 1) {
+    if (normalizeSetType(sets[i]?.set_type || "working") === "working") {
+      workingIndex += 1;
+    }
+  }
+  return `E${workingIndex}`;
 }
 
 export default function RoutineDetailPage() {
@@ -80,7 +98,7 @@ export default function RoutineDetailPage() {
     setDraft({ ...draft, exercises });
   }
 
-  function addSet(exIdx: number) {
+  function addSet(exIdx: number, type: "warmup" | "approach" | "working") {
     if (!draft) return;
     const exercises = draft.exercises.map((ex, i) => {
       if (i !== exIdx) return ex;
@@ -90,13 +108,61 @@ export default function RoutineDetailPage() {
           ...ex.sets,
           {
             set_index: ex.sets.length,
-            set_type: "normal",
+            set_type: type,
             target_weight_lbs: null,
-            target_reps: null,
-            rir_target: null,
+            target_reps: type === "warmup" ? 10 : 8,
+            rir_target: type === "warmup" ? 4 : type === "approach" ? 3 : 2,
           },
         ],
       };
+    });
+    setDraft({ ...draft, exercises });
+  }
+
+  function removeSet(exIdx: number, setIdx: number) {
+    if (!draft) return;
+    const exercises = draft.exercises.map((ex, i) => {
+      if (i !== exIdx) return ex;
+      const nextSets = ex.sets
+        .filter((_, j) => j !== setIdx)
+        .map((set, j) => ({ ...set, set_index: j }));
+      return { ...ex, sets: nextSets };
+    });
+    setDraft({ ...draft, exercises });
+  }
+
+  function moveSet(exIdx: number, setIdx: number, direction: -1 | 1) {
+    if (!draft) return;
+    const exercises = draft.exercises.map((ex, i) => {
+      if (i !== exIdx) return ex;
+      const nextIdx = setIdx + direction;
+      if (nextIdx < 0 || nextIdx >= ex.sets.length) return ex;
+      const sets = [...ex.sets];
+      [sets[setIdx], sets[nextIdx]] = [sets[nextIdx], sets[setIdx]];
+      return {
+        ...ex,
+        sets: sets.map((set, idx) => ({ ...set, set_index: idx })),
+      };
+    });
+    setDraft({ ...draft, exercises });
+  }
+
+  function copyFromPreviousSet(exIdx: number, setIdx: number) {
+    if (!draft || setIdx === 0) return;
+    const exercises = draft.exercises.map((ex, i) => {
+      if (i !== exIdx) return ex;
+      const previous = ex.sets[setIdx - 1];
+      if (!previous) return ex;
+      const sets = ex.sets.map((set, idx) => {
+        if (idx !== setIdx) return set;
+        return {
+          ...set,
+          target_weight_lbs: previous.target_weight_lbs,
+          target_reps: previous.target_reps,
+          rir_target: previous.rir_target,
+        };
+      });
+      return { ...ex, sets };
     });
     setDraft({ ...draft, exercises });
   }
@@ -164,7 +230,7 @@ export default function RoutineDetailPage() {
           rest_seconds: ex.rest_seconds,
           notes: ex.notes,
           sets: ex.sets.map((set) => ({
-            set_type: set.set_type,
+            set_type: normalizeSetType(set.set_type),
             target_weight_lbs: set.target_weight_lbs,
             target_reps: set.target_reps,
             rir_target: set.rir_target,
@@ -289,15 +355,16 @@ export default function RoutineDetailPage() {
             </div>
 
             <div className="rounded-xl border border-zinc-800 overflow-hidden">
-              <div className="grid grid-cols-4 gap-2 px-3 py-2 bg-zinc-950 text-[10px] text-zinc-500 uppercase tracking-wide font-semibold">
+              <div className="grid grid-cols-5 gap-2 px-3 py-2 bg-zinc-950 text-[10px] text-zinc-500 uppercase tracking-wide font-semibold">
                 <span>Set</span>
                 <span>Prev</span>
                 <span>LBS</span>
                 <span>Reps</span>
+                <span>RIR</span>
               </div>
               {exercise.sets.map((set, setIdx) => (
-                <div key={setIdx} className="grid grid-cols-4 gap-2 px-3 py-2 border-t border-zinc-800 text-sm items-center">
-                  <span className="font-mono text-zinc-300">{setLabel(set.set_type, setIdx)}</span>
+                <div key={setIdx} className="grid grid-cols-5 gap-2 px-3 py-2 border-t border-zinc-800 text-sm items-center">
+                  <span className="font-mono text-zinc-300">{setLabel(exercise.sets, setIdx)}</span>
                   <span className="text-zinc-600">-</span>
                   {editMode ? (
                     <input
@@ -327,17 +394,93 @@ export default function RoutineDetailPage() {
                   ) : (
                     <span>{set.target_reps ?? "-"}</span>
                   )}
+                  {editMode ? (
+                    <input
+                      type="number"
+                      value={set.rir_target ?? ""}
+                      onChange={(e) =>
+                        updateSet(exIdx, setIdx, {
+                          rir_target: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm"
+                    />
+                  ) : (
+                    <span>{set.rir_target ?? "-"}</span>
+                  )}
+                  {editMode && (
+                    <div className="col-span-5 flex items-center justify-between mt-1 gap-2">
+                      <select
+                        value={normalizeSetType(set.set_type)}
+                        onChange={(e) =>
+                          updateSet(exIdx, setIdx, {
+                            set_type: e.target.value,
+                          })
+                        }
+                        className="px-2 py-1 rounded bg-zinc-950 border border-zinc-800 text-xs"
+                      >
+                        {SET_TYPE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => copyFromPreviousSet(exIdx, setIdx)}
+                          disabled={setIdx === 0}
+                          className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs disabled:opacity-30"
+                        >
+                          ⧉
+                        </button>
+                        <button
+                          onClick={() => moveSet(exIdx, setIdx, -1)}
+                          disabled={setIdx === 0}
+                          className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs disabled:opacity-30"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          onClick={() => moveSet(exIdx, setIdx, 1)}
+                          disabled={setIdx === exercise.sets.length - 1}
+                          className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs disabled:opacity-30"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          onClick={() => removeSet(exIdx, setIdx)}
+                          className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs"
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
 
             {editMode && (
-              <button
-                onClick={() => addSet(exIdx)}
-                className="w-full mt-2 py-2 text-xs rounded-lg border border-dashed border-zinc-700 text-zinc-500"
-              >
-                + Add set
-              </button>
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                <button
+                  onClick={() => addSet(exIdx, "warmup")}
+                  className="py-2 text-xs rounded-lg border border-dashed border-zinc-700 text-zinc-400"
+                >
+                  + W
+                </button>
+                <button
+                  onClick={() => addSet(exIdx, "approach")}
+                  className="py-2 text-xs rounded-lg border border-dashed border-zinc-700 text-zinc-400"
+                >
+                  + A
+                </button>
+                <button
+                  onClick={() => addSet(exIdx, "working")}
+                  className="py-2 text-xs rounded-lg border border-dashed border-zinc-700 text-zinc-400"
+                >
+                  + E
+                </button>
+              </div>
             )}
           </div>
         ))}

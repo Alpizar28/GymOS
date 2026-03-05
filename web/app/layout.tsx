@@ -27,7 +27,7 @@ const bottomTabs = [
   { href: "/today",    label: "Today",    icon: "🏋️" },
   { href: "/routines", label: "Rutinas",  icon: "📚" },
   { href: "/",         label: "Home",     icon: "📊" },
-  { href: "/progress", label: "Progress", icon: "📈" },
+  { href: "/progress", label: "Streaks",  icon: "🔥" },
   { href: "/settings", label: "Historial", icon: "📅" },
   { href: "/profile",  label: "Perfil",   icon: "👤" },
 ];
@@ -38,7 +38,7 @@ const topNavLinks = [
   { href: "/routines", label: "Routines", icon: "📚" },
   { href: "/",         label: "Dashboard", icon: "📊" },
   { href: "/workouts", label: "Workouts", icon: "📝" },
-  { href: "/progress", label: "Progress", icon: "📈" },
+  { href: "/progress", label: "Streaks",  icon: "🔥" },
   { href: "/settings", label: "Settings", icon: "⚙️" },
   { href: "/profile",  label: "Perfil",   icon: "👤" },
 ];

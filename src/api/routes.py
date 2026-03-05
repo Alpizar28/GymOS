@@ -1308,6 +1308,17 @@ async def share_routine(routine_id: int) -> dict:
 @router.post("/routines/{routine_id}/start")
 async def start_routine(routine_id: int) -> dict:
     """Convert a saved routine into today's active plan and persist it."""
+
+    def to_today_set_type(value: str) -> str:
+        normalized = (value or "").strip().lower()
+        if normalized == "warmup":
+            return "warmup"
+        if normalized in {"approach", "working", "normal"}:
+            return "normal"
+        if normalized == "drop":
+            return "drop"
+        return "normal"
+
     async with async_session() as session:
         routine = await _fetch_routine_or_404(session, routine_id)
         if not routine.exercises:
@@ -1329,7 +1340,7 @@ async def start_routine(routine_id: int) -> dict:
 
                 sets_payload.append(
                     {
-                        "set_type": set_row.set_type,
+                        "set_type": to_today_set_type(set_row.set_type),
                         "weight_lbs": set_row.target_weight_lbs,
                         "target_reps": set_row.target_reps,
                         "rir_target": set_row.rir_target,

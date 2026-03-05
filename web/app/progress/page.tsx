@@ -1,156 +1,239 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { api, type AnchorProgress } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
-// Dynamic import to avoid SSR issues with Chart.js
-let Chart: typeof import("chart.js/auto").default;
+import { api, type CalendarDay } from "@/lib/api";
 
-function AnchorCard({ anchor }: { anchor: AnchorProgress }) {
-    const chartRef = useRef<HTMLCanvasElement>(null);
-    const chartInstance = useRef<InstanceType<typeof Chart> | null>(null);
+const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
-    const statusColors: Record<string, string> = {
-        active: "bg-red-500/15 text-red-400",
-        deload: "bg-red-500/15 text-red-400",
-        consolidate: "bg-red-500/15 text-red-400",
-    };
+function formatISO(date: Date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
-    useEffect(() => {
-        if (!chartRef.current || anchor.history.length === 0 || !Chart) return;
+function localDateFromKey(key: string) {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
 
-        if (chartInstance.current) chartInstance.current.destroy();
+function dayDiff(a: Date, b: Date) {
+  const ms = 1000 * 60 * 60 * 24;
+  const ua = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+  const ub = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((ua - ub) / ms);
+}
 
-        const labels = anchor.history.map((h) => h.date);
-        const weights = anchor.history.map((h) => h.weight);
-        const e1rm = anchor.history.map((h) => h.estimated_1rm);
+function monthLabel(year: number, month: number) {
+  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(
+    new Date(year, month, 1)
+  );
+}
 
-        chartInstance.current = new Chart(chartRef.current, {
-            type: "line",
-            data: {
-                labels,
-                datasets: [
-                    {
-                        label: "Weight (lbs)",
-                        data: weights,
-                        borderColor: "#8b5cf6",
-                        backgroundColor: "rgba(139, 92, 246, 0.08)",
-                        fill: true,
-                        tension: 0.3,
-                        pointRadius: 2,
-                        pointHoverRadius: 6,
-                    },
-                    {
-                        label: "Est. 1RM",
-                        data: e1rm,
-                        borderColor: "#06b6d4",
-                        borderDash: [5, 5],
-                        tension: 0.3,
-                        pointRadius: 0,
-                        pointHoverRadius: 4,
-                    },
-                ],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: { mode: "index", intersect: false },
-                plugins: {
-                    legend: { labels: { color: "#71717a", font: { size: 11 } } },
-                },
-                scales: {
-                    x: {
-                        ticks: { color: "#52525b", maxTicksLimit: 10, font: { size: 10 } },
-                        grid: { color: "rgba(63, 63, 70, 0.3)" },
-                    },
-                    y: {
-                        ticks: { color: "#52525b", font: { size: 10 } },
-                        grid: { color: "rgba(63, 63, 70, 0.3)" },
-                    },
-                },
-            },
-        });
+function buildMonthCells(year: number, month: number) {
+  const first = new Date(year, month, 1);
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  const lead = first.getDay();
+  const cells: (Date | null)[] = [];
 
-        return () => {
-            chartInstance.current?.destroy();
-        };
-    }, [anchor.history]);
+  for (let i = 0; i < lead; i += 1) cells.push(null);
+  for (let day = 1; day <= totalDays; day += 1) cells.push(new Date(year, month, day));
+  while (cells.length % 7 !== 0) cells.push(null);
 
-    return (
-        <div className="bg-gradient-to-br from-zinc-800/80 to-zinc-900/80 border border-zinc-700/50 rounded-xl p-5 card-glow transition-all duration-300">
-            <div className="flex items-center justify-between mb-3">
-                <div>
-                    <h3 className="text-lg font-bold">{anchor.exercise}</h3>
-                    <div className="flex items-center gap-3 mt-1">
-                        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusColors[anchor.status] || "bg-zinc-700 text-zinc-400"}`}>
-                            {anchor.status.toUpperCase()}
-                        </span>
-                        <span className="text-sm text-zinc-400">
-                            Streak: {anchor.streak}{anchor.streak > 0 ? " 🔥" : ""}
-                        </span>
-                        {anchor.last_rir !== null && (
-                            <span className="text-sm text-zinc-500">Last RIR: {anchor.last_rir}</span>
-                        )}
-                    </div>
-                </div>
-                <div className="text-right">
-                    <p className="text-2xl font-bold font-mono text-red-400">
-                        {anchor.target_weight}lb
-                    </p>
-                    <p className="text-sm text-zinc-500">× {anchor.reps_range}</p>
-                </div>
-            </div>
+  return cells;
+}
 
-            {anchor.history.length > 0 ? (
-                <div className="relative h-60 mt-4">
-                    <canvas ref={chartRef} />
-                </div>
-            ) : (
-                <p className="text-sm text-zinc-600 italic mt-2">No workout data yet</p>
-            )}
-        </div>
-    );
+function computeStreaks(workoutKeys: string[], today: Date) {
+  const dates = [...new Set(workoutKeys)].sort().map(localDateFromKey);
+  if (dates.length === 0) {
+    return { current: 0, longest: 0 };
+  }
+
+  let current = 0;
+  const last = dates[dates.length - 1];
+  if (dayDiff(today, last) <= 2) {
+    current = 1;
+    for (let i = dates.length - 1; i > 0; i -= 1) {
+      const gap = dayDiff(dates[i], dates[i - 1]);
+      if (gap <= 3) current += 1;
+      else break;
+    }
+  }
+
+  let run = 1;
+  let longest = 1;
+  for (let i = 1; i < dates.length; i += 1) {
+    const gap = dayDiff(dates[i], dates[i - 1]);
+    if (gap <= 3) {
+      run += 1;
+    } else {
+      run = 1;
+    }
+    if (run > longest) longest = run;
+  }
+
+  return { current, longest };
 }
 
 export default function ProgressPage() {
-    const [anchors, setAnchors] = useState<AnchorProgress[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [chartLoaded, setChartLoaded] = useState(false);
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState<CalendarDay[]>([]);
+  const [sharing, setSharing] = useState(false);
+  const [toast, setToast] = useState("");
 
-    useEffect(() => {
-        // Dynamically import Chart.js
-        import("chart.js/auto").then((mod) => {
-            Chart = mod.default;
-            setChartLoaded(true);
-        });
+  const today = useMemo(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }, []);
 
-        api.getProgress().then((data) => {
-            setAnchors(data);
-            setLoading(false);
-        });
-    }, []);
+  const seasonStart = useMemo(() => new Date(today.getFullYear(), 0, 1), [today]);
+  const seasonEnd = useMemo(() => new Date(today.getFullYear(), today.getMonth() + 1, 0), [today]);
 
-    return (
-        <div>
-            <h1 className="text-2xl font-bold tracking-tight mb-6">Anchor Progress</h1>
+  async function load() {
+    setLoading(true);
+    try {
+      const calendarDays = await api.getCalendar(formatISO(seasonStart), formatISO(seasonEnd));
+      setDays(calendarDays);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-            {loading ? (
-                <div className="flex items-center justify-center h-40 gap-3 text-zinc-500">
-                    <div className="w-5 h-5 border-2 border-zinc-600 border-t-red-500 rounded-full animate-spin" />
-                    Loading...
-                </div>
-            ) : anchors.length === 0 ? (
-                <div className="text-center py-16 text-zinc-600">
-                    <p className="text-lg mb-2">No anchor data yet</p>
-                    <p className="text-sm">Log workouts with anchor exercises to see progress here.</p>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {anchors.map((a) => (
-                        <AnchorCard key={a.exercise_id} anchor={a} />
-                    ))}
-                </div>
-            )}
+  useEffect(() => {
+    void load();
+  }, [seasonStart, seasonEnd]);
+
+  const workoutSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const day of days) {
+      if (day.workouts.length > 0) set.add(day.date);
+    }
+    return set;
+  }, [days]);
+
+  const streak = useMemo(() => computeStreaks([...workoutSet], today), [workoutSet, today]);
+
+  const months = useMemo(() => {
+    const result: { key: string; label: string; cells: (Date | null)[] }[] = [];
+    for (let month = 0; month <= today.getMonth(); month += 1) {
+      result.push({
+        key: `${today.getFullYear()}-${month}`,
+        label: monthLabel(today.getFullYear(), month),
+        cells: buildMonthCells(today.getFullYear(), month),
+      });
+    }
+    return result;
+  }, [today]);
+
+  async function handleShare() {
+    if (sharing) return;
+    setSharing(true);
+    const text = `🔥 GymOS Streak\nCurrent: ${streak.current}\nLongest: ${streak.longest}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "GymOS Streak", text });
+      } else {
+        await navigator.clipboard.writeText(text);
+        setToast("Streak copied");
+        window.setTimeout(() => setToast(""), 1800);
+      }
+    } catch {
+      // User cancelled share, no action needed.
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  return (
+    <div className="max-w-md mx-auto">
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={() => router.back()} className="w-10 h-10 rounded-full border border-zinc-800">
+          ←
+        </button>
+        <h1 className="text-xl font-bold">Streaks</h1>
+        <div className="flex items-center gap-1">
+          <button onClick={() => void load()} className="w-10 h-10 rounded-full border border-zinc-800">
+            ⟳
+          </button>
+          <button onClick={() => void handleShare()} className="w-10 h-10 rounded-full border border-zinc-800">
+            ⤴
+          </button>
         </div>
-    );
+      </div>
+
+      <div className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-600/25 to-emerald-500/10 p-5 mb-4">
+        <div className="flex items-start justify-between">
+          <p className="text-6xl leading-none font-black text-white">{streak.current}</p>
+          <span className="text-4xl">🔥</span>
+        </div>
+        <p className="text-base font-semibold mt-2 text-emerald-100">current streak!</p>
+        <p className="text-xs text-emerald-200/80 mt-1">Longest: {streak.longest}</p>
+      </div>
+
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+        <h2 className="text-sm font-semibold mb-3">Season Calendar</h2>
+
+        {loading ? (
+          <div className="py-10 text-center text-zinc-500 text-sm">Loading season...</div>
+        ) : (
+          <div className="space-y-4 max-h-[62vh] overflow-y-auto pr-1">
+            {months.map((month) => (
+              <div key={month.key} className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-3">
+                <p className="text-xs font-semibold text-zinc-300 mb-2">{month.label}</p>
+                <div className="grid grid-cols-7 gap-1 mb-1">
+                  {WEEKDAYS.map((day) => (
+                    <p key={`${month.key}-${day}`} className="text-[10px] text-zinc-500 text-center">
+                      {day}
+                    </p>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {month.cells.map((cell, idx) => {
+                    if (!cell) return <div key={`${month.key}-empty-${idx}`} className="h-8" />;
+
+                    const key = formatISO(cell);
+                    const isWorkout = workoutSet.has(key);
+                    const isToday = dayDiff(cell, today) === 0;
+                    const isFuture = dayDiff(cell, today) > 0;
+
+                    let className = "h-8 w-8 rounded-full flex items-center justify-center text-[11px] border ";
+                    let content: string = String(cell.getDate());
+
+                    if (isWorkout && isToday) {
+                      className += "bg-emerald-500 border-emerald-300 text-emerald-950 ring-2 ring-emerald-300/60";
+                      content = "💪";
+                    } else if (isWorkout) {
+                      className += "bg-yellow-400 border-yellow-300 text-yellow-950";
+                      content = "💪";
+                    } else if (isToday) {
+                      className += "bg-zinc-900 border-emerald-500 text-emerald-300";
+                    } else if (isFuture) {
+                      className += "bg-zinc-900 border-zinc-800 text-zinc-600";
+                    } else {
+                      className += "bg-zinc-800 border-zinc-700 text-zinc-300";
+                    }
+
+                    return (
+                      <div key={`${month.key}-${key}`} className="flex items-center justify-center">
+                        <span className={className}>{content}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {toast && (
+        <div className="fixed bottom-24 left-4 right-4 sm:left-auto sm:right-6 sm:w-auto z-50 px-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-sm text-white text-center">
+          {toast}
+        </div>
+      )}
+    </div>
+  );
 }
