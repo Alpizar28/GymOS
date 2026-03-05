@@ -235,7 +235,7 @@ class WorkoutDetail(BaseModel):
 
 
 class RoutineSetInput(StrictRequestModel):
-    set_type: str = Field(default="normal", pattern=r"^(normal|warmup|drop)$")
+    set_type: str = Field(default="normal", pattern=r"^(normal|warmup|drop|approach|working)$")
     target_weight_lbs: float | None = Field(default=None, ge=0, le=2000)
     target_reps: int | None = Field(default=None, ge=0, le=200)
     rir_target: int | None = Field(default=None, ge=0, le=10)
