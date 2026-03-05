@@ -438,6 +438,7 @@ async def log_today_workout(payload: TodayLogRequest) -> dict:
             select(Workout)
             .where(Workout.date == today)
             .where(Workout.template_day_name == payload.day_name)
+            .order_by(desc(Workout.id))
             .limit(1)
         )
         workout = existing.scalar_one_or_none()
@@ -1561,10 +1562,14 @@ async def complete_today_session(payload: CompleteSessionRequest) -> dict:
             raise HTTPException(status_code=404, detail="Workout not found")
 
         # Save fatigue feedback
-        feedback = SessionFeedback(
-            workout_id=payload.workout_id,
-            fatigue=payload.fatigue,
-        )
+        feedback = await session.get(SessionFeedback, payload.workout_id)
+        if feedback is None:
+            feedback = SessionFeedback(
+                workout_id=payload.workout_id,
+                fatigue=payload.fatigue,
+            )
+        else:
+            feedback.fatigue = payload.fatigue
         session.add(feedback)
 
         # Advance athlete state

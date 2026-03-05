@@ -43,6 +43,9 @@ async def init_db() -> None:
     # Ensure new templates exist in existing DBs
     await _ensure_templates()
 
+    # Keep cache tables lean and indexes in place
+    await _run_db_hygiene()
+
 
 async def _auto_seed_if_empty() -> None:
     """
@@ -101,3 +104,18 @@ async def _ensure_templates() -> None:
             await session.commit()
         elif routine_inserted:
             await session.commit()
+
+
+async def _run_db_hygiene() -> None:
+    from src.services.db_maintenance import run_database_hygiene
+
+    async with async_session() as session:
+        result = await run_database_hygiene(session)
+        await session.commit()
+
+    if result["plan_days_deduped"] or result["orphan_plans_removed"]:
+        logger.info(
+            "Database hygiene: deduped plan_days=%d, removed orphan plans=%d",
+            result["plan_days_deduped"],
+            result["orphan_plans_removed"],
+        )
