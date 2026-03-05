@@ -73,22 +73,35 @@ async def backfill_workout_training_types(session: AsyncSession) -> dict:
     workouts = workouts_result.scalars().all()
 
     updated = 0
+    upgraded_from_custom = 0
     matched_routine = 0
     matched_heuristic = 0
 
     for workout in workouts:
         current = (workout.training_type or "").strip().lower()
-        if current in VALID_TRAINING_TYPES:
-            continue
-
         normalized_template = _normalize_template_name(workout.template_day_name)
         from_routine = routine_lookup.get(normalized_template)
+        desired = "custom"
         if from_routine:
-            workout.training_type = from_routine
+            desired = from_routine
             matched_routine += 1
         else:
-            workout.training_type = _classify_training_type(workout.template_day_name)
+            desired = _classify_training_type(workout.template_day_name)
             matched_heuristic += 1
+
+        # Keep existing non-custom classifications as authoritative.
+        # But allow custom/invalid historical values to be upgraded.
+        should_update = False
+        if current not in VALID_TRAINING_TYPES:
+            should_update = True
+        elif current == "custom" and desired != "custom":
+            should_update = True
+            upgraded_from_custom += 1
+
+        if not should_update:
+            continue
+
+        workout.training_type = desired
 
         session.add(workout)
         updated += 1
@@ -96,6 +109,7 @@ async def backfill_workout_training_types(session: AsyncSession) -> dict:
     return {
         "workouts_scanned": len(workouts),
         "updated": updated,
+        "upgraded_from_custom": upgraded_from_custom,
         "matched_routine": matched_routine,
         "matched_heuristic": matched_heuristic,
     }
