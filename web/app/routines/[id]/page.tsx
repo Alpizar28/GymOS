@@ -8,6 +8,8 @@ import {
   type ExerciseItem,
   type RoutineDetail,
   type RoutineExerciseTemplate,
+  type RoutineProgressionAnchor,
+  type RoutineProgressionPreviewResponse,
   type RoutineSetTemplate,
 } from "@/lib/api";
 import { TrashIcon } from "@/components/icons";
@@ -36,6 +38,27 @@ function setLabel(sets: RoutineSetTemplate[], index: number) {
   return `E${workingIndex}`;
 }
 
+function progressionActionLabel(action: RoutineProgressionAnchor["suggestion"]["action"]) {
+  if (action === "increase_weight") return "Subir peso";
+  if (action === "increase_reps") return "Subir reps";
+  if (action === "add_set") return "Agregar serie";
+  if (action === "deload") return "Deload";
+  return "Mantener";
+}
+
+function progressionActionTone(action: RoutineProgressionAnchor["suggestion"]["action"]) {
+  if (action === "increase_weight" || action === "increase_reps") {
+    return "border-red-500/40 bg-red-500/15 text-red-200";
+  }
+  if (action === "deload") {
+    return "border-amber-500/40 bg-amber-500/15 text-amber-200";
+  }
+  if (action === "add_set") {
+    return "border-zinc-500/40 bg-zinc-500/15 text-zinc-200";
+  }
+  return "border-zinc-700 bg-zinc-800/60 text-zinc-300";
+}
+
 export default function RoutineDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
@@ -50,6 +73,10 @@ export default function RoutineDetailPage() {
   const [starting, setStarting] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [toast, setToast] = useState("");
+  const [progression, setProgression] = useState<RoutineProgressionPreviewResponse | null>(null);
+  const [loadingProgression, setLoadingProgression] = useState(false);
+  const [applyingProgression, setApplyingProgression] = useState(false);
+  const [progressionError, setProgressionError] = useState("");
 
   function showToast(message: string) {
     setToast(message);
@@ -217,6 +244,40 @@ export default function RoutineDetailPage() {
     showToast("JSON copiado al portapapeles");
   }
 
+  async function loadProgression() {
+    setLoadingProgression(true);
+    setProgressionError("");
+    try {
+      const preview = await api.getRoutineProgressionPreview(routineId, 5);
+      setProgression(preview);
+    } catch {
+      setProgressionError("No se pudo analizar progresion");
+    } finally {
+      setLoadingProgression(false);
+    }
+  }
+
+  async function applyProgression() {
+    setApplyingProgression(true);
+    setProgressionError("");
+    try {
+      const result = await api.applyRoutineProgression(routineId, 5);
+      setRoutine(result.routine);
+      setDraft(result.routine);
+      setProgression({
+        routine_id: result.routine_id,
+        routine_name: result.routine_name,
+        lookback: result.lookback,
+        anchors: result.anchors,
+      });
+      showToast(`Progresion aplicada: ${result.updated_sets} sets, ${result.added_sets} sets nuevos`);
+    } catch {
+      setProgressionError("No se pudo aplicar progresion");
+    } finally {
+      setApplyingProgression(false);
+    }
+  }
+
   async function saveRoutine() {
     if (!draft) return;
     setSaving(true);
@@ -285,7 +346,7 @@ export default function RoutineDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mb-5">
         <button
           onClick={() => void startRoutine()}
           disabled={starting}
@@ -305,7 +366,84 @@ export default function RoutineDetailPage() {
         >
           Share Routine
         </button>
+        <button
+          onClick={() => void loadProgression()}
+          disabled={loadingProgression}
+          className="py-3 rounded-xl border border-zinc-700 text-zinc-300 text-sm font-semibold disabled:opacity-40"
+        >
+          {loadingProgression ? "Analizando..." : "Analizar progresion"}
+        </button>
+        <button
+          onClick={() => void applyProgression()}
+          disabled={applyingProgression}
+          className="py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-100 text-sm font-semibold disabled:opacity-40"
+        >
+          {applyingProgression ? "Aplicando..." : "Aplicar progresion"}
+        </button>
       </div>
+
+      {(progression || progressionError) && (
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 mb-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold">Progresion de anchors</p>
+              <p className="text-xs text-zinc-500">Basado en ultimas 5 sesiones por anchor</p>
+            </div>
+            {progression && <p className="text-xs text-zinc-500">{progression.anchors.length} anchors</p>}
+          </div>
+
+          {progressionError && <p className="text-xs text-red-400">{progressionError}</p>}
+
+          {progression && progression.anchors.length === 0 && (
+            <p className="text-xs text-zinc-500">Esta rutina no tiene anchors vinculados.</p>
+          )}
+
+          <div className="space-y-2">
+            {progression?.anchors.map((anchor) => (
+              <div key={anchor.routine_exercise_id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">{anchor.exercise}</p>
+                  <span className={`px-2 py-1 rounded-full text-[11px] border ${progressionActionTone(anchor.suggestion.action)}`}>
+                    {progressionActionLabel(anchor.suggestion.action)}
+                  </span>
+                </div>
+
+                <p className="text-xs text-zinc-500">{anchor.suggestion.reason}</p>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {anchor.recent_top_sets.map((set) => (
+                    <span key={`${anchor.routine_exercise_id}-${set.date}`} className="px-2 py-1 rounded border border-zinc-800 text-[11px] text-zinc-300 bg-zinc-900">
+                      {set.date} · {set.weight}lb x {set.reps}
+                      {set.rir !== null ? ` · RIR ${set.rir}` : ""}
+                    </span>
+                  ))}
+                </div>
+
+                {anchor.proposed_updates.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-500">Cambios sugeridos</p>
+                    {anchor.proposed_updates.map((update) => (
+                      <p key={`${anchor.routine_exercise_id}-${update.set_index}`} className="text-xs text-zinc-300">
+                        Set #{update.set_index + 1}: {update.target_weight_lbs ?? "-"} lb · {update.target_reps ?? "-"} reps
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {anchor.proposed_new_set && (
+                  <p className="text-xs text-zinc-300">
+                    Nueva serie: {anchor.proposed_new_set.target_weight_lbs ?? "-"} lb · {anchor.proposed_new_set.target_reps ?? "-"} reps · RIR {anchor.proposed_new_set.rir_target ?? "-"}
+                  </p>
+                )}
+
+                {anchor.proposed_updates.length === 0 && !anchor.proposed_new_set && (
+                  <p className="text-xs text-zinc-500">Sin cambios para este anchor.</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {editMode && (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3 mb-4 space-y-3">

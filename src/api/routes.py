@@ -19,6 +19,10 @@ from src.models.settings import AthleteState, Setting, WeekTemplate
 from src.models.workouts import Workout, WorkoutExercise, WorkoutSet
 from src.services.plan_generator import generate_day_plan
 from src.services.recommendation_service import suggest_day
+from src.services.routine_progression_service import (
+    apply_routine_progression,
+    build_routine_progression_preview,
+)
 from src.services.stats_service import get_anchor_progress, get_weekly_summary
 from src.services.workout_logger import log_manual_workout
 
@@ -1492,6 +1496,46 @@ async def start_routine(routine_id: int) -> dict:
         await session.commit()
 
         return {"routine_id": routine.id, "plan_day_id": plan_day.id, "plan": plan_json}
+
+
+@router.get("/routines/{routine_id}/progression-preview")
+async def routine_progression_preview(
+    routine_id: int,
+    lookback: int = Query(default=5, ge=3, le=8),
+) -> dict:
+    """Preview anchor progression suggestions for a specific saved routine."""
+    async with async_session() as session:
+        routine = await _fetch_routine_or_404(session, routine_id)
+        preview = await build_routine_progression_preview(session, routine, lookback=lookback)
+        return {
+            "routine_id": routine.id,
+            "routine_name": routine.name,
+            "lookback": lookback,
+            "anchors": preview,
+        }
+
+
+@router.post("/routines/{routine_id}/progression-apply")
+async def routine_progression_apply(
+    routine_id: int,
+    lookback: int = Query(default=5, ge=3, le=8),
+) -> dict:
+    """Apply progression suggestions directly into routine working sets."""
+    async with async_session() as session:
+        routine = await _fetch_routine_or_404(session, routine_id)
+        apply_result = await apply_routine_progression(session, routine, lookback=lookback)
+        await session.commit()
+        updated = await _fetch_routine_or_404(session, routine_id)
+        return {
+            "routine_id": routine.id,
+            "routine_name": routine.name,
+            "lookback": lookback,
+            "updated_exercises": apply_result["updated_exercises"],
+            "updated_sets": apply_result["updated_sets"],
+            "added_sets": apply_result["added_sets"],
+            "anchors": apply_result["preview"],
+            "routine": _routine_to_detail_payload(updated),
+        }
 
 
 # ─── Complete Session (advance day + fatigue) ─────────────────────────────────

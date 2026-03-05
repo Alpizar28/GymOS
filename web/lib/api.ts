@@ -135,6 +135,61 @@ export interface RoutineDetail {
     exercises: RoutineExerciseTemplate[];
 }
 
+export interface RoutineProgressionTopSet {
+    date: string;
+    weight: number;
+    reps: number;
+    rir: number | null;
+}
+
+export interface RoutineProgressionSuggestion {
+    action: "increase_weight" | "increase_reps" | "maintain" | "deload" | "add_set";
+    reason: string;
+    apply_scope: "all_working_sets" | "top_working_set" | "none";
+    delta_lbs?: number;
+    delta_reps?: number;
+}
+
+export interface RoutineProgressionAnchor {
+    routine_exercise_id: number;
+    exercise_id: number;
+    exercise: string;
+    lookback_used: number;
+    recent_top_sets: RoutineProgressionTopSet[];
+    anchor_target: {
+        target_weight: number | null;
+        target_reps_min: number | null;
+        target_reps_max: number | null;
+        status: string | null;
+    };
+    suggestion: RoutineProgressionSuggestion;
+    proposed_updates: Array<{
+        set_index: number;
+        target_weight_lbs: number | null;
+        target_reps: number | null;
+    }>;
+    proposed_new_set: {
+        set_type: string;
+        target_weight_lbs: number | null;
+        target_reps: number | null;
+        rir_target: number | null;
+    } | null;
+}
+
+export interface RoutineProgressionPreviewResponse {
+    routine_id: number;
+    routine_name: string;
+    lookback: number;
+    anchors: RoutineProgressionAnchor[];
+}
+
+export interface RoutineProgressionApplyResponse extends RoutineProgressionPreviewResponse {
+    updated_exercises: number;
+    updated_sets: number;
+    added_sets: number;
+    routine: RoutineDetail;
+}
+
 export interface RoutineSetInput {
     set_type: string;
     target_weight_lbs: number | null;
@@ -344,6 +399,17 @@ export const api = {
     shareRoutine: (routine_id: number) =>
         fetchApi<{ version: number; exported_at: string; routine: RoutineDetail }>(
             `/routines/${routine_id}/share`,
+            {
+                method: "POST",
+            }
+        ),
+    getRoutineProgressionPreview: (routine_id: number, lookback = 5) =>
+        fetchApi<RoutineProgressionPreviewResponse>(
+            `/routines/${routine_id}/progression-preview?lookback=${lookback}`
+        ),
+    applyRoutineProgression: (routine_id: number, lookback = 5) =>
+        fetchApi<RoutineProgressionApplyResponse>(
+            `/routines/${routine_id}/progression-apply?lookback=${lookback}`,
             {
                 method: "POST",
             }
