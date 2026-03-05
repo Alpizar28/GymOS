@@ -559,14 +559,14 @@ function CompleteModal({ workoutId, onComplete, onClose }: {
 
 // ─── Set Card ────────────────────────────────────────────────────────────────
 
-function SetCard({ index, planned, actual, lastData, onChange, onRemove, onDuplicate, onComplete: onDone }: {
+function SetCard({ index, planned, actual, lastData, onChange, onRemove, onCopyAbove, onComplete: onDone }: {
     index: number;
     planned: TodaySet | null;
     actual: ActualSet;
     lastData: LastSessionSet | null;
     onChange: (u: ActualSet) => void;
     onRemove: () => void;
-    onDuplicate: () => void;
+    onCopyAbove: () => void;
     onComplete: () => void; // triggers rest timer
 }) {
     const upd = (f: Partial<ActualSet>) => onChange({ ...actual, ...f });
@@ -587,9 +587,13 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onDupli
                     )}
                 </div>
                 <div className="flex items-center gap-1.5">
-                    <button onClick={onDuplicate} title="Duplicate set"
-                        className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-600 active:text-red-400 active:bg-red-900/30 flex items-center justify-center text-base touch-manipulation">
-                        ⧉
+                    <button
+                        onClick={onCopyAbove}
+                        title="Copiar set anterior"
+                        disabled={index === 0}
+                        className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-600 active:text-red-400 active:bg-red-900/30 disabled:opacity-30 disabled:active:text-zinc-600 disabled:active:bg-zinc-800 flex items-center justify-center text-base touch-manipulation"
+                    >
+                        ↑
                     </button>
                     <button onClick={onRemove} title="Remove set"
                         className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-600 active:text-red-400 active:bg-red-900/30 flex items-center justify-center text-xl touch-manipulation">
@@ -647,13 +651,13 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onDupli
 
 // ─── Exercise Accordion ──────────────────────────────────────────────────────
 
-function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet, onDuplicateSet, onRemoveExercise, onSwap, onSetComplete }: {
+function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet, onCopyPreviousSet, onRemoveExercise, onSwap, onSetComplete }: {
     state: ExerciseState;
     onToggle: () => void;
     onSetChange: (si: number, u: ActualSet) => void;
     onAddSet: () => void;
     onRemoveSet: (si: number) => void;
-    onDuplicateSet: (si: number) => void;
+    onCopyPreviousSet: (si: number) => void;
     onRemoveExercise: () => void;
     onSwap: () => void;
     onSetComplete: (restSecs: number) => void;
@@ -700,7 +704,7 @@ function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet
                                 lastData={lastSession ? lastSession[i] ?? null : null}
                                 onChange={(u) => onSetChange(i, u)}
                                 onRemove={() => onRemoveSet(i)}
-                                onDuplicate={() => onDuplicateSet(i)}
+                                onCopyAbove={() => onCopyPreviousSet(i)}
                                 onComplete={() => onSetComplete(defaultRestSecs)}
                             />
                         ))}
@@ -1008,13 +1012,25 @@ export default function TodayPage() {
                 : e)
         );
 
-    const duplicateSet = (exIdx: number, si: number) =>
+    const copyPreviousSet = (exIdx: number, si: number) =>
         setExercises((p) =>
             p.map((e, i) => {
                 if (i !== exIdx) return e;
-                const src = e.sets[si];
-                const copy = { ...src, index: e.sets.length, completed: false };
-                return { ...e, sets: [...e.sets, copy] };
+                if (si === 0) return e;
+                const previous = e.sets[si - 1];
+                if (!previous) return e;
+                const nextSets = e.sets.map((s, j) =>
+                    j === si
+                        ? {
+                            ...s,
+                            actual_weight: previous.actual_weight,
+                            actual_reps: previous.actual_reps,
+                            actual_rir: previous.actual_rir,
+                            completed: false,
+                        }
+                        : s
+                );
+                return { ...e, sets: nextSets };
             })
         );
 
@@ -1259,7 +1275,7 @@ export default function TodayPage() {
                                 onSetChange={(si, u) => updateSet(i, si, u)}
                                 onAddSet={() => addSet(i)}
                                 onRemoveSet={(si) => removeSet(i, si)}
-                                onDuplicateSet={(si) => duplicateSet(i, si)}
+                                onCopyPreviousSet={(si) => copyPreviousSet(i, si)}
                                 onRemoveExercise={() => removeExercise(i)}
                                 onSwap={() => setSwapFor(ex.name)}
                                 onSetComplete={(secs) => startRestTimer(secs)}
