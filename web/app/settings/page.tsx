@@ -1010,6 +1010,8 @@ function UnifiedHistoryTab() {
   const [selectedWorkout, setSelectedWorkout] = useState<WorkoutDetail | null>(null);
   const [weeklyCompare, setWeeklyCompare] = useState<WeeklyCompareResponse | null>(null);
   const [weeklyCompareLoading, setWeeklyCompareLoading] = useState(true);
+  const [backfillLoading, setBackfillLoading] = useState(false);
+  const [backfillMessage, setBackfillMessage] = useState("");
 
   const today = useMemo(() => {
     const d = new Date();
@@ -1046,6 +1048,12 @@ function UnifiedHistoryTab() {
   useEffect(() => {
     writeHistoryPrefs({ mode, trainingType, selectedDate });
   }, [mode, trainingType, selectedDate]);
+
+  useEffect(() => {
+    if (!backfillMessage) return;
+    const timer = window.setTimeout(() => setBackfillMessage(""), 5000);
+    return () => window.clearTimeout(timer);
+  }, [backfillMessage]);
 
   const dayByDate = useMemo(() => {
     const map = new Map<string, CalendarDay>();
@@ -1127,6 +1135,28 @@ function UnifiedHistoryTab() {
   async function openWorkout(id: number) {
     const detail = await api.getWorkout(id);
     setSelectedWorkout(detail);
+  }
+
+  async function runTrainingTypeBackfill() {
+    setBackfillLoading(true);
+    setBackfillMessage("");
+    try {
+      const result = await api.backfillHistoryTrainingType();
+      setBackfillMessage(
+        `Backfill listo: ${result.updated}/${result.workouts_scanned} sesiones actualizadas`
+      );
+
+      const [calendarData, weeklyData] = await Promise.all([
+        api.getCalendar(calendarDateKey(seasonStart), calendarDateKey(seasonEnd), trainingType),
+        api.getWeeklyCompare(calendarDateKey(today), trainingType),
+      ]);
+      setDays(calendarData);
+      setWeeklyCompare(weeklyData);
+    } catch {
+      setBackfillMessage("No se pudo ejecutar backfill");
+    } finally {
+      setBackfillLoading(false);
+    }
   }
 
   return (
@@ -1225,7 +1255,16 @@ function UnifiedHistoryTab() {
             {item.label}
           </button>
         ))}
+        <button
+          onClick={() => void runTrainingTypeBackfill()}
+          disabled={backfillLoading}
+          className="px-3 py-1.5 rounded-full text-xs font-semibold border border-zinc-700/50 bg-zinc-950 text-zinc-300 disabled:opacity-40"
+        >
+          {backfillLoading ? "Reclasificando..." : "Reclasificar historial"}
+        </button>
       </div>
+
+      {backfillMessage ? <p className="text-xs text-zinc-400">{backfillMessage}</p> : null}
 
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
         {loading ? (

@@ -269,6 +269,13 @@ export interface WeeklyCompareResponse {
     };
 }
 
+export interface BackfillTrainingTypeResponse {
+    workouts_scanned: number;
+    updated: number;
+    matched_routine: number;
+    matched_heuristic: number;
+}
+
 export interface ManualSet {
     weight: number | null;
     reps: number | null;
@@ -461,6 +468,10 @@ export const api = {
         fetchApi<WeeklyCompareResponse>(
             `/history/weekly-compare?ref=${ref}&training_type=${encodeURIComponent(trainingType)}`
         ),
+    backfillHistoryTrainingType: () =>
+        fetchApi<BackfillTrainingTypeResponse>("/history/backfill-training-type", {
+            method: "POST",
+        }),
     createManualWorkout: (payload: ManualWorkoutPayload) =>
         fetchApi<{ workout_id: number }>("/workouts/manual", {
             method: "POST",
