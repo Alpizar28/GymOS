@@ -960,6 +960,271 @@ function StreakTab() {
   );
 }
 
+function UnifiedHistoryTab() {
+  const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState<CalendarDay[]>([]);
+  const [mode, setMode] = useState<"summary" | "detail">("summary");
+  const [selectedDate, setSelectedDate] = useState<string>(calendarDateKey(new Date()));
+  const [selectedWorkout, setSelectedWorkout] = useState<WorkoutDetail | null>(null);
+
+  const today = useMemo(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }, []);
+
+  const seasonStart = useMemo(() => new Date(today.getFullYear(), 0, 1), [today]);
+  const seasonEnd = useMemo(() => new Date(today.getFullYear(), today.getMonth() + 1, 0), [today]);
+
+  useEffect(() => {
+    setLoading(true);
+    api
+      .getCalendar(calendarDateKey(seasonStart), calendarDateKey(seasonEnd))
+      .then((data) => {
+        setDays(data);
+        const todayKey = calendarDateKey(today);
+        if (!data.some((d) => d.date === todayKey)) {
+          const latest = data.filter((d) => d.workouts.length > 0).slice(-1)[0];
+          if (latest) setSelectedDate(latest.date);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [seasonStart, seasonEnd, today]);
+
+  const dayByDate = useMemo(() => {
+    const map = new Map<string, CalendarDay>();
+    for (const d of days) map.set(d.date, d);
+    return map;
+  }, [days]);
+
+  const selectedDay = dayByDate.get(selectedDate) ?? null;
+
+  const workoutSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const day of days) {
+      if (day.workouts.length > 0) set.add(day.date);
+    }
+    return set;
+  }, [days]);
+
+  const streak = useMemo(() => computeStreaks([...workoutSet], today), [workoutSet, today]);
+
+  const months = useMemo(() => {
+    const result: { key: string; label: string; cells: (Date | null)[]; month: number }[] = [];
+    for (let month = 0; month <= today.getMonth(); month += 1) {
+      result.push({
+        key: `${today.getFullYear()}-${month}`,
+        label: monthLabel(today.getFullYear(), month),
+        cells: buildMonthCells(today.getFullYear(), month),
+        month,
+      });
+    }
+    return result;
+  }, [today]);
+
+  const monthSessions = useMemo(() => {
+    return days.filter((d) => {
+      const dt = localDateFromKey(d.date);
+      return dt.getMonth() === today.getMonth() && d.workouts.length > 0;
+    });
+  }, [days, today]);
+
+  const monthVolume = useMemo(
+    () => monthSessions.reduce((sum, day) => sum + day.workouts.reduce((n, w) => n + (w.total_volume_lbs || 0), 0), 0),
+    [monthSessions]
+  );
+
+  const maxDayVolume = useMemo(() => {
+    let max = 1;
+    for (const d of days) {
+      const v = d.workouts.reduce((n, w) => n + (w.total_volume_lbs || 0), 0);
+      if (v > max) max = v;
+    }
+    return max;
+  }, [days]);
+
+  const monthTimeline = useMemo(
+    () =>
+      [...monthSessions]
+        .reverse()
+        .map((d) => {
+          const sets = d.workouts.reduce((n, w) => n + (w.total_sets || 0), 0);
+          const volume = d.workouts.reduce((n, w) => n + (w.total_volume_lbs || 0), 0);
+          return { date: d.date, sets, volume, workouts: d.workouts };
+        }),
+    [monthSessions]
+  );
+
+  async function openWorkout(id: number) {
+    const detail = await api.getWorkout(id);
+    setSelectedWorkout(detail);
+  }
+
+  return (
+    <div className="space-y-4">
+      <WorkoutModal workout={selectedWorkout} onClose={() => setSelectedWorkout(null)} />
+
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+          <p className="text-[11px] text-zinc-500">Racha</p>
+          <p className="text-xl font-bold">{streak.current}</p>
+        </div>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+          <p className="text-[11px] text-zinc-500">Sesiones mes</p>
+          <p className="text-xl font-bold">{monthSessions.length}</p>
+        </div>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+          <p className="text-[11px] text-zinc-500">Volumen mes</p>
+          <p className="text-xl font-bold">{Math.round(monthVolume).toLocaleString()}</p>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => setMode("summary")}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold border ${
+            mode === "summary"
+              ? "bg-red-600/25 text-red-200 border-red-500/40"
+              : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50"
+          }`}
+        >
+          Resumen
+        </button>
+        <button
+          onClick={() => setMode("detail")}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold border ${
+            mode === "detail"
+              ? "bg-red-600/25 text-red-200 border-red-500/40"
+              : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50"
+          }`}
+        >
+          Detalle
+        </button>
+      </div>
+
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+        {loading ? (
+          <div className="py-10 text-center text-zinc-500 text-sm">Loading season...</div>
+        ) : (
+          <div className="space-y-4 max-h-[52vh] overflow-y-auto pr-1">
+            {months.map((month) => (
+              <div key={month.key} className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-3">
+                <p className="text-xs font-semibold text-zinc-300 mb-2">{month.label}</p>
+                <div className="grid grid-cols-7 gap-1 mb-1">
+                  {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+                    <p key={`${month.key}-${day}`} className="text-[10px] text-zinc-500 text-center">
+                      {day}
+                    </p>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {month.cells.map((cell, idx) => {
+                    if (!cell) return <div key={`${month.key}-empty-${idx}`} className="h-8" />;
+
+                    const key = calendarDateKey(cell);
+                    const day = dayByDate.get(key);
+                    const dayVolume = day ? day.workouts.reduce((n, w) => n + (w.total_volume_lbs || 0), 0) : 0;
+                    const isWorkout = !!day && day.workouts.length > 0;
+                    const isToday = dayDiff(cell, today) === 0;
+                    const isFuture = dayDiff(cell, today) > 0;
+                    const isSelected = selectedDate === key;
+
+                    let className = "h-8 w-8 rounded-full flex items-center justify-center text-[11px] border transition-all ";
+
+                    if (isWorkout) {
+                      if (mode === "detail") {
+                        const alpha = Math.min(0.9, Math.max(0.25, dayVolume / maxDayVolume));
+                        className += `text-red-100 border-red-500/50 bg-red-500/${Math.round(alpha * 100)}`;
+                      } else {
+                        className += "text-red-950 border-red-400 bg-red-500/90";
+                      }
+                    } else if (isToday) {
+                      className += "bg-zinc-900 border-red-500 text-red-300";
+                    } else if (isFuture) {
+                      className += "bg-zinc-900 border-zinc-800 text-zinc-600";
+                    } else {
+                      className += "bg-zinc-800 border-zinc-700 text-zinc-300";
+                    }
+
+                    if (isSelected) className += " ring-2 ring-red-300/60";
+
+                    return (
+                      <button
+                        key={`${month.key}-${key}`}
+                        onClick={() => setSelectedDate(key)}
+                        className="flex items-center justify-center"
+                      >
+                        <span className={className}>{cell.getDate()}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-semibold text-zinc-300">{selectedDate}</p>
+          {selectedDay?.workouts?.length ? (
+            <p className="text-xs text-zinc-500">{selectedDay.workouts.length} sesiones</p>
+          ) : null}
+        </div>
+
+        {!selectedDay || selectedDay.workouts.length === 0 ? (
+          <p className="text-sm text-zinc-600">Sin entrenamiento en este dia.</p>
+        ) : (
+          <div className="space-y-2">
+            {selectedDay.workouts.map((w) => (
+              <button
+                key={w.id}
+                onClick={() => void openWorkout(w.id)}
+                className="w-full text-left rounded-xl border border-zinc-800 bg-zinc-950/80 p-3"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold truncate">{w.day_name?.replace(/_/g, " ") || "Workout"}</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      {w.total_sets} sets · {Math.round(w.total_volume_lbs).toLocaleString()} lbs
+                    </p>
+                  </div>
+                  <span className="text-xs text-zinc-500">{w.duration_min || 0} min</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {mode === "detail" && (
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+          <h3 className="text-sm font-semibold mb-3">Timeline del mes</h3>
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            {monthTimeline.length === 0 ? (
+              <p className="text-sm text-zinc-600">Sin sesiones en este mes.</p>
+            ) : (
+              monthTimeline.map((entry) => (
+                <button
+                  key={entry.date}
+                  onClick={() => setSelectedDate(entry.date)}
+                  className="w-full text-left rounded-lg border border-zinc-800 bg-zinc-950/70 px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm text-zinc-200">{entry.date}</p>
+                    <p className="text-xs text-zinc-500">{entry.sets} sets · {Math.round(entry.volume).toLocaleString()} lbs</p>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LibraryTab() {
   const [exercises, setExercises] = useState<ExerciseItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1219,41 +1484,16 @@ function ProtectionTab() {
 }
 
 export default function SettingsPage() {
-  const [active, setActive] = useState<"calendar" | "streaks">("calendar");
-
   return (
     <div className="max-w-2xl mx-auto overflow-x-hidden">
       <div className="mb-5 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.16),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(239,68,68,0.12)]">
         <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">GymOS</p>
         <h1 className="text-2xl font-bold tracking-tight">Historial</h1>
-        <p className="text-sm text-zinc-500 mt-1">Calendario y rachas en una sola vista</p>
-      </div>
-
-      <div className="flex gap-2 mb-5">
-        <button
-          onClick={() => setActive("calendar")}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold border ${
-            active === "calendar"
-              ? "bg-red-600/25 text-red-200 border-red-500/40"
-              : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50"
-          }`}
-        >
-          Calendario
-        </button>
-        <button
-          onClick={() => setActive("streaks")}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold border ${
-            active === "streaks"
-              ? "bg-red-600/25 text-red-200 border-red-500/40"
-              : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50"
-          }`}
-        >
-          Rachas
-        </button>
+        <p className="text-sm text-zinc-500 mt-1">Calendario, rachas y detalle en una vista</p>
       </div>
 
       <div className="animate-in fade-in duration-200">
-        {active === "calendar" ? <CalendarTab /> : <StreakTab />}
+        <UnifiedHistoryTab />
       </div>
     </div>
   );
