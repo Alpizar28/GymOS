@@ -39,6 +39,11 @@ interface TodayDraft {
     exercises: ExerciseState[];
 }
 
+interface UndoAction {
+    label: string;
+    previousExercises: ExerciseState[];
+}
+
 const DRAFT_PREFIX = "gymos:today-draft";
 
 function localDateISO() {
@@ -61,6 +66,15 @@ function hasSetData(s: ActualSet) {
 
 function normalizeIndices(sets: ActualSet[]) {
     return sets.map((s, i) => ({ ...s, index: i }));
+}
+
+function cloneExercises(state: ExerciseState[]) {
+    return state.map((ex) => ({
+        ...ex,
+        plannedSets: ex.plannedSets.map((set) => ({ ...set })),
+        sets: ex.sets.map((set) => ({ ...set })),
+        lastSession: ex.lastSession ? ex.lastSession.map((set) => ({ ...set })) : ex.lastSession,
+    }));
 }
 
 function mergeExercises(base: ExerciseState[], incoming: ExerciseState[]) {
@@ -808,7 +822,8 @@ function CompleteModal({ workoutId, onComplete, onClose }: {
 
 // ─── Set Card ────────────────────────────────────────────────────────────────
 
-function SetCard({ index, planned, actual, lastData, onChange, onRemove, onCopyAbove, onComplete: onDone }: {
+function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, onRemove, onCopyAbove, onComplete: onDone }: {
+    exerciseIndex: number;
     index: number;
     planned: TodaySet | null;
     actual: ActualSet;
@@ -816,7 +831,7 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onCopyA
     onChange: (u: ActualSet) => void;
     onRemove: () => void;
     onCopyAbove: () => void;
-    onComplete: () => void; // triggers rest timer
+    onComplete: (setIndex: number) => void; // triggers rest timer + next focus
 }) {
     const upd = (f: Partial<ActualSet>) => onChange({ ...actual, ...f });
     const visual = setTypeVisual(planned, actual);
@@ -854,6 +869,7 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onCopyA
                 <div>
                     <label className="block text-xs text-zinc-600 mb-1">lbs</label>
                     <input type="number" step="2.5" inputMode="decimal"
+                        id={`set-${exerciseIndex}-${index}-weight`}
                         value={actual.actual_weight ?? ""}
                         onChange={(e) => upd({ actual_weight: e.target.value ? parseFloat(e.target.value) : null })}
                         placeholder={planned?.weight_lbs ? String(planned.weight_lbs) : "lb"}
@@ -862,6 +878,7 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onCopyA
                 <div>
                     <label className="block text-xs text-zinc-600 mb-1">reps</label>
                     <input type="number" inputMode="numeric"
+                        id={`set-${exerciseIndex}-${index}-reps`}
                         value={actual.actual_reps ?? ""}
                         onChange={(e) => upd({ actual_reps: e.target.value ? parseInt(e.target.value) : null })}
                         placeholder={planned?.target_reps ? String(planned.target_reps) : "reps"}
@@ -870,6 +887,7 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onCopyA
                 <div>
                     <label className="block text-xs text-zinc-600 mb-1">RIR</label>
                     <input type="number" inputMode="numeric" min="0" max="5"
+                        id={`set-${exerciseIndex}-${index}-rir`}
                         value={actual.actual_rir ?? ""}
                         onChange={(e) => upd({ actual_rir: e.target.value ? parseInt(e.target.value) : null })}
                         placeholder={planned?.rir_target != null ? String(planned.rir_target) : "RIR"}
@@ -881,7 +899,7 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onCopyA
                     <button
                         onClick={() => {
                             upd({ completed: !actual.completed });
-                            if (!actual.completed) onDone(); // trigger rest timer on marking done
+                            if (!actual.completed) onDone(index); // trigger rest timer on marking done
                         }}
                         className={`w-full py-2.5 rounded-lg font-bold text-base transition-colors touch-manipulation ${actual.completed
                                 ? "bg-red-600 text-white"
@@ -898,7 +916,8 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onCopyA
 
 // ─── Exercise Accordion ──────────────────────────────────────────────────────
 
-function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet, onCopyPreviousSet, onRemoveExercise, onSwap, onMoveUp, onMoveDown, onSetComplete }: {
+function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddSet, onRemoveSet, onCopyPreviousSet, onRemoveExercise, onSwap, onMoveUp, onMoveDown, onSetComplete }: {
+    exerciseIndex: number;
     state: ExerciseState;
     onToggle: () => void;
     onSetChange: (si: number, u: ActualSet) => void;
@@ -909,7 +928,7 @@ function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet
     onSwap: () => void;
     onMoveUp: () => void;
     onMoveDown: () => void;
-    onSetComplete: () => void;
+    onSetComplete: (setIndex: number) => void;
 }) {
     const { open, sets, plannedSets, lastSession } = state;
     const done = sets.filter((s) => s.completed).length;
@@ -948,6 +967,7 @@ function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet
                         {sets.map((actual, i) => (
                             <SetCard
                                 key={i}
+                                exerciseIndex={exerciseIndex}
                                 index={i}
                                 planned={plannedSets[i] ?? null}
                                 actual={actual}
@@ -996,11 +1016,37 @@ export default function TodayPage() {
     const [restTimerLeft, setRestTimerLeft] = useState<number | null>(null);
     const [restRunning, setRestRunning] = useState(false);
     const [restDefaultSeconds, setRestDefaultSeconds] = useState(120);
+    const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+    const undoTimeoutRef = useRef<number | null>(null);
     const draftReadyRef = useRef(false);
     const [lastDraftSaveAt, setLastDraftSaveAt] = useState<number | null>(null);
     const [restoredDraft, setRestoredDraft] = useState(false);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
+
+    const clearUndoTimeout = useCallback(() => {
+        if (undoTimeoutRef.current !== null) {
+            window.clearTimeout(undoTimeoutRef.current);
+            undoTimeoutRef.current = null;
+        }
+    }, []);
+
+    const queueUndo = useCallback((previousExercises: ExerciseState[], label: string) => {
+        clearUndoTimeout();
+        setUndoAction({ previousExercises: cloneExercises(previousExercises), label });
+        undoTimeoutRef.current = window.setTimeout(() => {
+            setUndoAction(null);
+            undoTimeoutRef.current = null;
+        }, 5000);
+    }, [clearUndoTimeout]);
+
+    const applyUndo = useCallback(() => {
+        if (!undoAction) return;
+        clearUndoTimeout();
+        setExercises(cloneExercises(undoAction.previousExercises));
+        setUndoAction(null);
+        showToast("Undo applied");
+    }, [undoAction, clearUndoTimeout]);
 
     const buildExerciseStateFromPlan = useCallback((data: TodayPlan): ExerciseState[] => (
         data.exercises.map((ex) => ({
@@ -1131,10 +1177,12 @@ export default function TodayPage() {
         setNextDay(null);
         setRestTimerLeft(null);
         setRestRunning(false);
+        clearUndoTimeout();
+        setUndoAction(null);
 
         writeDraftNow(data.day_name, merged, recoveredWorkoutId);
         draftReadyRef.current = true;
-    }, [buildExerciseStateFromPlan, hydrateFromLoggedWorkout, readDraft, writeDraftNow]);
+    }, [buildExerciseStateFromPlan, clearUndoTimeout, hydrateFromLoggedWorkout, readDraft, writeDraftNow]);
 
     const loadDayMeta = useCallback(async () => {
         const [options, rec] = await Promise.all([
@@ -1154,6 +1202,8 @@ export default function TodayPage() {
         }, 400);
         return () => window.clearTimeout(timer);
     }, [plan, exercises, savedId, writeDraftNow]);
+
+    useEffect(() => () => clearUndoTimeout(), [clearUndoTimeout]);
 
     useEffect(() => {
         if (!plan) return;
@@ -1263,11 +1313,15 @@ export default function TodayPage() {
         setExercises((p) => p.map((e, i) => i === exIdx ? { ...e, sets: [...e.sets, newSet(e.sets.length)] } : e));
 
     const removeSet = (exIdx: number, si: number) =>
-        setExercises((p) =>
-            p.map((e, i) => i === exIdx
+        setExercises((p) => {
+            const target = p[exIdx];
+            if (!target || !target.sets[si]) return p;
+            const next = p.map((e, i) => i === exIdx
                 ? { ...e, sets: e.sets.filter((_, j) => j !== si).map((s, j) => ({ ...s, index: j })) }
-                : e)
-        );
+                : e);
+            queueUndo(p, `${target.name}: set removed`);
+            return next;
+        });
 
     const copyPreviousSet = (exIdx: number, si: number) =>
         setExercises((p) =>
@@ -1291,7 +1345,14 @@ export default function TodayPage() {
             })
         );
 
-    const removeExercise = (idx: number) => setExercises((p) => p.filter((_, i) => i !== idx));
+    const removeExercise = (idx: number) =>
+        setExercises((p) => {
+            const target = p[idx];
+            if (!target) return p;
+            const next = p.filter((_, i) => i !== idx);
+            queueUndo(p, `${target.name}: exercise removed`);
+            return next;
+        });
 
     const addExercise = (exercise: { name: string; is_anchor: boolean }) => {
         setExercises((p) => [
@@ -1372,9 +1433,25 @@ export default function TodayPage() {
         return () => window.clearInterval(timer);
     }, [restRunning, restTimerLeft]);
 
-    const startRestTimer = () => {
+    const focusNextSetInput = useCallback((exerciseIdx: number, setIdx: number) => {
+        const focusTarget = (exIndex: number, sIndex: number) => {
+            const el = document.getElementById(`set-${exIndex}-${sIndex}-weight`) as HTMLInputElement | null;
+            if (!el) return false;
+            el.focus();
+            el.select();
+            return true;
+        };
+
+        window.setTimeout(() => {
+            if (focusTarget(exerciseIdx, setIdx + 1)) return;
+            focusTarget(exerciseIdx + 1, 0);
+        }, 50);
+    }, []);
+
+    const startRestTimer = (exerciseIdx: number, setIdx: number) => {
         setRestTimerLeft(restDefaultSeconds);
         setRestRunning(true);
+        focusNextSetInput(exerciseIdx, setIdx);
     };
 
     const totalSets = exercises.reduce((n, e) => n + e.sets.length, 0);
@@ -1667,6 +1744,7 @@ export default function TodayPage() {
                         {visibleExerciseItems.map(({ ex, index: i }) => (
                             <ExerciseAccordion
                                 key={`${ex.name}-${i}`}
+                                exerciseIndex={i}
                                 state={ex}
                                 onToggle={() => handleToggle(i)}
                                 onSetChange={(si, u) => updateSet(i, si, u)}
@@ -1677,7 +1755,7 @@ export default function TodayPage() {
                                 onSwap={() => setSwapFor(ex.name)}
                                 onMoveUp={() => moveExercise(i, -1)}
                                 onMoveDown={() => moveExercise(i, 1)}
-                                onSetComplete={startRestTimer}
+                                onSetComplete={(si) => startRestTimer(i, si)}
                             />
                         ))}
                     </div>
@@ -1712,6 +1790,18 @@ export default function TodayPage() {
                             Finish
                         </button>
                     </div>
+                </div>
+            )}
+
+            {undoAction && (
+                <div className="fixed bottom-36 left-4 right-4 z-40 sm:left-auto sm:right-6 sm:w-auto sm:max-w-sm px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl flex items-center justify-between gap-3">
+                    <p className="text-xs text-zinc-300 truncate">{undoAction.label}</p>
+                    <button
+                        onClick={applyUndo}
+                        className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold"
+                    >
+                        Undo
+                    </button>
                 </div>
             )}
 
