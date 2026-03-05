@@ -2,14 +2,68 @@ import { NextRequest } from "next/server";
 
 const DEFAULT_BACKEND = "http://backend:8000";
 const DEFAULT_PROXY_TIMEOUT_MS = 60000;
+const BACKEND_DISCOVERY_TTL_MS = 60_000;
+
+let cachedBackendBase: string | null = null;
+let cachedBackendAt = 0;
 
 function backendBaseUrl() {
   return (
     process.env.BACKEND_URL ||
     process.env.SERVICE_URL_BACKEND ||
+    process.env.COOLIFY_URL_BACKEND ||
     process.env.NEXT_PUBLIC_BACKEND_URL ||
     DEFAULT_BACKEND
   ).replace(/\/$/, "");
+}
+
+function backendCandidates() {
+  const values = [
+    process.env.BACKEND_URL,
+    process.env.SERVICE_URL_BACKEND,
+    process.env.COOLIFY_URL_BACKEND,
+    process.env.NEXT_PUBLIC_BACKEND_URL,
+    DEFAULT_BACKEND,
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+  ]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => value.replace(/\/$/, ""));
+
+  return [...new Set(values)];
+}
+
+async function resolveBackendBaseUrl() {
+  const now = Date.now();
+  if (cachedBackendBase && now - cachedBackendAt < BACKEND_DISCOVERY_TTL_MS) {
+    return cachedBackendBase;
+  }
+
+  const candidates = backendCandidates();
+  for (const candidate of candidates) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    try {
+      const health = await fetch(`${candidate}/api/health`, {
+        method: "GET",
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      if (health.ok) {
+        cachedBackendBase = candidate;
+        cachedBackendAt = now;
+        return candidate;
+      }
+    } catch {
+      // Continue to next candidate.
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  cachedBackendBase = backendBaseUrl();
+  cachedBackendAt = now;
+  return cachedBackendBase;
 }
 
 function proxyTimeoutMs() {
@@ -21,7 +75,8 @@ function proxyTimeoutMs() {
 
 async function proxy(request: NextRequest, method: string, path: string[]) {
   const url = new URL(request.url);
-  const target = `${backendBaseUrl()}/api/${path.join("/")}${url.search}`;
+  const baseUrl = await resolveBackendBaseUrl();
+  const target = `${baseUrl}/api/${path.join("/")}${url.search}`;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), proxyTimeoutMs());
@@ -49,6 +104,9 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
       headers: resHeaders,
     });
   } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[api-proxy] ${method} ${target} failed: ${message}`);
+
     if (error instanceof Error && error.name === "AbortError") {
       return Response.json(
         { detail: "Backend timeout" },

@@ -1,0 +1,172 @@
+# GymOS
+
+Personal training operating system built for a high-frequency lifter workflow.
+
+GymOS combines training plan generation, deterministic progression, session logging,
+history analytics, routines management, and profile-level health context in one
+mobile-first experience.
+
+---
+
+## Why GymOS
+
+Most fitness tools split your workflow across multiple apps:
+- one for routines,
+- one for workout logging,
+- one for body metrics,
+- one for nutrition.
+
+GymOS is designed to unify that lifecycle with a clear UX and a robust backend.
+
+---
+
+## Product Highlights
+
+- **Today-first UX**: root route redirects to `/today` for immediate training flow.
+- **Step-based training UI**: choose -> train, with draft persistence and focus mode.
+- **Routines module**: folders, routine cards, detailed set structures (W/A/E), start/share/duplicate.
+- **Unified Historial**: calendar + streaks + selected-day drill-down in one view.
+- **Perfil hub**: personal data, templates, exercise library, protections, stats.
+- **PWA-ready frontend**: installable app shell with offline fallback.
+- **Coolify-friendly proxying**: resilient API proxy with timeout handling.
+
+---
+
+## Tech Stack
+
+### Backend
+- Python 3.11+
+- FastAPI
+- SQLAlchemy async
+- SQLite (`aiosqlite`)
+
+### Frontend
+- Next.js 16 (App Router)
+- React 19
+- Tailwind CSS
+
+### Intelligence
+- OpenAI-based planning (generation layer)
+- deterministic progression engine (execution/rule layer)
+
+---
+
+## Repository Structure
+
+```text
+GymOS/
+├── src/                  # FastAPI backend
+├── web/                  # Next.js frontend
+├── tests/                # pytest suite
+├── scripts/              # seed + offline data pipeline
+├── data/                 # athlete source/generated data
+├── mejoras/              # product/UX roadmap docs
+├── docker-compose.yaml
+├── Dockerfile.backend
+├── Dockerfile.frontend
+├── AGENTS.md
+└── CLAUDE.md
+```
+
+---
+
+## Quick Start
+
+## 1) Backend
+
+```bash
+pip install -e ".[dev]"
+python -m src.main
+```
+
+Backend runs at `http://localhost:8000`.
+
+## 2) Frontend
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Frontend runs at `http://localhost:3000`.
+
+## 3) Full stack with Docker
+
+```bash
+docker-compose up --build
+```
+
+---
+
+## Useful Commands
+
+### Backend
+
+```bash
+pytest tests/ -v
+ruff check src/
+ruff format src/
+python scripts/seed_db.py
+```
+
+### Frontend
+
+```bash
+cd web
+npm run build
+npm run lint
+```
+
+---
+
+## Main App Routes
+
+- `/today` — main training flow
+- `/routines` — routine folders/cards
+- `/routines/[id]` — routine detail and editor
+- `/settings` — unified history (summary/detail)
+- `/profile` — personal profile and training utilities
+- `/workouts` — workout records
+- `/` — redirects to `/today`
+
+---
+
+## Roadmap Docs
+
+Planning is organized by horizon in `mejoras/`:
+
+- `mejoras/01_posibles_mejoras_proximas.md`
+- `mejoras/02_mejoras_mediano_plazo.md`
+- `mejoras/03_mejoras_largo_plazo.md`
+
+Includes near-term UX improvements, medium-term body metrics integration
+(Megafit/Cubitt manual-first), and long-term nutrition module goals.
+
+---
+
+## Deployment Notes
+
+- Frontend API traffic is proxied through `web/app/api/[...path]/route.ts`.
+- Proxy timeout is configurable via `PROXY_TIMEOUT_MS` (default 60s).
+- Designed for container deployment (Coolify-compatible).
+
+---
+
+## Current Design Direction
+
+- Dark theme, red accent system
+- Mobile-first interactions
+- Minimal UI by default, deeper analytics on-demand
+- Functional consistency over visual novelty
+
+---
+
+## Contributing (Internal)
+
+Before opening PR/merge:
+
+1. `npm run build` passes in `web/`
+2. Backend compiles/tests for touched modules
+3. No accidental UX regressions on mobile
+4. Keep `AGENTS.md` and roadmap docs aligned when architecture/product direction changes
