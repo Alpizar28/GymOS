@@ -895,7 +895,6 @@ function StreakTab() {
       <div className="rounded-2xl border border-red-500/25 bg-gradient-to-br from-red-600/25 to-red-500/10 p-5">
         <div className="flex items-start justify-between">
           <p className="text-6xl leading-none font-black text-white">{streak.current}</p>
-          <span className="text-4xl">🔥</span>
         </div>
         <p className="text-base font-semibold mt-2 text-red-100">current streak</p>
         <p className="text-xs text-red-200/80 mt-1">Longest: {streak.longest}</p>

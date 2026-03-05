@@ -732,7 +732,7 @@ function CompleteModal({ workoutId, onComplete, onClose }: {
 }) {
     const [fatigue, setFatigue] = useState(5);
     const [saving, setSaving] = useState(false);
-    const label = fatigue <= 3 ? "Easy 💪" : fatigue <= 6 ? "Moderate 😤" : fatigue <= 8 ? "Hard 😓" : "Destroyed 💀";
+    const label = fatigue <= 3 ? "Easy" : fatigue <= 6 ? "Moderate" : fatigue <= 8 ? "Hard" : "Exhausted";
     async function go() {
         setSaving(true);
         try { const r = await api.completeSession(workoutId, fatigue); onComplete(r.next_day_index); }
@@ -1081,7 +1081,7 @@ export default function TodayPage() {
             recoveredWorkoutId = localDraft.savedId ?? recoveredWorkoutId;
             setRestoredDraft(true);
             if (showRestoreToast) {
-                showToast("📝 Borrador restaurado");
+                showToast("Borrador restaurado");
             }
         } else {
             setRestoredDraft(false);

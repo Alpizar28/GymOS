@@ -26,19 +26,19 @@ export const viewport: Viewport = {
 
 // Bottom tab bar (mobile) — 5 most-used items
 const bottomTabs = [
-  { href: "/today",    label: "Today",    icon: "🏋️" },
-  { href: "/routines", label: "Rutinas",  icon: "📚" },
-  { href: "/settings", label: "Historial", icon: "📅" },
-  { href: "/profile",  label: "Perfil",   icon: "👤" },
+  { href: "/today",    label: "Today" },
+  { href: "/routines", label: "Rutinas" },
+  { href: "/settings", label: "Historial" },
+  { href: "/profile",  label: "Perfil" },
 ];
 
 // Top nav (desktop only)
 const topNavLinks = [
-  { href: "/today",    label: "Today",    icon: "🏋️" },
-  { href: "/routines", label: "Routines", icon: "📚" },
-  { href: "/workouts", label: "Workouts", icon: "📝" },
-  { href: "/settings", label: "Settings", icon: "⚙️" },
-  { href: "/profile",  label: "Perfil",   icon: "👤" },
+  { href: "/today",    label: "Today" },
+  { href: "/routines", label: "Routines" },
+  { href: "/workouts", label: "Workouts" },
+  { href: "/settings", label: "Settings" },
+  { href: "/profile",  label: "Perfil" },
 ];
 
 export default function RootLayout({
@@ -65,7 +65,7 @@ export default function RootLayout({
         <nav className="hidden sm:block fixed top-0 left-0 right-0 z-50 bg-zinc-950/85 backdrop-blur-xl border-b border-zinc-800/60">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center h-16 gap-6">
             <span className="text-xl font-bold bg-gradient-to-r from-red-500 to-red-400 bg-clip-text text-transparent">
-              🏋️ GymOS
+              GymOS
             </span>
             <ul className="flex gap-1">
               {topNavLinks.map((link) => (
@@ -74,7 +74,6 @@ export default function RootLayout({
                     href={link.href}
                     className="px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:text-zinc-100 hover:bg-red-500/10 transition-all duration-200"
                   >
-                    <span className="mr-1.5">{link.icon}</span>
                     {link.label}
                   </Link>
                 </li>
@@ -99,7 +98,6 @@ export default function RootLayout({
                 href={tab.href}
                 className="flex-1 min-w-0 flex flex-col items-center justify-center py-2 gap-1 text-zinc-500 active:text-red-400 touch-manipulation"
               >
-                <span className="text-xl leading-none">{tab.icon}</span>
                 <span className="text-[9px] font-semibold tracking-wide truncate max-w-full px-0.5">{tab.label}</span>
               </Link>
             ))}

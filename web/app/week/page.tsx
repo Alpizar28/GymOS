@@ -4,18 +4,18 @@ import { useEffect, useState } from "react";
 import { api, type WeekDay, type PlanExercise } from "@/lib/api";
 
 const LOCK_ICONS: Record<string, string> = {
-    Push_Heavy: "🔴",
-    Push_Light: "🟠",
-    Pull_Heavy: "🔵",
-    Pull_Light: "🟣",
-    Legs_Heavy: "🟢",
-    Legs_Light: "🟡",
+    Push_Heavy: "PH",
+    Push_Light: "PL",
+    Pull_Heavy: "RH",
+    Pull_Light: "RL",
+    Legs_Heavy: "LH",
+    Legs_Light: "LL",
 };
 
 function DayCard({ day, onGenerate, loading }: { day: WeekDay; onGenerate: () => void; loading: boolean }) {
     const [open, setOpen] = useState(false);
     const focusParts = day.focus.split(",").map((f) => f.trim());
-    const icon = LOCK_ICONS[day.name] ?? "⚪";
+    const icon = LOCK_ICONS[day.name] ?? "--";
 
     return (
         <div
@@ -52,7 +52,7 @@ function DayCard({ day, onGenerate, loading }: { day: WeekDay; onGenerate: () =>
                             disabled={loading}
                             className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600/20 text-red-300 hover:bg-red-600/40 transition disabled:opacity-50"
                         >
-                            {loading ? "Generating..." : "⚡ Generate"}
+                            {loading ? "Generating..." : "Generate"}
                         </button>
                     )}
                 </div>
@@ -62,16 +62,16 @@ function DayCard({ day, onGenerate, loading }: { day: WeekDay; onGenerate: () =>
             {open && day.plan && (
                 <div className="px-5 pb-4 border-t border-zinc-700/30 pt-3">
                     <div className="flex items-center gap-3 text-xs text-zinc-500 mb-3">
-                        <span>⏱ ~{day.plan.estimated_duration_min} min</span>
-                        <span>📊 {day.plan.total_sets} sets</span>
+                        <span>~{day.plan.estimated_duration_min} min</span>
+                        <span>{day.plan.total_sets} sets</span>
                         {day.plan.estimated_volume_lbs > 0 && (
-                            <span>💪 ~{Math.round(day.plan.estimated_volume_lbs).toLocaleString()} lbs</span>
+                            <span>~{Math.round(day.plan.estimated_volume_lbs).toLocaleString()} lbs</span>
                         )}
                     </div>
                     <div className="space-y-1">
                         {day.plan.exercises.map((ex: PlanExercise, i: number) => (
                             <div key={i} className="flex items-center gap-2 text-sm text-zinc-300">
-                                <span>{ex.is_anchor ? "🔴" : "⚪"}</span>
+                                <span>{ex.is_anchor ? "A" : "-"}</span>
                                 <span className="font-medium">{ex.name}</span>
                                 <span className="text-zinc-600">
                                     {ex.sets.length} sets
@@ -141,7 +141,7 @@ export default function WeekPage() {
     if (error) {
         return (
             <div className="flex items-center justify-center h-64 text-red-400">
-                ⚠️ {error}
+                Error: {error}
             </div>
         );
     }
@@ -161,7 +161,7 @@ export default function WeekPage() {
                     disabled={generatingAll}
                     className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-red-500/25 hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
                 >
-                    {generatingAll ? "⏳ Generating..." : "⚡ Generate All 6 Days"}
+                    {generatingAll ? "Generating..." : "Generate All 6 Days"}
                 </button>
             </div>
 

@@ -131,7 +131,7 @@ export default function ProgressPage() {
   async function handleShare() {
     if (sharing) return;
     setSharing(true);
-    const text = `🔥 GymOS Streak\nCurrent: ${streak.current}\nLongest: ${streak.longest}`;
+    const text = `GymOS Streak\nCurrent: ${streak.current}\nLongest: ${streak.longest}`;
     try {
       if (navigator.share) {
         await navigator.share({ title: "GymOS Streak", text });
@@ -167,7 +167,6 @@ export default function ProgressPage() {
       <div className="rounded-2xl border border-red-500/25 bg-gradient-to-br from-red-600/25 to-red-500/10 p-5 mb-4">
         <div className="flex items-start justify-between">
           <p className="text-6xl leading-none font-black text-white">{streak.current}</p>
-          <span className="text-4xl">🔥</span>
         </div>
         <p className="text-base font-semibold mt-2 text-red-100">current streak!</p>
         <p className="text-xs text-red-200/80 mt-1">Longest: {streak.longest}</p>
@@ -204,10 +203,10 @@ export default function ProgressPage() {
 
                     if (isWorkout && isToday) {
                       className += "bg-red-500 border-red-300 text-red-950 ring-2 ring-red-300/60";
-                      content = "💪";
+                      content = "W";
                     } else if (isWorkout) {
                       className += "bg-red-500/80 border-red-400 text-red-950";
-                      content = "💪";
+                      content = "W";
                     } else if (isToday) {
                       className += "bg-zinc-900 border-red-500 text-red-300";
                     } else if (isFuture) {

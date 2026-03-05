@@ -5,7 +5,6 @@ import {
   api,
   type DashboardData,
   type ExerciseItem,
-  type DayOption,
   type PersonalProfile,
   type ProtectionRule,
   type CalendarDay,
@@ -47,11 +46,10 @@ const MUSCLE_GROUPS = [
 ];
 
 const SECTIONS = [
-  { id: "personal",   label: "Datos",      icon: "👤" },
-  { id: "stats",      label: "Stats",      icon: "📊" },
-  { id: "templates",  label: "Plantillas", icon: "📋" },
-  { id: "library",    label: "Ejercicios", icon: "📚" },
-  { id: "protection", label: "Protección", icon: "🛡️" },
+  { id: "personal",   label: "Datos" },
+  { id: "stats",      label: "Stats" },
+  { id: "library",    label: "Ejercicios" },
+  { id: "protection", label: "Proteccion" },
 ] as const;
 
 type SectionId = typeof SECTIONS[number]["id"];
@@ -284,21 +282,58 @@ function PersonalSection({ onSaved }: { onSaved?: (profile: PersonalProfile) => 
 
 function StatsSection() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [last14Days, setLast14Days] = useState<CalendarDay[]>([]);
 
   useEffect(() => {
-    api.getDashboard().then(setData).catch(() => {});
+    const today = new Date();
+    const fromDate = addDays(today, -13);
+
+    Promise.all([
+      api.getDashboard(),
+      api.getCalendar(formatISO(fromDate), formatISO(today)),
+    ])
+      .then(([dashboard, calendar]) => {
+        setData(dashboard);
+        setLast14Days(calendar);
+      })
+      .catch(() => {});
   }, []);
 
   if (!data) return <Spinner />;
 
   const { state, weekly_stats } = data;
+  const anchorProgress = weekly_stats.anchor_progress ?? [];
+
+  const workouts = weekly_stats.workouts ?? 0;
+  const totalSets = weekly_stats.total_sets ?? 0;
+  const totalVolume = weekly_stats.total_volume_lbs ?? 0;
+
+  const volumePerWorkout = workouts > 0 ? totalVolume / workouts : 0;
+  const setsPerWorkout = workouts > 0 ? totalSets / workouts : 0;
+
+  const anchorsTotal = anchorProgress.length;
+  const anchorsDeload = anchorProgress.filter((a) => a.status === "deload").length;
+  const anchorsConsolidating = anchorProgress.filter((a) => a.status === "consolidate").length;
+  const topAnchorStreak = anchorProgress.reduce((max, item) => Math.max(max, item.streak ?? 0), 0);
+
+  const sessions14d = last14Days.reduce((count, day) => count + (day.workouts.length > 0 ? 1 : 0), 0);
+  const fatigueState =
+    state.fatigue_score >= 7 ? "Alta" : state.fatigue_score >= 4 ? "Moderada" : "Baja";
 
   const cards = [
     { label: "Siguiente día",   value: formatDayLabel(state.next_day_name), sub: `Día ${state.next_day_index}` },
     { label: "Fatiga",          value: state.fatigue_score.toFixed(1),       sub: "/ 10" },
-    { label: "Sesiones semana", value: String(weekly_stats.workouts ?? 0),   sub: "esta semana" },
-    { label: "Volumen semana",  value: `${((weekly_stats.total_volume_lbs ?? 0) / 1000).toFixed(1)}k`, sub: "lbs totales" },
-    { label: "Sets semana",     value: String(weekly_stats.total_sets ?? 0), sub: "sets realizados" },
+    { label: "Estado fatiga",   value: fatigueState,                           sub: "estado actual" },
+    { label: "Sesiones semana", value: String(workouts),                       sub: "esta semana" },
+    { label: "Volumen semana",  value: `${(totalVolume / 1000).toFixed(1)}k`, sub: "lbs totales" },
+    { label: "Sets semana",     value: String(totalSets),                      sub: "sets realizados" },
+    { label: "Volumen por sesión", value: `${Math.round(volumePerWorkout)}`,   sub: "lbs por sesión" },
+    { label: "Sets por sesión", value: setsPerWorkout.toFixed(1),              sub: "promedio" },
+    { label: "Sesiones 14 días", value: String(sessions14d),                   sub: "actividad reciente" },
+    { label: "Anchors activos", value: String(anchorsTotal),                   sub: "objetivos seguidos" },
+    { label: "Anchors en deload", value: String(anchorsDeload),                sub: "carga reducida" },
+    { label: "Anchors consolidando", value: String(anchorsConsolidating),      sub: "misma carga" },
+    { label: "Mejor racha anchor", value: String(topAnchorStreak),             sub: "sesiones seguidas" },
   ];
 
   return (
@@ -483,228 +518,6 @@ function MiniCalendarSection() {
   );
 }
 
-// ── Templates ─────────────────────────────────────────────────────────────────
-
-function TemplatesSection() {
-  const [options, setOptions] = useState<DayOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState<string | null>(null);
-  const [planByTemplate, setPlanByTemplate] = useState<Record<string, { exercises: { name: string; sets: { set_type: string; weight_lbs: number | null; target_reps: number | null; rir_target?: number | null }[] }[] }>>({});
-  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
-  const [planErrors, setPlanErrors] = useState<Record<string, string>>({});
-  const [templateSearch, setTemplateSearch] = useState("");
-  const [showSetPreview, setShowSetPreview] = useState(false);
-
-  useEffect(() => {
-    api.getDayOptions().then(setOptions).catch(() => {}).finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const saved = window.localStorage.getItem("profile:templates:showPreview");
-    setShowSetPreview(saved === "1");
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("profile:templates:showPreview", showSetPreview ? "1" : "0");
-  }, [showSetPreview]);
-
-  if (loading) return <Spinner />;
-  if (options.length === 0)
-    return <p className="text-sm text-zinc-600 text-center py-6">No hay plantillas configuradas.</p>;
-
-  const SPLIT_COLORS: Record<string, string> = {
-    push: "bg-red-500/15 text-red-300 border-red-500/30",
-    pull: "bg-red-500/15 text-red-300 border-red-500/30",
-    leg: "bg-red-500/15 text-red-300 border-red-500/30",
-    arm: "bg-red-500/15 text-red-300 border-red-500/30",
-  };
-
-  function splitColor(name: string) {
-    const n = name.toLowerCase();
-    if (n.includes("push") || n.includes("pecho")) return SPLIT_COLORS.push;
-    if (n.includes("pull") || n.includes("espalda")) return SPLIT_COLORS.pull;
-    if (n.includes("leg") || n.includes("pierna") || n.includes("quad") || n.includes("femoral")) return SPLIT_COLORS.leg;
-    if (n.includes("arm") || n.includes("brazo")) return SPLIT_COLORS.arm;
-    return "bg-zinc-700/30 text-zinc-300 border-zinc-600/40";
-  }
-
-  async function loadTemplatePreview(templateName: string) {
-    setPlanErrors((prev) => {
-      const next = { ...prev };
-      delete next[templateName];
-      return next;
-    });
-    setLoadingPlan(templateName);
-    try {
-      const plan = await api.generateDay(templateName);
-      setPlanByTemplate((prev) => ({
-        ...prev,
-        [templateName]: {
-          exercises: plan.exercises.map((ex) => ({
-            name: ex.name,
-            sets: ex.sets,
-          })),
-        },
-      }));
-    } catch {
-      setPlanErrors((prev) => ({
-        ...prev,
-        [templateName]: "No se pudo cargar el detalle de sets de esta plantilla.",
-      }));
-    } finally {
-      setLoadingPlan((prev) => (prev === templateName ? null : prev));
-    }
-  }
-
-  async function handleToggleTemplate(templateName: string, isCurrentlyOpen: boolean) {
-    if (isCurrentlyOpen) {
-      setOpen(null);
-      return;
-    }
-
-    setOpen(templateName);
-    if (showSetPreview && !planByTemplate[templateName]) {
-      await loadTemplatePreview(templateName);
-    }
-  }
-
-  const filteredOptions = options.filter((opt) => {
-    const q = templateSearch.trim().toLowerCase();
-    if (!q) return true;
-    return [opt.name, opt.focus, ...(opt.exercises ?? [])].join(" ").toLowerCase().includes(q);
-  });
-
-  return (
-    <div className="space-y-3">
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3 space-y-3">
-        <input
-          type="text"
-          placeholder="Buscar plantilla o ejercicio..."
-          value={templateSearch}
-          onChange={(e) => setTemplateSearch(e.target.value)}
-          className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-red-500/40"
-        />
-        <button
-          onClick={() => setShowSetPreview((v) => !v)}
-          className={`w-full px-3 py-2 rounded-lg border text-sm font-semibold transition ${
-            showSetPreview
-              ? "border-red-500/40 bg-red-500/20 text-red-200"
-              : "border-zinc-700 bg-zinc-800 text-zinc-300"
-          }`}
-        >
-          {showSetPreview ? "Ocultar preview de sets" : "Mostrar preview de sets"}
-        </button>
-      </div>
-
-      {filteredOptions.length === 0 && (
-        <p className="text-sm text-zinc-600 text-center py-6">No hay plantillas que coincidan.</p>
-      )}
-
-      {filteredOptions.map((opt) => {
-        const isOpen = open === opt.name;
-        const color = splitColor(opt.name);
-        const focuses = opt.focus.split(",").map((f) => f.trim()).filter(Boolean);
-        const templateExercises = (opt.exercises ?? []).filter((e) => e.trim().length > 0);
-        const preview = planByTemplate[opt.name];
-        const previewExerciseCount = preview?.exercises?.length ?? 0;
-        const previewSetCount = preview?.exercises?.reduce((n, ex) => n + ex.sets.length, 0) ?? 0;
-
-        return (
-          <div key={opt.name} className={`rounded-xl border ${color} overflow-hidden transition-all`}>
-            <button
-              className="w-full flex items-center justify-between px-4 py-3.5 text-left"
-              onClick={() => handleToggleTemplate(opt.name, isOpen)}
-            >
-              <div>
-                <p className="font-semibold text-sm">{formatDayLabel(opt.name)}</p>
-                <p className="text-xs opacity-60 mt-0.5">{focuses.join(" · ")}</p>
-              </div>
-              <span className="text-lg opacity-60">{isOpen ? "▲" : "▼"}</span>
-            </button>
-            {isOpen && (
-              <div className="px-4 pb-4 pt-1 border-t border-current/10">
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {focuses.map((f) => (
-                    <span key={f} className="px-2.5 py-1 rounded-full text-xs font-medium bg-black/20 border border-current/20">
-                      {f}
-                    </span>
-                  ))}
-                </div>
-
-                <details className="mt-3 rounded-lg border border-current/20 bg-black/20 px-3 py-2">
-                  <summary className="text-xs font-semibold cursor-pointer">Ejercicios de la plantilla</summary>
-                  {templateExercises.length > 0 ? (
-                    <div className="mt-2 space-y-1">
-                      {templateExercises.map((exercise) => (
-                        <p key={exercise} className="text-xs opacity-90">- {exercise}</p>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-xs opacity-70">No hay ejercicios definidos en anchors.</p>
-                  )}
-                </details>
-
-                {showSetPreview && (
-                  <details className="mt-3 rounded-lg border border-current/20 bg-black/20 px-3 py-2" open>
-                    <summary className="text-xs font-semibold cursor-pointer">Plan de sets (preview)</summary>
-                    {loadingPlan === opt.name ? (
-                      <p className="mt-2 text-xs opacity-70">Cargando sets...</p>
-                    ) : planErrors[opt.name] ? (
-                      <div className="mt-2 space-y-2">
-                        <p className="text-xs text-red-300">{planErrors[opt.name]}</p>
-                        <button
-                          onClick={() => loadTemplatePreview(opt.name)}
-                          className="px-2.5 py-1 rounded-lg border border-red-500/30 bg-red-500/15 text-red-200 text-xs"
-                        >
-                          Reintentar
-                        </button>
-                      </div>
-                    ) : previewExerciseCount > 0 ? (
-                      <div className="mt-2 space-y-2">
-                        <p className="text-xs opacity-80">{previewExerciseCount} ejercicios · {previewSetCount} sets</p>
-                        {preview.exercises.map((exercise) => (
-                          <details key={exercise.name} className="rounded-lg border border-current/20 p-2">
-                            <summary className="text-xs font-semibold cursor-pointer">{exercise.name}</summary>
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                              {exercise.sets.map((set, setIndex) => {
-                                const label = set.set_type === "warmup" ? "W" : set.set_type === "drop" ? "D" : `S${setIndex + 1}`;
-                                const weight = set.weight_lbs ?? "-";
-                                const reps = set.target_reps ?? "-";
-                                const rir = set.rir_target ?? "-";
-                                return (
-                                  <span key={`${exercise.name}-${setIndex}`} className="px-2 py-1 rounded-md text-[11px] border border-current/25 bg-black/20">
-                                    {label} · {weight}lb · {reps}r · RIR {rir}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          </details>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="mt-2 space-y-2">
-                        <p className="text-xs opacity-70">Sin preview de sets disponible.</p>
-                        <button
-                          onClick={() => loadTemplatePreview(opt.name)}
-                          className="px-2.5 py-1 rounded-lg border border-current/30 bg-black/20 text-xs"
-                        >
-                          Cargar preview
-                        </button>
-                      </div>
-                    )}
-                  </details>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 // ── Library ───────────────────────────────────────────────────────────────────
 
 const MUSCLE_FILTERS = [
@@ -782,7 +595,7 @@ function LibrarySection() {
             : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50"
         }`}
       >
-        🔴 Solo Anchors
+        Solo anchors
       </button>
 
       {/* Count */}
@@ -853,9 +666,9 @@ function ProtectionSection() {
     try {
       await api.addProtection(muscle, severity);
       load();
-      showToast(`🛡️ Protección activada para ${muscle}`);
+      showToast(`Proteccion activada para ${muscle}`);
     } catch {
-      showToast("❌ Error al añadir protección");
+      showToast("Error al anadir proteccion");
     } finally {
       setAdding(false);
     }
@@ -865,9 +678,9 @@ function ProtectionSection() {
     try {
       await api.removeProtection(m);
       setProtections((prev) => prev.filter((p) => p.muscle_group !== m));
-      showToast(`✅ Protección eliminada para ${m}`);
+      showToast(`Proteccion eliminada para ${m}`);
     } catch {
-      showToast("❌ Error al eliminar protección");
+      showToast("Error al eliminar proteccion");
     }
   }
 
@@ -911,7 +724,7 @@ function ProtectionSection() {
         </div>
       ) : (
         <div className="p-4 rounded-xl border border-zinc-800 text-zinc-600 text-sm text-center">
-          🟢 Sin protecciones activas — todo al 100%
+          Sin protecciones activas - todo al 100%
         </div>
       )}
 
@@ -951,7 +764,7 @@ function ProtectionSection() {
           disabled={adding}
           className="w-full py-2.5 bg-gradient-to-r from-red-600 to-red-500 text-white font-semibold rounded-lg hover:opacity-90 transition disabled:opacity-50"
         >
-          {adding ? "Añadiendo..." : `🛡️ Proteger ${muscle}`}
+          {adding ? "Anadiendo..." : `Proteger ${muscle}`}
         </button>
       </div>
 
@@ -997,7 +810,6 @@ export default function ProfilePage() {
                 : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50 hover:text-zinc-300"
             }`}
           >
-            <span>{s.icon}</span>
             {s.label}
           </button>
         ))}
@@ -1007,7 +819,6 @@ export default function ProfilePage() {
       <div className="animate-in fade-in duration-200">
         {active === "personal"   && <PersonalSection onSaved={setPersonalSummary} />}
         {active === "stats"      && <StatsSection />}
-        {active === "templates"  && <TemplatesSection />}
         {active === "library"    && <LibrarySection />}
         {active === "protection" && <ProtectionSection />}
       </div>
