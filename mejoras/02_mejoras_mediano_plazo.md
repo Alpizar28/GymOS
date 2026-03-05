@@ -8,6 +8,39 @@ Integracion de mediciones corporales (Megafit/Cubitt) con importacion manual y v
 
 ---
 
+## 0. Monetizacion y planes (publico + coaches)
+
+### 0.1 Alcance
+- Implementar el modelo de pricing definido en `mejoras/Vision.md`.
+- Separar completamente roles: coach vs cliente.
+- El plan del coach no desbloquea features premium del cliente.
+
+### 0.2 Entitlements publicos
+- Publico Free:
+  - historial 3 meses
+  - IA 5 rutinas/mes
+- Publico Pro ($10/mes):
+  - historial completo
+  - analitica avanzada
+  - IA 20-50 rutinas/mes
+  - exportaciones
+
+### 0.3 Entitlements para coach
+- Coach Free: hasta 5 clientes
+- Coach Pro ($20/mes): hasta 25 clientes + stats basicos + IA ampliada
+- Coach Full ($50/mes): hasta 100 clientes + stats agregados + IA avanzada
+- Branding completo en Pro/Full
+
+### 0.4 Tareas tecnicas
+1. Crear tabla `subscriptions` con estado y plan.
+2. Crear tabla `coach_profiles` y `coach_clients` (codigo de acceso).
+3. Definir limite de clientes por plan en backend.
+4. Implementar rate limits de IA por plan (publico y coach).
+5. UI para gestion de plan (upgrade/downgrade).
+6. Logs de uso (IA, clientes activos, exportaciones).
+
+---
+
 ## 1. Integracion Megafit/Cubitt (manual-first)
 
 ## 1.1 Contexto

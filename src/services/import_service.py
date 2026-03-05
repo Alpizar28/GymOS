@@ -343,11 +343,36 @@ async def seed_anchor_targets(session: AsyncSession) -> int:
     return count
 
 
+async def import_body_metrics_seed(
+    session: AsyncSession,
+    path: Path,
+) -> int:
+    """Import body metrics seed JSON. Returns inserted count."""
+    from src.services.body_metrics_service import import_body_metrics
+
+    data = json.loads(path.read_text())
+    source = str(data.get("source") or "seed").strip() or "seed"
+    records = data.get("records") or []
+    if not isinstance(records, list) or not records:
+        logger.warning("Body metrics seed file is empty")
+        return 0
+
+    result = await import_body_metrics(session, source=source, records=records)
+    logger.info(
+        "Imported body metrics seed: inserted=%d duplicates=%d errors=%d",
+        result["inserted"],
+        result["duplicates"],
+        result["errors"],
+    )
+    return int(result["inserted"])
+
+
 async def run_full_import(
     session: AsyncSession,
     athlete_profile_path: Path,
     exercise_library_path: Path,
     program_constraints_path: Path,
+    body_metrics_path: Path | None = None,
 ) -> dict[str, int]:
     """Run all import steps in order. Returns counts dict."""
     results: dict[str, int] = {}
@@ -359,6 +384,12 @@ async def run_full_import(
     results["week_template_days"] = await seed_week_template(session)
     await seed_athlete_state(session)
     results["anchor_targets"] = await seed_anchor_targets(session)
+
+    if body_metrics_path and body_metrics_path.exists():
+        results["body_metrics"] = await import_body_metrics_seed(session, body_metrics_path)
+    else:
+        results["body_metrics"] = 0
+
     await session.commit()
     logger.info("Full import complete: %s", results)
     return results

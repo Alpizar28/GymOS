@@ -301,12 +301,16 @@ Objetivo: cruzar training + body metrics con recomendaciones simples y accionabl
   - HIS-01..HIS-08
   - UX-03
   - BM-01..BM-04
+  - SP-01..SP-06
+  - CO-01..CO-05
 - Should:
   - UX-01, UX-02
   - BM-06, BM-07
   - AN-01, AN-03
+  - CO-06..CO-08
 - Could:
   - AN-04 y mejoras visuales no criticas
+  - SP-07 (hardening Postgres)
 - Won't (por ahora):
   - Integraciones API externas automaticas (Megafit/Cubitt)
 
@@ -321,10 +325,167 @@ Objetivo: cruzar training + body metrics con recomendaciones simples y accionabl
 8. PR8: BM-05 + BM-06 + BM-07
 9. PR9: AN-01 + AN-03
 10. PR10: AN-02 + AN-04 + QA final
+11. PR11: SP-01 + SP-02
+12. PR12: SP-03 + SP-04
+13. PR13: SP-05 + SP-06
+14. PR14: CO-01 + CO-02
+15. PR15: CO-03 + CO-04
+16. PR16: CO-05 + CO-06
+17. PR17: CO-07 + CO-08
 
 ## Siguiente bloque recomendado
 1. Cerrar HIS-09 con checklist manual final (mobile + desktop) y evidencia.
 2. Iniciar E3 (BM-01 y BM-02) para desbloquear body metrics.
+3. Iniciar SP-01 (Supabase setup + env) como base de migracion.
+
+## Checklist tecnico detallado (HIS-09 + BM-01..BM-04)
+
+### HIS-09 — QA funcional del flujo historial
+
+**Objetivo**
+- Validar flujo end-to-end sin regresiones y con evidencia minima (capturas o notas).
+
+**Alcance**
+- Today -> Save -> Settings -> filtros -> detalle, en mobile y desktop.
+
+**Checklist de ejecucion (orden sugerido)**
+1. Preparacion
+   - Base limpia o con datos representativos (semanas con sesiones variadas).
+   - Confirmar build/lint pasados o usar branch estable.
+2. Smoke de flujo principal
+   - Today: registrar entrenamiento con `training_type`.
+   - Save: confirmar persistencia y refresco de UI.
+   - Settings -> Historial: abrir sin errores.
+3. Filtros de historial
+   - Chips: Todos/Push/Pull/Legs/Custom.
+   - Verificar que calendario + lista dia + timeline cambian en sincronia.
+   - Filtro invalido: no debe romper ni quedar en estado incoherente.
+4. Weekly compare
+   - Verificar sesiones/sets/volumen de semana actual vs pasada.
+   - Deltas (absoluto y %): validar division por cero.
+5. Leyenda de intensidad
+   - Aparece en detalle del calendario.
+   - Umbrales coherentes con volumen relativo del mes.
+6. Persistencia de preferencias
+   - Cambiar `mode`, `training_type`, `selectedDate`.
+   - Recargar ruta `/settings` y confirmar restauracion.
+   - Probar sin `localStorage` (modo privado o bloqueo simulado).
+7. Estados UI
+   - `loading`, `empty`, `error` visiblemente manejados.
+8. Mobile-first
+   - Sin overflow horizontal.
+   - Tap targets y spacing consistentes.
+9. Evidencia
+   - 6-10 capturas o notas de validacion por seccion.
+   - Registrar cualquier divergencia o edge case.
+
+**Salida esperada**
+- Resultado por punto del checklist (OK/Fail + observacion).
+- Evidencia adjunta (capturas o notas).
+
+### BM-01 — Modelo y migracion `body_metrics`
+
+**Checklist tecnico**
+- Definir modelo SQLAlchemy con campos minimos:
+  - `id`, `measured_at` (datetime), `source` (str), `weight_kg` (float),
+    `body_fat_pct` (float), `muscle_mass_kg` (float), `notes` (str, opcional),
+    `payload_raw` (json/text opcional), `created_at`.
+- Indices:
+  - `measured_at` (consultas por periodo)
+  - `(source, measured_at)` (dedupe)
+- Validar constraints suaves (no negativos, % en rango 0..100).
+- Migracion con Alembic si ya se esta usando; si no, documentar plan.
+
+**Casos limite a probar**
+- `measured_at` en futuro (definir si se rechaza o permite).
+- `measured_at` faltante (debe error).
+- `source` vacio (debe error).
+
+### BM-02 — Servicio de validacion y dedupe
+
+**Checklist tecnico**
+- Validaciones:
+  - `weight_kg`: 20..300 (ajustable)
+  - `body_fat_pct`: 2..70
+  - `muscle_mass_kg`: 10..120
+  - `measured_at`: datetime valido
+- Dedupe por `(source, measured_at)`:
+  - Si existe, marcar como duplicado y no insertar.
+- Respuesta de servicio:
+  - `inserted`: int
+  - `duplicates`: int
+  - `errors`: lista por fila con razon
+
+**Casos limite**
+- Dos filas con mismo `measured_at` y distinto payload: debe dedupe.
+- Valores limite exactos (2%, 70%, etc.).
+- Payload con campos extra: ignorar o guardar en `payload_raw`.
+
+### BM-03 — Import manual CSV/JSON
+
+**Endpoint sugerido**
+- `POST /api/body-metrics/import`
+
+**Payload JSON (ejemplo)**
+```json
+{
+  "source": "manual",
+  "records": [
+    {
+      "measured_at": "2026-03-01",
+      "weight_kg": 78.4,
+      "body_fat_pct": 18.2,
+      "muscle_mass_kg": 34.1,
+      "notes": "Ayunas"
+    },
+    {
+      "measured_at": "2026-03-05",
+      "weight_kg": 78.0,
+      "body_fat_pct": 17.9
+    }
+  ]
+}
+```
+
+**CSV (si soportas import)**
+- Columnas minimas: `measured_at,weight_kg`
+- Opcionales: `body_fat_pct,muscle_mass_kg,notes`
+
+**Checklist tecnico**
+- Parsear `measured_at` con formato ISO y fallback `YYYY-MM-DD`.
+- Reporte por fila:
+  - `row_index`
+  - `status`: `inserted|duplicate|error`
+  - `error`: mensaje si aplica
+- Persistir `payload_raw` (si se requiere trazabilidad).
+
+**Casos limite**
+- CSV con separador `;` vs `,`.
+- Valores con coma decimal (`78,5`): decidir si soportar.
+- Registros incompletos (solo `measured_at` sin peso).
+- Batch muy grande (limite recomendado).
+
+### BM-04 — Endpoints de consulta
+
+**Endpoints**
+- `GET /api/body-metrics`
+  - Filtros: `from`, `to`, `source` opcionales.
+  - Orden: por `measured_at` desc.
+- `GET /api/body-metrics/latest`
+  - Devuelve ultimo registro valido.
+- `GET /api/body-metrics/summary`
+  - KPIs simples: ultimo peso, delta 7d/30d si hay datos.
+
+**Checklist tecnico**
+- Manejo de vacio:
+  - `latest` devuelve 404 o payload vacio consistente.
+  - `summary` devuelve nulls o 0 con bandera `has_data`.
+- Fechas invalidas -> 400 con `detail` claro.
+- Orden determinista.
+
+**Casos limite**
+- Solo 1 registro: `summary` sin delta.
+- Muchos registros mismo dia: decidir si tomar ultimo por `created_at`.
 
 ## Riesgos y mitigaciones
 - Riesgo: mapeo ambiguo de `template_day_name`
@@ -333,3 +494,228 @@ Objetivo: cruzar training + body metrics con recomendaciones simples y accionabl
   - Mitigacion: modo simple por defecto, detalle bajo demanda
 - Riesgo: calidad variable de archivos de import
   - Mitigacion: parser versionado, validacion fuerte, reporte de errores
+
+---
+
+## Epica E5 — Migracion a Supabase (corto plazo, prioridad alta)
+Objetivo: mover a Postgres administrado con Auth Google sin romper el flujo actual.
+
+### SP-01 — Provisionar proyecto Supabase
+- Tipo: Infra
+- Estado: PENDIENTE
+- Estimacion: 3 pts
+- Dependencias: ninguna
+- Criterios de aceptacion:
+  - Proyecto Pro creado
+  - Region definida
+  - Backups diarios habilitados (7 dias)
+  - Limites/alertas configurados
+ - Subtareas:
+   - Crear organizacion/proyecto en Supabase
+   - Configurar region y nombre de proyecto
+   - Activar backups diarios (7 dias)
+   - Configurar alertas de disk/egress/compute
+
+### SP-02 — Configurar Auth Google en Supabase
+- Tipo: Infra/Auth
+- Estado: PENDIENTE
+- Estimacion: 3 pts
+- Dependencias: SP-01
+- Criterios de aceptacion:
+  - OAuth client creado en Google Cloud
+  - Redirect URIs de prod + staging + local
+  - Provider habilitado en Supabase
+  - Login Google probado en entorno local
+ - Subtareas:
+   - Crear OAuth Client (Web) en Google Cloud
+   - Registrar URIs de callback (prod/staging/local)
+   - Activar Google provider en Supabase Auth
+   - Probar flujo login/logout en local
+
+### SP-03 — Preparar backend para Postgres + Alembic
+- Tipo: Backend
+- Estado: PENDIENTE
+- Estimacion: 5 pts
+- Dependencias: SP-01
+- Criterios de aceptacion:
+  - Alembic inicializado
+  - Migracion base generada
+  - `DATABASE_URL` soporta `postgresql+asyncpg`
+  - Configuracion de pool definida
+ - Subtareas:
+   - Inicializar Alembic (config + env)
+   - Generar migracion base desde modelos actuales
+   - Agregar soporte `asyncpg` en settings
+   - Definir pool size/timeouts para prod
+
+### SP-04 — Migracion de datos SQLite -> Postgres
+- Tipo: Backend/Data
+- Estado: PENDIENTE
+- Estimacion: 8 pts
+- Dependencias: SP-03
+- Criterios de aceptacion:
+  - Export/import ordenado por FK
+  - Conteo de filas por tabla validado
+  - Validacion de queries criticas
+ - Subtareas:
+   - Script de export SQLite (por tabla)
+   - Script de import Postgres (orden por FK)
+   - Validar conteos por tabla
+   - Validar queries criticas (today, history, routines)
+
+### SP-05 — Cutover en Coolify
+- Tipo: Infra/Deploy
+- Estado: PENDIENTE
+- Estimacion: 5 pts
+- Dependencias: SP-04
+- Criterios de aceptacion:
+  - Variables env actualizadas
+  - Downtime documentado
+  - Rollback plan definido
+  - Monitoring 24-48h post cutover
+ - Subtareas:
+   - Actualizar `DATABASE_URL` y keys Supabase en Coolify
+   - Definir ventana de mantenimiento
+   - Checklist de rollback a SQLite
+   - Monitoreo intensivo 24-48h
+
+### SP-06 — Retencion 3 meses + resumen mensual
+- Tipo: Backend/Data
+- Estado: PENDIENTE
+- Estimacion: 5 pts
+- Dependencias: SP-05
+- Criterios de aceptacion:
+  - Job de purge por fecha
+  - Tabla de resumen mensual
+  - Documentacion de politica de retencion
+ - Subtareas:
+   - Definir tabla de resumen mensual
+   - Crear job de purge (cron)
+   - Documentar politica de retencion
+
+### SP-07 — Hardening Postgres
+- Tipo: Backend/Infra
+- Estado: PENDIENTE
+- Estimacion: 5 pts
+- Dependencias: SP-05
+- Criterios de aceptacion:
+  - Indices revisados
+  - Queries pesadas optimizadas
+  - Pooling y timeouts ajustados
+ - Subtareas:
+   - Revisar indices en tablas grandes
+   - Optimizar queries de historial
+   - Ajustar pool y timeouts
+
+---
+
+## Epica E6 — Monetizacion Publico + Coaches (mediano plazo)
+Objetivo: implementar los planes definidos en `mejoras/Vision.md`.
+
+### CO-01 — Modelo de suscripciones y entitlements
+- Tipo: Backend
+- Estado: PENDIENTE
+- Estimacion: 5 pts
+- Dependencias: SP-05
+- Criterios de aceptacion:
+  - Tabla `subscriptions`
+  - Tabla `entitlements`
+  - Estados de plan (publico free/pro, coach free/pro/full)
+ - Subtareas:
+   - Definir esquema `subscriptions`
+   - Definir esquema `entitlements`
+   - Migraciones y modelos
+
+### CO-02 — Modelo Coach + Clientes
+- Tipo: Backend
+- Estado: PENDIENTE
+- Estimacion: 5 pts
+- Dependencias: CO-01
+- Criterios de aceptacion:
+  - Tabla `coach_profiles`
+  - Tabla `coach_clients`
+  - Codigo de acceso funcional
+ - Subtareas:
+   - Definir esquema `coach_profiles`
+   - Definir esquema `coach_clients`
+   - Generar codigo de acceso y validacion
+
+### CO-03 — Limites por plan
+- Tipo: Backend
+- Estado: PENDIENTE
+- Estimacion: 3 pts
+- Dependencias: CO-02
+- Criterios de aceptacion:
+  - Limites de clientes por plan
+  - Limites de IA por plan
+  - Errors claros en exceso
+ - Subtareas:
+   - Middleware de limites por plan
+   - Respuestas 429/403 con detalle claro
+
+### CO-04 — Panel de gestion de coach
+- Tipo: Frontend
+- Estado: PENDIENTE
+- Estimacion: 5 pts
+- Dependencias: CO-02
+- Criterios de aceptacion:
+  - Lista de clientes
+  - Accesos rapidos
+  - Estados de actividad basicos
+ - Subtareas:
+   - Vista lista de clientes
+   - Accesos rapidos a perfiles
+   - Indicador de actividad reciente
+
+### CO-05 — Stats basicos por cliente
+- Tipo: Backend/Frontend
+- Estado: PENDIENTE
+- Estimacion: 5 pts
+- Dependencias: CO-04
+- Criterios de aceptacion:
+  - Sesiones/semana
+  - Volumen semanal
+  - Adherencia
+ - Subtareas:
+   - Endpoint de stats por cliente
+   - UI de stats compacta
+
+### CO-06 — Branding completo coach
+- Tipo: Frontend
+- Estado: PENDIENTE
+- Estimacion: 3 pts
+- Dependencias: CO-04
+- Criterios de aceptacion:
+  - Logo + colores aplicados
+  - Visible en vistas cliente
+ - Subtareas:
+   - Guardar branding en perfil coach
+   - Aplicar tema en vistas cliente
+
+### CO-07 — Publico Pro entitlements
+- Tipo: Backend/Frontend
+- Estado: PENDIENTE
+- Estimacion: 3 pts
+- Dependencias: CO-01
+- Criterios de aceptacion:
+  - Historial completo
+  - Analitica avanzada
+  - IA ampliada
+ - Subtareas:
+   - Gate de historial extendido
+   - Gate de analitica avanzada
+   - Limites IA por plan publico
+
+### CO-08 — Facturacion y upgrades
+- Tipo: Backend/Frontend
+- Estado: PENDIENTE
+- Estimacion: 5 pts
+- Dependencias: CO-01
+- Criterios de aceptacion:
+  - Flujo upgrade/downgrade
+  - Estado reflejado en UI
+  - Eventos de pago auditables
+ - Subtareas:
+   - UI de upgrade/downgrade
+   - Webhook de pagos
+   - Auditoria de eventos

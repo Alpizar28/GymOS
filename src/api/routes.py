@@ -11,6 +11,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import selectinload
 
 from src.database import async_session
+from src.models.body_metrics import BodyMetric
 from src.models.exercises import Exercise, ExerciseStats
 from src.models.plans import Plan, PlanDay
 from src.models.progression import AnchorTarget
@@ -18,6 +19,14 @@ from src.models.routines import Routine, RoutineExercise, RoutineFolder, Routine
 from src.models.settings import AthleteState, Setting, WeekTemplate
 from src.models.workouts import Workout, WorkoutExercise, WorkoutSet
 from src.services.plan_generator import generate_day_plan
+from src.services.body_metrics_service import (
+    get_body_metrics_summary,
+    get_latest_body_metric,
+    import_body_metrics,
+    list_body_metrics,
+    parse_csv_records,
+    parse_date_bound,
+)
 from src.services.recommendation_service import suggest_day
 from src.services.routine_progression_service import (
     apply_routine_progression,
@@ -296,6 +305,43 @@ class PersonalProfileUpdateRequest(StrictRequestModel):
     weight_lbs: float | None = Field(default=None, ge=50, le=900)
     goal: str | None = Field(default=None, max_length=200)
     notes: str | None = Field(default=None, max_length=2000)
+
+
+class BodyMetricImportRequest(StrictRequestModel):
+    source: str = Field(default="manual", min_length=1, max_length=50)
+    records: list[dict] | None = Field(default=None, max_length=5000)
+    csv_text: str | None = Field(default=None, max_length=200000)
+
+
+class BodyMetricResponse(BaseModel):
+    id: int
+    measured_at: str
+    source: str
+    weight_kg: float | None
+    body_fat_pct: float | None
+    muscle_mass_kg: float | None
+    notes: str | None
+    created_at: str
+
+
+class BodyMetricSummaryResponse(BaseModel):
+    has_data: bool
+    latest: BodyMetricResponse | None
+    delta_7d_weight_kg: float | None
+    delta_30d_weight_kg: float | None
+
+
+def _body_metric_to_payload(metric: BodyMetric) -> BodyMetricResponse:
+    return BodyMetricResponse(
+        id=metric.id,
+        measured_at=metric.measured_at.isoformat(),
+        source=metric.source,
+        weight_kg=metric.weight_kg,
+        body_fat_pct=metric.body_fat_pct,
+        muscle_mass_kg=metric.muscle_mass_kg,
+        notes=metric.notes,
+        created_at=metric.created_at.isoformat(),
+    )
 
 
 class AnchorProgressResponse(BaseModel):
@@ -1001,6 +1047,97 @@ async def update_personal_profile(payload: PersonalProfileUpdateRequest) -> Pers
             goal=data.get("goal"),
             notes=data.get("notes"),
         )
+
+
+# ─── Body Metrics ─────────────────────────────────────────────────────────────
+
+
+@router.post("/body-metrics/import")
+async def import_body_metrics_endpoint(payload: BodyMetricImportRequest) -> dict:
+    """Import manual body metrics from JSON or CSV."""
+    if payload.records and payload.csv_text:
+        raise HTTPException(status_code=400, detail="Provide records or csv_text, not both")
+    if not payload.records and not payload.csv_text:
+        raise HTTPException(status_code=400, detail="Provide records or csv_text")
+
+    source = payload.source.strip()
+    if not source:
+        raise HTTPException(status_code=400, detail="Source is required")
+
+    records = payload.records
+    if payload.csv_text:
+        try:
+            records = parse_csv_records(payload.csv_text)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="Invalid csv_text") from exc
+
+    if not records:
+        raise HTTPException(status_code=400, detail="No records provided")
+
+    async with async_session() as session:
+        result = await import_body_metrics(session, source=source, records=records)
+        await session.commit()
+        return result
+
+
+@router.get("/body-metrics")
+async def get_body_metrics(
+    from_date: str | None = Query(default=None, alias="from"),
+    to_date: str | None = Query(default=None, alias="to"),
+    source: str | None = Query(default=None),
+) -> list[BodyMetricResponse]:
+    """List body metrics with optional date/source filters."""
+    try:
+        start = parse_date_bound(from_date, is_end=False) if from_date else None
+        end = parse_date_bound(to_date, is_end=True) if to_date else None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid date") from exc
+
+    if start and end and end < start:
+        raise HTTPException(status_code=400, detail="Invalid date range")
+
+    normalized_source = source.strip() if source else None
+
+    async with async_session() as session:
+        metrics = await list_body_metrics(
+            session,
+            source=normalized_source,
+            start=start,
+            end=end,
+        )
+        return [_body_metric_to_payload(metric) for metric in metrics]
+
+
+@router.get("/body-metrics/latest")
+async def get_body_metrics_latest() -> BodyMetricResponse:
+    """Return the most recent body metrics entry."""
+    async with async_session() as session:
+        latest = await get_latest_body_metric(session)
+        if not latest:
+            raise HTTPException(status_code=404, detail="No body metrics found")
+        return _body_metric_to_payload(latest)
+
+
+@router.get("/body-metrics/summary")
+async def get_body_metrics_summary_endpoint() -> BodyMetricSummaryResponse:
+    """Return a summary of recent body metrics trends."""
+    async with async_session() as session:
+        summary = await get_body_metrics_summary(session)
+
+    if not summary["has_data"]:
+        return BodyMetricSummaryResponse(
+            has_data=False,
+            latest=None,
+            delta_7d_weight_kg=None,
+            delta_30d_weight_kg=None,
+        )
+
+    return BodyMetricSummaryResponse(
+        has_data=True,
+        latest=_body_metric_to_payload(summary["latest"]),
+        delta_7d_weight_kg=summary["delta_7d_weight_kg"],
+        delta_30d_weight_kg=summary["delta_30d_weight_kg"],
+    )
 
 
 @router.get("/day-recommendation")

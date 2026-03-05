@@ -1,4 +1,5 @@
 from src.models.settings import Setting, WeekTemplate, AthleteState
+from src.models.body_metrics import BodyMetric
 from src.models.exercises import Exercise, ExerciseStats
 from src.models.workouts import Workout, WorkoutExercise, WorkoutSet
 from src.models.progression import AnchorTarget
@@ -10,6 +11,7 @@ __all__ = [
     "Setting",
     "WeekTemplate",
     "AthleteState",
+    "BodyMetric",
     "Exercise",
     "ExerciseStats",
     "Workout",

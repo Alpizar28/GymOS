@@ -71,6 +71,7 @@ async def _auto_seed_if_empty() -> None:
     athlete_profile = project_root / "data" / "ATHLETE_PROFILE.json"
     exercise_library = project_root / "data" / "EXERCISE_LIBRARY.json"
     program_constraints = project_root / "data" / "PROGRAM_CONSTRAINTS.json"
+    body_metrics_seed = project_root / "data" / "BODY_METRICS_SEED.json"
 
     missing = [p for p in [athlete_profile, exercise_library, program_constraints] if not p.exists()]
     if missing:
@@ -85,6 +86,7 @@ async def _auto_seed_if_empty() -> None:
             athlete_profile_path=athlete_profile,
             exercise_library_path=exercise_library,
             program_constraints_path=program_constraints,
+            body_metrics_path=body_metrics_seed if body_metrics_seed.exists() else None,
         )
 
     logger.info(

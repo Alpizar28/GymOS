@@ -132,16 +132,20 @@ Generar recomendaciones simples y accionables usando datos combinados.
 ## 4.1 Escalabilidad de datos
 - Indices y archivado historico para queries largas.
 - Estrategia de backup y restore automatizada.
+ - Politica de retencion configurable por plan.
+ - Jobs de resumen mensual para historico antiguo.
 
 ## 4.2 Observabilidad
 - metricas de API
 - tiempos por endpoint
 - errores de integracion externa
+ - panel de uso por coach (clientes activos, IA consumida)
 
 ## 4.3 Seguridad y privacidad
 - controles de acceso por seccion sensible
 - politica de retencion de datos
 - trazabilidad de cambios en datos personales y de salud
+ - auditoria de acciones de coach sobre clientes
 
 ---
 
@@ -178,6 +182,27 @@ Generar recomendaciones simples y accionables usando datos combinados.
 ## R-L4
 - integraciones externas de nutricion (si viable)
 - automatizacion avanzada
+
+---
+
+## 7. Escala de monetizacion y coaches (largo plazo)
+
+### 7.1 Marketplace interno (opcional)
+- Biblioteca de rutinas publicas por coach.
+- Rating y reviews internas.
+- Revenue share por descargas premium.
+
+### 7.2 Play Store y suscripciones
+- Suscripciones in-app para publico Pro.
+- Validacion server-side de recibos.
+- Estados: active, grace_period, canceled, expired.
+
+### 7.3 Herramientas avanzadas para coaches
+- Segmentacion por cohortes y objetivos.
+- Automatizacion de actualizaciones de rutina.
+- Alertas por estancamiento o inactividad.
+
+---
 
 ---
 

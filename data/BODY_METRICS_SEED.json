@@ -1,0 +1,54 @@
+{
+  "source": "seed",
+  "records": [
+    {
+      "measured_at": "2026-01-06",
+      "weight_kg": 78.6,
+      "body_fat_pct": 19.4,
+      "muscle_mass_kg": 34.0,
+      "notes": "Inicio de seguimiento"
+    },
+    {
+      "measured_at": "2026-01-13",
+      "weight_kg": 78.2,
+      "body_fat_pct": 19.0,
+      "muscle_mass_kg": 34.1
+    },
+    {
+      "measured_at": "2026-01-20",
+      "weight_kg": 77.9,
+      "body_fat_pct": 18.8,
+      "muscle_mass_kg": 34.2
+    },
+    {
+      "measured_at": "2026-01-27",
+      "weight_kg": 77.6,
+      "body_fat_pct": 18.5,
+      "muscle_mass_kg": 34.3
+    },
+    {
+      "measured_at": "2026-02-03",
+      "weight_kg": 77.4,
+      "body_fat_pct": 18.3,
+      "muscle_mass_kg": 34.4
+    },
+    {
+      "measured_at": "2026-02-10",
+      "weight_kg": 77.1,
+      "body_fat_pct": 18.1,
+      "muscle_mass_kg": 34.5
+    },
+    {
+      "measured_at": "2026-02-17",
+      "weight_kg": 76.9,
+      "body_fat_pct": 17.9,
+      "muscle_mass_kg": 34.6
+    },
+    {
+      "measured_at": "2026-02-24",
+      "weight_kg": 76.8,
+      "body_fat_pct": 17.8,
+      "muscle_mass_kg": 34.6
+    }
+  ]
+}

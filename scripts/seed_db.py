@@ -23,6 +23,7 @@ DEFAULT_PATHS = {
     "athlete_profile": PROJECT_ROOT / "data" / "ATHLETE_PROFILE.json",
     "exercise_library": PROJECT_ROOT / "data" / "EXERCISE_LIBRARY.json",
     "program_constraints": PROJECT_ROOT / "data" / "PROGRAM_CONSTRAINTS.json",
+    "body_metrics": PROJECT_ROOT / "data" / "BODY_METRICS_SEED.json",
 }
 
 
@@ -32,7 +33,9 @@ async def seed() -> None:
     logger.info("Database tables created")
 
     # Validate paths
-    for name, path in DEFAULT_PATHS.items():
+    required = ["athlete_profile", "exercise_library", "program_constraints"]
+    for name in required:
+        path = DEFAULT_PATHS[name]
         if not path.exists():
             logger.error("Missing file: %s (expected at %s)", name, path)
             sys.exit(1)
@@ -43,6 +46,7 @@ async def seed() -> None:
             athlete_profile_path=DEFAULT_PATHS["athlete_profile"],
             exercise_library_path=DEFAULT_PATHS["exercise_library"],
             program_constraints_path=DEFAULT_PATHS["program_constraints"],
+            body_metrics_path=DEFAULT_PATHS["body_metrics"],
         )
 
     logger.info("Seed complete!")
