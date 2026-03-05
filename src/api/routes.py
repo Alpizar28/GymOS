@@ -180,6 +180,7 @@ class RoutineFolderUpdateRequest(BaseModel):
 
 class PersonalProfileResponse(BaseModel):
     full_name: str
+    photo_url: str | None = None
     age: int | None = None
     height_cm: float | None = None
     weight_lbs: float | None = None
@@ -189,6 +190,7 @@ class PersonalProfileResponse(BaseModel):
 
 class PersonalProfileUpdateRequest(BaseModel):
     full_name: str | None = None
+    photo_url: str | None = None
     age: int | None = None
     height_cm: float | None = None
     weight_lbs: float | None = None
@@ -819,6 +821,7 @@ async def get_personal_profile() -> PersonalProfileResponse:
             data = json.loads(personal.value)
             return PersonalProfileResponse(
                 full_name=data.get("full_name", "Athlete"),
+                photo_url=data.get("photo_url"),
                 age=data.get("age"),
                 height_cm=data.get("height_cm"),
                 weight_lbs=data.get("weight_lbs"),
@@ -837,6 +840,7 @@ async def get_personal_profile() -> PersonalProfileResponse:
 
         return PersonalProfileResponse(
             full_name="Athlete",
+            photo_url=None,
             age=None,
             height_cm=None,
             weight_lbs=default_weight,
@@ -856,6 +860,7 @@ async def update_personal_profile(payload: PersonalProfileUpdateRequest) -> Pers
 
         data = json.loads(row.value) if row else {
             "full_name": "Athlete",
+            "photo_url": None,
             "age": None,
             "height_cm": None,
             "weight_lbs": None,
@@ -880,6 +885,7 @@ async def update_personal_profile(payload: PersonalProfileUpdateRequest) -> Pers
 
         return PersonalProfileResponse(
             full_name=data.get("full_name", "Athlete"),
+            photo_url=data.get("photo_url"),
             age=data.get("age"),
             height_cm=data.get("height_cm"),
             weight_lbs=data.get("weight_lbs"),

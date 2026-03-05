@@ -73,6 +73,7 @@ export interface DayOptionCreate {
 
 export interface PersonalProfile {
     full_name: string;
+    photo_url: string | null;
     age: number | null;
     height_cm: number | null;
     weight_lbs: number | null;

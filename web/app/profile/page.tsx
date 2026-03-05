@@ -67,7 +67,43 @@ function Spinner() {
   );
 }
 
-function PersonalSection() {
+function ProfileIdentityCard({ profile }: { profile: PersonalProfile | null }) {
+  if (!profile) return null;
+
+  const initials = profile.full_name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("") || "A";
+
+  return (
+    <div className="mb-4 rounded-xl border border-zinc-800 bg-zinc-900/70 p-4">
+      <div className="flex items-center gap-3">
+        <div className="w-14 h-14 rounded-full overflow-hidden border border-zinc-700 bg-zinc-950 flex items-center justify-center text-zinc-300 font-bold">
+          {profile.photo_url ? (
+            <img src={profile.photo_url} alt="Profile" className="w-full h-full object-cover" />
+          ) : (
+            <span>{initials}</span>
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold text-zinc-100 truncate">{profile.full_name}</p>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            {profile.age ? `${profile.age} años` : "Edad -"}
+            {" · "}
+            {profile.weight_lbs ? `${profile.weight_lbs} lb` : "Peso -"}
+            {" · "}
+            {profile.height_cm ? `${profile.height_cm} cm` : "Estatura -"}
+          </p>
+          {profile.goal && <p className="text-xs text-zinc-400 mt-1 truncate">Objetivo: {profile.goal}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PersonalSection({ onSaved }: { onSaved?: (profile: PersonalProfile) => void }) {
   const [data, setData] = useState<PersonalProfile | null>(null);
   const [draft, setDraft] = useState<PersonalProfile | null>(null);
   const [editing, setEditing] = useState(false);
@@ -90,6 +126,7 @@ function PersonalSection() {
       const updated = await api.updatePersonalProfile({ ...draft });
       setData(updated);
       setDraft(updated);
+      onSaved?.(updated);
       setEditing(false);
       setToast("Datos actualizados");
       setTimeout(() => setToast(""), 2000);
@@ -136,6 +173,20 @@ function PersonalSection() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label className="text-xs text-zinc-500 block mb-1">Foto de perfil (URL)</label>
+            {editing ? (
+              <input
+                value={draft.photo_url ?? ""}
+                onChange={(e) => setDraft((prev) => prev ? { ...prev, photo_url: e.target.value || null } : prev)}
+                placeholder="https://..."
+                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
+              />
+            ) : (
+              <p className="text-sm text-zinc-300 truncate">{data.photo_url || "Sin foto"}</p>
+            )}
+          </div>
+
           <div className="col-span-2">
             <label className="text-xs text-zinc-500 block mb-1">Nombre</label>
             {editing ? (
@@ -917,6 +968,11 @@ function ProtectionSection() {
 
 export default function ProfilePage() {
   const [active, setActive] = useState<SectionId>("personal");
+  const [personalSummary, setPersonalSummary] = useState<PersonalProfile | null>(null);
+
+  useEffect(() => {
+    api.getPersonalProfile().then(setPersonalSummary).catch(() => {});
+  }, []);
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -926,6 +982,8 @@ export default function ProfilePage() {
         <h1 className="text-2xl font-bold tracking-tight">Perfil</h1>
         <p className="text-sm text-zinc-500 mt-1">Tu historial, ejercicios y configuración</p>
       </div>
+
+      <ProfileIdentityCard profile={personalSummary} />
 
       {/* Section tab bar */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 mb-5 no-scrollbar">
@@ -947,7 +1005,7 @@ export default function ProfilePage() {
 
       {/* Section content */}
       <div className="animate-in fade-in duration-200">
-        {active === "personal"   && <PersonalSection />}
+        {active === "personal"   && <PersonalSection onSaved={setPersonalSummary} />}
         {active === "stats"      && <StatsSection />}
         {active === "templates"  && <TemplatesSection />}
         {active === "library"    && <LibrarySection />}
