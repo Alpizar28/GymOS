@@ -20,6 +20,13 @@ const SET_TYPE_OPTIONS = [
   { value: "working", label: "E" },
 ] as const;
 
+const ROUTINE_TYPE_OPTIONS = [
+  { value: "push", label: "Push" },
+  { value: "pull", label: "Pull" },
+  { value: "legs", label: "Legs" },
+  { value: "custom", label: "Custom" },
+] as const;
+
 function normalizeSetType(setType: string) {
   if (setType === "normal") return "working";
   return setType;
@@ -286,6 +293,7 @@ export default function RoutineDetailPage() {
         name: draft.name,
         subtitle: draft.subtitle,
         notes: draft.notes,
+        training_type: draft.training_type,
         exercises: draft.exercises.map((ex) => ({
           name: ex.name,
           exercise_id: ex.exercise_id,
@@ -329,6 +337,11 @@ export default function RoutineDetailPage() {
 
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 mb-4">
         <p className="text-xs uppercase tracking-wider text-zinc-500 mb-2">Overview</p>
+        <div className="mb-3">
+          <span className="inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold border border-zinc-700 bg-zinc-950 text-zinc-300">
+            Tipo: {ROUTINE_TYPE_OPTIONS.find((opt) => opt.value === draft.training_type)?.label ?? "Custom"}
+          </span>
+        </div>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-center text-xs text-zinc-500">Body Front</div>
           <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-center text-xs text-zinc-500">Body Back</div>
@@ -447,6 +460,17 @@ export default function RoutineDetailPage() {
 
       {editMode && (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3 mb-4 space-y-3">
+          <select
+            value={draft.training_type}
+            onChange={(e) => setDraft({ ...draft, training_type: e.target.value as "push" | "pull" | "legs" | "custom" })}
+            className="w-full px-3 py-2.5 rounded-lg bg-zinc-950 border border-zinc-700 text-sm"
+          >
+            {ROUTINE_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                Tipo: {option.label}
+              </option>
+            ))}
+          </select>
           <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 min-w-0">
             <select
               value={selectedExerciseName}
