@@ -71,6 +71,15 @@ export interface DayOptionCreate {
     rules: Record<string, unknown>;
 }
 
+export interface PersonalProfile {
+    full_name: string;
+    age: number | null;
+    height_cm: number | null;
+    weight_lbs: number | null;
+    goal: string | null;
+    notes: string | null;
+}
+
 export interface RoutineFolder {
     id: number;
     name: string;
@@ -279,6 +288,13 @@ export const api = {
     createDayOption: (payload: DayOptionCreate) =>
         fetchApi<DayOption>("/day-options", {
             method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        }),
+    getPersonalProfile: () => fetchApi<PersonalProfile>("/profile/personal"),
+    updatePersonalProfile: (payload: Partial<PersonalProfile>) =>
+        fetchApi<PersonalProfile>("/profile/personal", {
+            method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         }),

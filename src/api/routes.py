@@ -15,7 +15,7 @@ from src.models.exercises import Exercise, ExerciseStats
 from src.models.plans import Plan, PlanDay
 from src.models.progression import AnchorTarget
 from src.models.routines import Routine, RoutineExercise, RoutineFolder, RoutineSet
-from src.models.settings import AthleteState, WeekTemplate
+from src.models.settings import AthleteState, Setting, WeekTemplate
 from src.models.workouts import Workout, WorkoutExercise, WorkoutSet
 from src.services.plan_generator import generate_day_plan
 from src.services.recommendation_service import suggest_day
@@ -176,6 +176,24 @@ class RoutineFolderCreateRequest(BaseModel):
 class RoutineFolderUpdateRequest(BaseModel):
     name: str | None = None
     sort_order: int | None = None
+
+
+class PersonalProfileResponse(BaseModel):
+    full_name: str
+    age: int | None = None
+    height_cm: float | None = None
+    weight_lbs: float | None = None
+    goal: str | None = None
+    notes: str | None = None
+
+
+class PersonalProfileUpdateRequest(BaseModel):
+    full_name: str | None = None
+    age: int | None = None
+    height_cm: float | None = None
+    weight_lbs: float | None = None
+    goal: str | None = None
+    notes: str | None = None
 
 
 class AnchorProgressResponse(BaseModel):
@@ -786,6 +804,88 @@ async def create_day_option(payload: DayOptionCreate) -> DayOptionResponse:
 
     anchors = [a for a in rules.get("anchors", []) if isinstance(a, str) and a.strip()]
     return DayOptionResponse(name=name, focus=payload.focus.strip(), exercises=anchors)
+
+
+@router.get("/profile/personal")
+async def get_personal_profile() -> PersonalProfileResponse:
+    """Get editable personal profile fields for Profile page."""
+    async with async_session() as session:
+        personal_result = await session.execute(
+            select(Setting).where(Setting.key == "athlete_personal_profile")
+        )
+        personal = personal_result.scalar_one_or_none()
+
+        if personal:
+            data = json.loads(personal.value)
+            return PersonalProfileResponse(
+                full_name=data.get("full_name", "Athlete"),
+                age=data.get("age"),
+                height_cm=data.get("height_cm"),
+                weight_lbs=data.get("weight_lbs"),
+                goal=data.get("goal"),
+                notes=data.get("notes"),
+            )
+
+        metrics_result = await session.execute(
+            select(Setting).where(Setting.key == "athlete_global_metrics")
+        )
+        metrics = metrics_result.scalar_one_or_none()
+        default_weight = None
+        if metrics:
+            parsed = json.loads(metrics.value)
+            default_weight = parsed.get("bodyweight_end_lbs")
+
+        return PersonalProfileResponse(
+            full_name="Athlete",
+            age=None,
+            height_cm=None,
+            weight_lbs=default_weight,
+            goal=None,
+            notes=None,
+        )
+
+
+@router.patch("/profile/personal")
+async def update_personal_profile(payload: PersonalProfileUpdateRequest) -> PersonalProfileResponse:
+    """Update editable personal profile fields."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(Setting).where(Setting.key == "athlete_personal_profile")
+        )
+        row = result.scalar_one_or_none()
+
+        data = json.loads(row.value) if row else {
+            "full_name": "Athlete",
+            "age": None,
+            "height_cm": None,
+            "weight_lbs": None,
+            "goal": None,
+            "notes": None,
+        }
+
+        updates = payload.model_dump(exclude_unset=True)
+        for key, value in updates.items():
+            data[key] = value
+
+        full_name = str(data.get("full_name") or "Athlete").strip() or "Athlete"
+        data["full_name"] = full_name
+
+        if row is None:
+            row = Setting(key="athlete_personal_profile", value=json.dumps(data))
+            session.add(row)
+        else:
+            row.value = json.dumps(data)
+
+        await session.commit()
+
+        return PersonalProfileResponse(
+            full_name=data.get("full_name", "Athlete"),
+            age=data.get("age"),
+            height_cm=data.get("height_cm"),
+            weight_lbs=data.get("weight_lbs"),
+            goal=data.get("goal"),
+            notes=data.get("notes"),
+        )
 
 
 @router.get("/day-recommendation")

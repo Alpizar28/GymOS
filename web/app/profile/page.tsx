@@ -6,6 +6,7 @@ import {
   type DashboardData,
   type ExerciseItem,
   type DayOption,
+  type PersonalProfile,
   type ProtectionRule,
   type CalendarDay,
   type WorkoutDetail,
@@ -46,8 +47,8 @@ const MUSCLE_GROUPS = [
 ];
 
 const SECTIONS = [
+  { id: "personal",   label: "Datos",      icon: "👤" },
   { id: "stats",      label: "Stats",      icon: "📊" },
-  { id: "calendar",   label: "Calendario", icon: "🗓️" },
   { id: "templates",  label: "Plantillas", icon: "📋" },
   { id: "library",    label: "Ejercicios", icon: "📚" },
   { id: "protection", label: "Protección", icon: "🛡️" },
@@ -62,6 +63,168 @@ function Spinner() {
     <div className="flex items-center justify-center h-20 gap-2 text-zinc-500 text-sm">
       <div className="w-4 h-4 border-2 border-zinc-600 border-t-red-500 rounded-full animate-spin" />
       Cargando...
+    </div>
+  );
+}
+
+function PersonalSection() {
+  const [data, setData] = useState<PersonalProfile | null>(null);
+  const [draft, setDraft] = useState<PersonalProfile | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState("");
+
+  useEffect(() => {
+    api.getPersonalProfile().then((profile) => {
+      setData(profile);
+      setDraft(profile);
+    }).catch(() => {});
+  }, []);
+
+  if (!data || !draft) return <Spinner />;
+
+  async function save() {
+    if (!draft) return;
+    setSaving(true);
+    try {
+      const updated = await api.updatePersonalProfile({ ...draft });
+      setData(updated);
+      setDraft(updated);
+      setEditing(false);
+      setToast("Datos actualizados");
+      setTimeout(() => setToast(""), 2000);
+    } catch {
+      setToast("No se pudo guardar");
+      setTimeout(() => setToast(""), 2000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold">Información personal</p>
+          {!editing ? (
+            <button
+              onClick={() => setEditing(true)}
+              className="px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-300 text-xs"
+            >
+              Editar
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setDraft(data);
+                  setEditing(false);
+                }}
+                className="px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400 text-xs"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={save}
+                disabled={saving}
+                className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold disabled:opacity-40"
+              >
+                {saving ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label className="text-xs text-zinc-500 block mb-1">Nombre</label>
+            {editing ? (
+              <input
+                value={draft.full_name}
+                onChange={(e) => setDraft((prev) => prev ? { ...prev, full_name: e.target.value } : prev)}
+                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
+              />
+            ) : (
+              <p className="text-sm text-zinc-200">{data.full_name || "-"}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs text-zinc-500 block mb-1">Edad</label>
+            {editing ? (
+              <input
+                type="number"
+                value={draft.age ?? ""}
+                onChange={(e) => setDraft((prev) => prev ? { ...prev, age: e.target.value ? Number(e.target.value) : null } : prev)}
+                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
+              />
+            ) : (
+              <p className="text-sm text-zinc-200">{data.age ?? "-"}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs text-zinc-500 block mb-1">Estatura (cm)</label>
+            {editing ? (
+              <input
+                type="number"
+                value={draft.height_cm ?? ""}
+                onChange={(e) => setDraft((prev) => prev ? { ...prev, height_cm: e.target.value ? Number(e.target.value) : null } : prev)}
+                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
+              />
+            ) : (
+              <p className="text-sm text-zinc-200">{data.height_cm ?? "-"}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs text-zinc-500 block mb-1">Peso (lb)</label>
+            {editing ? (
+              <input
+                type="number"
+                value={draft.weight_lbs ?? ""}
+                onChange={(e) => setDraft((prev) => prev ? { ...prev, weight_lbs: e.target.value ? Number(e.target.value) : null } : prev)}
+                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
+              />
+            ) : (
+              <p className="text-sm text-zinc-200">{data.weight_lbs ?? "-"}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs text-zinc-500 block mb-1">Objetivo</label>
+            {editing ? (
+              <input
+                value={draft.goal ?? ""}
+                onChange={(e) => setDraft((prev) => prev ? { ...prev, goal: e.target.value || null } : prev)}
+                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
+              />
+            ) : (
+              <p className="text-sm text-zinc-200">{data.goal ?? "-"}</p>
+            )}
+          </div>
+
+          <div className="col-span-2">
+            <label className="text-xs text-zinc-500 block mb-1">Notas</label>
+            {editing ? (
+              <textarea
+                value={draft.notes ?? ""}
+                onChange={(e) => setDraft((prev) => prev ? { ...prev, notes: e.target.value || null } : prev)}
+                rows={3}
+                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
+              />
+            ) : (
+              <p className="text-sm text-zinc-300 whitespace-pre-wrap">{data.notes ?? "-"}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {toast && (
+        <div className="fixed bottom-24 left-4 right-4 sm:left-auto sm:right-6 sm:w-auto z-50 px-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-sm text-white text-center">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
@@ -753,7 +916,7 @@ function ProtectionSection() {
 // ─── main page ────────────────────────────────────────────────────────────────
 
 export default function ProfilePage() {
-  const [active, setActive] = useState<SectionId>("stats");
+  const [active, setActive] = useState<SectionId>("personal");
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -784,8 +947,8 @@ export default function ProfilePage() {
 
       {/* Section content */}
       <div className="animate-in fade-in duration-200">
+        {active === "personal"   && <PersonalSection />}
         {active === "stats"      && <StatsSection />}
-        {active === "calendar"   && <MiniCalendarSection />}
         {active === "templates"  && <TemplatesSection />}
         {active === "library"    && <LibrarySection />}
         {active === "protection" && <ProtectionSection />}

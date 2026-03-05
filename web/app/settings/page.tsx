@@ -1039,46 +1039,17 @@ function ProtectionTab() {
   );
 }
 
-type TabId = "calendar" | "library" | "protection";
-
-const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: "calendar", label: "Calendario", icon: "🗓️" },
-  { id: "library", label: "Biblioteca", icon: "📚" },
-  { id: "protection", label: "Proteccion", icon: "🛡️" },
-];
-
 export default function SettingsPage() {
-  const [active, setActive] = useState<TabId>("calendar");
-
   return (
     <div className="max-w-2xl mx-auto overflow-x-hidden">
       <div className="mb-5 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.16),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(239,68,68,0.12)]">
         <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">GymOS</p>
         <h1 className="text-2xl font-bold tracking-tight">Historial</h1>
-        <p className="text-sm text-zinc-500 mt-1">Tu calendario, biblioteca y protecciones</p>
-      </div>
-
-      <div className="flex flex-wrap gap-1.5 pb-1 mb-5">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActive(tab.id)}
-            className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
-              active === tab.id
-                ? "bg-red-600/25 text-red-200 border-red-500/40"
-                : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50 hover:text-zinc-300"
-            }`}
-          >
-            <span>{tab.icon}</span>
-            {tab.label}
-          </button>
-        ))}
+        <p className="text-sm text-zinc-500 mt-1">Tu calendario de entrenamiento</p>
       </div>
 
       <div className="animate-in fade-in duration-200">
-        {active === "calendar" && <CalendarTab />}
-        {active === "library" && <LibraryTab />}
-        {active === "protection" && <ProtectionTab />}
+        <CalendarTab />
       </div>
     </div>
   );
