@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   api,
   type CalendarDay,
+  type CreateExercisePayload,
   type ExerciseItem,
   type ManualExercise,
   type ManualWorkoutPayload,
@@ -21,6 +22,20 @@ const QUICK_TEMPLATES = [
   "Pecho_Espalda",
   "Cuadriceps",
   "Femorales_Nalga",
+];
+
+const EXERCISE_TYPE_OPTIONS = ["compound", "isolation", "machine", "cable", "bodyweight", "unknown"];
+const MOVEMENT_PATTERN_OPTIONS = [
+  "horizontal_push",
+  "vertical_push",
+  "horizontal_pull",
+  "vertical_pull",
+  "squat",
+  "hinge",
+  "unilateral",
+  "core",
+  "other",
+  "unknown",
 ];
 
 const MUSCLE_FILTERS = [
@@ -183,9 +198,29 @@ function ManualWorkoutModal({
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [library, setLibrary] = useState<ExerciseItem[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(true);
+  const [creatingExercise, setCreatingExercise] = useState(false);
+  const [detailIndex, setDetailIndex] = useState<number | null>(null);
+  const [detailForm, setDetailForm] = useState<CreateExercisePayload>({
+    name: "",
+    primary_muscle: "unknown",
+    type: "unknown",
+    movement_pattern: "unknown",
+    is_anchor: false,
+    is_staple: false,
+  });
   const [exercises, setExercises] = useState<ManualExercise[]>([
     { name: "", sets: [{ weight: null, reps: null, rir: null, set_type: "normal" }] },
   ]);
+
+  useEffect(() => {
+    api
+      .getExercises()
+      .then(setLibrary)
+      .catch(() => {})
+      .finally(() => setLibraryLoading(false));
+  }, []);
 
   const updateExercise = (idx: number, ex: ManualExercise) =>
     setExercises((prev) => prev.map((e, i) => (i === idx ? ex : e)));
@@ -195,6 +230,15 @@ function ManualWorkoutModal({
       ...prev,
       { name: "", sets: [{ weight: null, reps: null, rir: null, set_type: "normal" }] },
     ]);
+
+  const moveExercise = (idx: number, direction: -1 | 1) =>
+    setExercises((prev) => {
+      const next = idx + direction;
+      if (next < 0 || next >= prev.length) return prev;
+      const arr = [...prev];
+      [arr[idx], arr[next]] = [arr[next], arr[idx]];
+      return arr;
+    });
 
   const removeExercise = (idx: number) => setExercises((prev) => prev.filter((_, i) => i !== idx));
 
@@ -209,6 +253,58 @@ function ManualWorkoutModal({
       ...exercises[idx],
       sets: exercises[idx].sets.filter((_, i) => i !== si),
     });
+
+  const selectFromLibrary = (idx: number, item: ExerciseItem) => {
+    updateExercise(idx, { ...exercises[idx], name: item.name });
+  };
+
+  const createQuickExercise = async (idx: number) => {
+    const name = exercises[idx].name.trim();
+    if (!name) {
+      setError("Escribe un nombre para crear el ejercicio.");
+      return;
+    }
+    setCreatingExercise(true);
+    setError("");
+    try {
+      const created = await api.createExercise({ name });
+      setLibrary((prev) => [created, ...prev]);
+      updateExercise(idx, { ...exercises[idx], name: created.name });
+    } catch (e: unknown) {
+      if (e instanceof Error && e.message.includes("409")) {
+        const existing = library.find((it) => it.name.toLowerCase() === name.toLowerCase());
+        if (existing) {
+          updateExercise(idx, { ...exercises[idx], name: existing.name });
+          setCreatingExercise(false);
+          return;
+        }
+      }
+      setError("No se pudo crear el ejercicio.");
+    } finally {
+      setCreatingExercise(false);
+    }
+  };
+
+  const createDetailedExercise = async () => {
+    if (detailIndex === null) return;
+    const name = detailForm.name?.trim() || exercises[detailIndex].name.trim();
+    if (!name) {
+      setError("El nombre del ejercicio es obligatorio.");
+      return;
+    }
+    setCreatingExercise(true);
+    setError("");
+    try {
+      const created = await api.createExercise({ ...detailForm, name });
+      setLibrary((prev) => [created, ...prev]);
+      updateExercise(detailIndex, { ...exercises[detailIndex], name: created.name });
+      setDetailIndex(null);
+    } catch {
+      setError("No se pudo crear el ejercicio con detalles.");
+    } finally {
+      setCreatingExercise(false);
+    }
+  };
 
   async function save() {
     setSaving(true);
@@ -345,6 +441,10 @@ function ManualWorkoutModal({
               {exercises.map((ex, i) => (
                 <div key={i} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
                   <div className="flex items-center justify-between mb-3">
+                    <div className="flex gap-1 mr-2">
+                      <button onClick={() => moveExercise(i, -1)} className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-500">↑</button>
+                      <button onClick={() => moveExercise(i, 1)} className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-500">↓</button>
+                    </div>
                     <input
                       value={ex.name}
                       onChange={(e) => updateExercise(i, { ...ex, name: e.target.value })}
@@ -355,6 +455,80 @@ function ManualWorkoutModal({
                       x
                     </button>
                   </div>
+
+                  {ex.name.trim() && (
+                    <div className="mb-3 space-y-2">
+                      {libraryLoading ? (
+                        <p className="text-xs text-zinc-600">Cargando biblioteca...</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {library
+                            .filter((it) => it.name.toLowerCase().includes(ex.name.toLowerCase().trim()))
+                            .slice(0, 6)
+                            .map((it) => (
+                              <button
+                                key={it.id}
+                                onClick={() => selectFromLibrary(i, it)}
+                                className="px-2 py-1 rounded-full border border-zinc-700 text-xs text-zinc-400"
+                              >
+                                {it.name}
+                              </button>
+                            ))}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => createQuickExercise(i)}
+                          disabled={creatingExercise || !ex.name.trim()}
+                          className="py-2 rounded-lg bg-red-600 text-white text-xs font-semibold disabled:opacity-40"
+                        >
+                          Crear rapido
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDetailIndex(i);
+                            setDetailForm((prev) => ({ ...prev, name: ex.name }));
+                          }}
+                          className="py-2 rounded-lg border border-zinc-700 text-zinc-300 text-xs font-semibold"
+                        >
+                          Crear con detalles
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {detailIndex === i && (
+                    <div className="mb-3 rounded-lg border border-zinc-800 bg-zinc-950/70 p-3 space-y-2">
+                      <input
+                        value={detailForm.name || ""}
+                        onChange={(e) => setDetailForm((p) => ({ ...p, name: e.target.value }))}
+                        placeholder="Nombre"
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+                      />
+                      <div className="grid grid-cols-3 gap-2">
+                        <select value={detailForm.primary_muscle} onChange={(e) => setDetailForm((p) => ({ ...p, primary_muscle: e.target.value }))} className="bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-2 text-xs text-white">
+                          <option value="unknown">unknown</option>
+                          {MUSCLE_FILTERS.filter((m) => m !== "all").map((m) => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                        <select value={detailForm.type} onChange={(e) => setDetailForm((p) => ({ ...p, type: e.target.value }))} className="bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-2 text-xs text-white">
+                          {EXERCISE_TYPE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                        <select value={detailForm.movement_pattern} onChange={(e) => setDetailForm((p) => ({ ...p, movement_pattern: e.target.value }))} className="bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-2 text-xs text-white">
+                          {MOVEMENT_PATTERN_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex gap-3 text-xs text-zinc-400">
+                        <label className="flex items-center gap-1"><input type="checkbox" checked={Boolean(detailForm.is_anchor)} onChange={(e) => setDetailForm((p) => ({ ...p, is_anchor: e.target.checked }))} /> Anchor</label>
+                        <label className="flex items-center gap-1"><input type="checkbox" checked={Boolean(detailForm.is_staple)} onChange={(e) => setDetailForm((p) => ({ ...p, is_staple: e.target.checked }))} /> Staple</label>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => setDetailIndex(null)} className="py-2 rounded-lg border border-zinc-700 text-zinc-400 text-xs">Cancelar</button>
+                        <button onClick={createDetailedExercise} disabled={creatingExercise} className="py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs disabled:opacity-40">Guardar</button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     {ex.sets.map((s, si) => (
                       <div key={si} className="grid grid-cols-4 gap-2">

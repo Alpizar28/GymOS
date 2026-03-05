@@ -96,6 +96,15 @@ class ExerciseResponse(BaseModel):
     total_sets: int
 
 
+class ExerciseCreateRequest(BaseModel):
+    name: str
+    primary_muscle: str | None = None
+    type: str | None = None
+    movement_pattern: str | None = None
+    is_anchor: bool = False
+    is_staple: bool = False
+
+
 class WorkoutSummary(BaseModel):
     id: int
     date: str
@@ -527,6 +536,55 @@ async def list_exercises() -> list[ExerciseResponse]:
             )
             for ex, stats in result.all()
         ]
+
+
+@router.post("/exercises")
+async def create_exercise(payload: ExerciseCreateRequest) -> ExerciseResponse:
+    """Create a new exercise in the library."""
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Exercise name is required")
+
+    primary_muscle = (payload.primary_muscle or "unknown").strip().lower() or "unknown"
+    exercise_type = (payload.type or "unknown").strip().lower() or "unknown"
+    movement_pattern = (payload.movement_pattern or "unknown").strip().lower() or "unknown"
+
+    async with async_session() as session:
+        existing_result = await session.execute(
+            select(Exercise).where(func.lower(Exercise.name_canonical) == name.lower()).limit(1)
+        )
+        existing = existing_result.scalar_one_or_none()
+        if existing:
+            raise HTTPException(status_code=409, detail="Exercise already exists")
+
+        exercise = Exercise(
+            name_canonical=name,
+            aliases_json="[]",
+            primary_muscle=primary_muscle,
+            secondary_muscles_json="[]",
+            type=exercise_type,
+            movement_pattern=movement_pattern,
+            is_anchor=payload.is_anchor,
+            is_staple=payload.is_staple,
+        )
+        session.add(exercise)
+        await session.commit()
+        await session.refresh(exercise)
+
+        return ExerciseResponse(
+            id=exercise.id,
+            name=exercise.name_canonical,
+            primary_muscle=exercise.primary_muscle,
+            type=exercise.type,
+            movement_pattern=exercise.movement_pattern,
+            is_anchor=exercise.is_anchor,
+            is_staple=exercise.is_staple,
+            avg_weight=0,
+            max_weight=0,
+            avg_reps=0,
+            frequency_score="low",
+            total_sets=0,
+        )
 
 
 # --- Progress ---

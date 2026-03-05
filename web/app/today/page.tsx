@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
     api,
+    type CreateExercisePayload,
     type TodayPlan,
     type TodaySet,
     type SetLogEntry,
@@ -12,6 +13,7 @@ import {
     type DayOption,
     type DayRecommendation,
     type DayOptionCreate,
+    type ExerciseItem,
 } from "@/lib/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -185,6 +187,21 @@ const MUSCLE_OPTIONS = [
     "core",
 ];
 
+const EXERCISE_TYPE_OPTIONS = ["compound", "isolation", "machine", "cable", "bodyweight", "unknown"];
+
+const MOVEMENT_PATTERN_OPTIONS = [
+    "horizontal_push",
+    "vertical_push",
+    "horizontal_pull",
+    "vertical_pull",
+    "squat",
+    "hinge",
+    "unilateral",
+    "core",
+    "other",
+    "unknown",
+];
+
 function TogglePill({
     label,
     active,
@@ -264,24 +281,194 @@ function RestTimer({ seconds: initial, onDismiss }: { seconds: number; onDismiss
 
 // ─── Add Exercise Modal ───────────────────────────────────────────────────────
 
-function AddExerciseModal({ onAdd, onClose }: { onAdd: (name: string) => void; onClose: () => void }) {
+function AddExerciseModal({
+    onAdd,
+    onClose,
+}: {
+    onAdd: (exercise: { name: string; is_anchor: boolean }) => void;
+    onClose: () => void;
+}) {
     const [q, setQ] = useState("");
+    const [library, setLibrary] = useState<ExerciseItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [creating, setCreating] = useState(false);
+    const [error, setError] = useState("");
+    const [showDetails, setShowDetails] = useState(false);
+    const [details, setDetails] = useState<CreateExercisePayload>({
+        name: "",
+        primary_muscle: "unknown",
+        type: "unknown",
+        movement_pattern: "unknown",
+        is_anchor: false,
+        is_staple: false,
+    });
+
+    useEffect(() => {
+        api
+            .getExercises()
+            .then(setLibrary)
+            .catch(() => setError("No se pudo cargar la biblioteca"))
+            .finally(() => setLoading(false));
+    }, []);
+
+    const filtered = library
+        .filter((ex) => ex.name.toLowerCase().includes(q.toLowerCase().trim()))
+        .slice(0, 12);
+
+    const quickCreate = async () => {
+        const name = q.trim();
+        if (!name) return;
+        setCreating(true);
+        setError("");
+        try {
+            const created = await api.createExercise({ name });
+            setLibrary((prev) => [created, ...prev]);
+            onAdd({ name: created.name, is_anchor: created.is_anchor });
+        } catch (e: unknown) {
+            if (e instanceof Error && e.message.includes("409")) {
+                const existing = library.find((ex) => ex.name.toLowerCase() === name.toLowerCase());
+                if (existing) {
+                    onAdd({ name: existing.name, is_anchor: existing.is_anchor });
+                    return;
+                }
+            }
+            setError("No se pudo crear el ejercicio");
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    const detailedCreate = async () => {
+        const name = details.name?.trim() || q.trim();
+        if (!name) {
+            setError("Escribe un nombre para crear el ejercicio");
+            return;
+        }
+        setCreating(true);
+        setError("");
+        try {
+            const created = await api.createExercise({ ...details, name });
+            setLibrary((prev) => [created, ...prev]);
+            onAdd({ name: created.name, is_anchor: created.is_anchor });
+        } catch {
+            setError("No se pudo crear el ejercicio con detalles");
+        } finally {
+            setCreating(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm shadow-2xl">
+            <div className="bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
                     <h3 className="font-semibold text-white">Add Exercise</h3>
                     <button onClick={onClose} className="text-zinc-500 hover:text-white text-2xl w-10 h-10 flex items-center justify-center">✕</button>
                 </div>
-                <div className="p-5 space-y-4 pb-8">
+                <div className="p-5 space-y-4 pb-8 max-h-[80vh] overflow-y-auto">
                     <input autoFocus type="text" placeholder="Exercise name…" value={q}
                         onChange={(e) => setQ(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter" && q.trim()) onAdd(q.trim()); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" && q.trim()) quickCreate(); }}
                         className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-base text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-red-500" />
-                    <button onClick={() => q.trim() && onAdd(q.trim())}
-                        className="w-full py-3.5 bg-red-600 text-white font-bold rounded-xl active:opacity-80 touch-manipulation text-base">
-                        ➕ Add to Workout
-                    </button>
+
+                    {loading ? (
+                        <p className="text-sm text-zinc-500">Cargando biblioteca...</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {filtered.map((item) => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => onAdd({ name: item.name, is_anchor: item.is_anchor })}
+                                    className="w-full text-left px-3 py-2 rounded-lg border border-zinc-800 bg-zinc-950/60"
+                                >
+                                    <p className="text-sm text-white">{item.name}</p>
+                                    <p className="text-xs text-zinc-500">{item.primary_muscle} · {item.type}</p>
+                                </button>
+                            ))}
+                            {filtered.length === 0 && q.trim() && (
+                                <p className="text-xs text-zinc-600">No hay coincidencias en biblioteca.</p>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-3 space-y-3">
+                        <p className="text-xs uppercase tracking-wide text-zinc-500">Crear nuevo ejercicio</p>
+                        <button
+                            onClick={quickCreate}
+                            disabled={creating || !q.trim()}
+                            className="w-full py-2.5 bg-red-600 text-white font-semibold rounded-lg disabled:opacity-40"
+                        >
+                            {creating ? "Creando..." : "Agregar rapido"}
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowDetails((v) => !v);
+                                setDetails((prev) => ({ ...prev, name: q.trim() || prev.name || "" }));
+                            }}
+                            className="w-full py-2.5 border border-zinc-700 text-zinc-300 rounded-lg"
+                        >
+                            {showDetails ? "Ocultar detalles" : "Agregar con detalles"}
+                        </button>
+
+                        {showDetails && (
+                            <div className="space-y-2 pt-1">
+                                <input
+                                    value={details.name || ""}
+                                    onChange={(e) => setDetails((p) => ({ ...p, name: e.target.value }))}
+                                    placeholder="Nombre"
+                                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+                                />
+                                <div className="grid grid-cols-3 gap-2">
+                                    <select
+                                        value={details.primary_muscle}
+                                        onChange={(e) => setDetails((p) => ({ ...p, primary_muscle: e.target.value }))}
+                                        className="bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-2 text-xs text-white"
+                                    >
+                                        {MUSCLE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                                    </select>
+                                    <select
+                                        value={details.type}
+                                        onChange={(e) => setDetails((p) => ({ ...p, type: e.target.value }))}
+                                        className="bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-2 text-xs text-white"
+                                    >
+                                        {EXERCISE_TYPE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                                    </select>
+                                    <select
+                                        value={details.movement_pattern}
+                                        onChange={(e) => setDetails((p) => ({ ...p, movement_pattern: e.target.value }))}
+                                        className="bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-2 text-xs text-white"
+                                    >
+                                        {MOVEMENT_PATTERN_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                                    </select>
+                                </div>
+                                <div className="flex gap-2 text-xs">
+                                    <label className="flex items-center gap-1 text-zinc-400">
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(details.is_anchor)}
+                                            onChange={(e) => setDetails((p) => ({ ...p, is_anchor: e.target.checked }))}
+                                        />
+                                        Anchor
+                                    </label>
+                                    <label className="flex items-center gap-1 text-zinc-400">
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(details.is_staple)}
+                                            onChange={(e) => setDetails((p) => ({ ...p, is_staple: e.target.checked }))}
+                                        />
+                                        Staple
+                                    </label>
+                                </div>
+                                <button
+                                    onClick={detailedCreate}
+                                    disabled={creating}
+                                    className="w-full py-2.5 bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-lg disabled:opacity-40"
+                                >
+                                    Guardar con detalles
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                    {error && <p className="text-xs text-red-400">{error}</p>}
                 </div>
             </div>
         </div>
@@ -651,7 +838,7 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onCopyA
 
 // ─── Exercise Accordion ──────────────────────────────────────────────────────
 
-function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet, onCopyPreviousSet, onRemoveExercise, onSwap, onSetComplete }: {
+function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet, onCopyPreviousSet, onRemoveExercise, onSwap, onMoveUp, onMoveDown, onSetComplete }: {
     state: ExerciseState;
     onToggle: () => void;
     onSetChange: (si: number, u: ActualSet) => void;
@@ -660,6 +847,8 @@ function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet
     onCopyPreviousSet: (si: number) => void;
     onRemoveExercise: () => void;
     onSwap: () => void;
+    onMoveUp: () => void;
+    onMoveDown: () => void;
     onSetComplete: (restSecs: number) => void;
 }) {
     const { open, sets, plannedSets, lastSession } = state;
@@ -692,6 +881,8 @@ function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet
                 <div className="px-4 pb-4 space-y-3">
                     <div className="flex gap-2">
                         <button onClick={onSwap} className="flex-1 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">🔄 Swap</button>
+                        <button onClick={onMoveUp} className="px-3 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">↑</button>
+                        <button onClick={onMoveDown} className="px-3 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">↓</button>
                         <button onClick={onRemoveExercise} className="flex-1 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-400 touch-manipulation">🗑️ Remove</button>
                     </div>
                     <div className="space-y-3">
@@ -1036,10 +1227,31 @@ export default function TodayPage() {
 
     const removeExercise = (idx: number) => setExercises((p) => p.filter((_, i) => i !== idx));
 
-    const addExercise = (name: string) => {
-        setExercises((p) => [...p, { name, is_anchor: false, notes: "", plannedSets: [], sets: [newSet(0)], open: true, lastSession: [] }]);
+    const addExercise = (exercise: { name: string; is_anchor: boolean }) => {
+        setExercises((p) => [
+            ...p,
+            {
+                name: exercise.name,
+                is_anchor: exercise.is_anchor,
+                notes: "",
+                plannedSets: [],
+                sets: [newSet(0)],
+                open: true,
+                lastSession: [],
+            },
+        ]);
         setShowAddExercise(false);
-        showToast(`➕ Added ${name}`);
+        showToast(`➕ Added ${exercise.name}`);
+    };
+
+    const moveExercise = (idx: number, direction: -1 | 1) => {
+        setExercises((prev) => {
+            const next = idx + direction;
+            if (next < 0 || next >= prev.length) return prev;
+            const arr = [...prev];
+            [arr[idx], arr[next]] = [arr[next], arr[idx]];
+            return arr;
+        });
     };
 
     const swapExercise = (idx: number, alt: AlternativeExercise) => {
@@ -1117,7 +1329,7 @@ export default function TodayPage() {
     );
 
     return (
-        <div className="max-w-2xl mx-auto pb-36">
+        <div className="max-w-6xl mx-auto pb-36 sm:pb-8">
             {/* Modals */}
             {swapFor !== null && swapIndex >= 0 && (
                 <SwapModal exerciseName={swapFor} onClose={() => setSwapFor(null)} onSwap={(alt) => swapExercise(swapIndex, alt)} />
@@ -1156,9 +1368,13 @@ export default function TodayPage() {
                         )}
                     </div>
                     {plan && (
-                        <div className="hidden sm:flex flex-col items-end">
-                            <span className="text-xs text-zinc-500">Sets</span>
-                            <span className="text-xl font-bold text-white">{totalSets}</span>
+                        <div className="hidden sm:flex items-center gap-2">
+                            <div className="px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-xs text-zinc-400">
+                                Sets <span className="text-zinc-200 font-semibold">{completedSets}/{totalSets}</span>
+                            </div>
+                            <div className="px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-xs text-zinc-400">
+                                Entrados <span className="text-zinc-200 font-semibold">{enteredSets}</span>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -1223,46 +1439,64 @@ export default function TodayPage() {
             </div>
 
             {plan && (
-                <>
-                    {/* Progress bar */}
-                    <div className="mb-5">
-                        <div className="flex justify-between text-xs text-zinc-500 mb-1.5">
-                            <span>{completedSets}/{totalSets} sets</span>
-                            <span>{totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0}%</span>
+                <div className="sm:grid sm:grid-cols-[280px_minmax(0,1fr)] sm:gap-4 sm:items-start">
+                    <aside className="mb-4 sm:mb-0 sm:sticky sm:top-24 space-y-4">
+                        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+                            <div className="flex justify-between text-xs text-zinc-500 mb-1.5">
+                                <span>{completedSets}/{totalSets} sets</span>
+                                <span>{totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0}%</span>
+                            </div>
+                            <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden mb-3">
+                                <div
+                                    className="h-full bg-red-500 rounded-full transition-all duration-500"
+                                    style={{ width: `${totalSets > 0 ? (completedSets / totalSets) * 100 : 0}%` }}
+                                />
+                            </div>
+                            <p className="text-xs text-zinc-600">
+                                {restoredDraft ? "Borrador restaurado" : "Borrador activo"}
+                                {lastDraftSaveAt ? ` · guardado ${new Date(lastDraftSaveAt).toLocaleTimeString()}` : ""}
+                            </p>
                         </div>
-                        <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-red-500 to-red-500 rounded-full transition-all duration-500"
-                                style={{ width: `${totalSets > 0 ? (completedSets / totalSets) * 100 : 0}%` }} />
-                        </div>
-                    </div>
 
-                    {/* Action bar */}
-                    <div className="hidden sm:flex gap-2 mb-5">
-                        <button onClick={() => setShowAddExercise(true)}
-                            className="flex-1 py-3 border border-zinc-700 text-zinc-300 font-semibold rounded-xl active:bg-zinc-800 touch-manipulation text-sm">
-                            ➕ Exercise
-                        </button>
-                        <button onClick={() => save(false)} disabled={saving || enteredSets === 0}
-                            className="flex-1 py-3 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold rounded-xl active:opacity-80 disabled:opacity-40 touch-manipulation text-sm">
-                            {saving ? "Saving..." : `💾 Save (${enteredSets})`}
-                        </button>
-                        {savedId !== null && (
-                            <button onClick={() => setShowComplete(true)}
-                                className="flex-1 py-3 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold rounded-xl active:opacity-80 touch-manipulation text-sm">
+                        <div className="hidden sm:grid gap-2">
+                            <button
+                                onClick={() => setShowAddExercise(true)}
+                                className="w-full py-3 border border-zinc-700 text-zinc-300 font-semibold rounded-xl"
+                            >
+                                ➕ Exercise
+                            </button>
+                            <button
+                                onClick={() => save(false)}
+                                disabled={saving || enteredSets === 0}
+                                className="w-full py-3 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold rounded-xl disabled:opacity-40"
+                            >
+                                {saving ? "Saving..." : `💾 Save (${enteredSets})`}
+                            </button>
+                            <button
+                                onClick={() => savedId !== null && setShowComplete(true)}
+                                disabled={savedId === null}
+                                className="w-full py-3 bg-zinc-800 text-zinc-100 font-bold rounded-xl disabled:opacity-40"
+                            >
                                 ✅ Done
                             </button>
+                        </div>
+
+                        {completedSets > 0 && (
+                            <div className="hidden sm:block p-4 bg-zinc-900 border border-zinc-800 rounded-2xl">
+                                <h3 className="font-semibold text-zinc-300 mb-3">Summary</h3>
+                                <div className="grid grid-cols-1 gap-2 text-sm">
+                                    <p className="text-zinc-400">Sets <span className="text-white font-semibold">{completedSets}</span></p>
+                                    <p className="text-zinc-400">Exercises <span className="text-white font-semibold">{exercises.filter((e) => e.sets.some((s) => s.completed)).length}</span></p>
+                                    <p className="text-zinc-400">Volume <span className="text-white font-semibold">{completedVolume > 0 ? `${Math.round(completedVolume / 1000 * 10) / 10}k lbs` : "-"}</span></p>
+                                </div>
+                                {savedId && <p className="text-xs text-red-400 mt-3">Workout #{savedId}</p>}
+                            </div>
                         )}
-                    </div>
+                    </aside>
 
-                    <p className="text-xs text-zinc-600 mb-5">
-                        {restoredDraft ? "Borrador restaurado" : "Borrador activo"}
-                        {lastDraftSaveAt ? ` · guardado ${new Date(lastDraftSaveAt).toLocaleTimeString()}` : ""}
-                    </p>
-
-                    {/* Exercises */}
-                    <div className="space-y-3">
+                    <section className="space-y-3">
                         {exercises.length === 0 && (
-                            <div className="text-center py-16 text-zinc-600">
+                            <div className="text-center py-16 text-zinc-600 rounded-2xl border border-zinc-800 bg-zinc-950">
                                 <p className="text-lg mb-3">No exercises yet</p>
                                 <button onClick={() => setShowAddExercise(true)} className="px-6 py-3 border border-zinc-700 rounded-xl text-zinc-400 touch-manipulation">➕ Add Exercise</button>
                             </div>
@@ -1278,29 +1512,30 @@ export default function TodayPage() {
                                 onCopyPreviousSet={(si) => copyPreviousSet(i, si)}
                                 onRemoveExercise={() => removeExercise(i)}
                                 onSwap={() => setSwapFor(ex.name)}
+                                onMoveUp={() => moveExercise(i, -1)}
+                                onMoveDown={() => moveExercise(i, 1)}
                                 onSetComplete={(secs) => startRestTimer(secs)}
                             />
                         ))}
-                    </div>
 
-                    {/* Summary */}
-                    {completedSets > 0 && (
-                        <div className="mt-6 p-5 bg-zinc-800/60 border border-zinc-700/50 rounded-2xl">
-                            <h3 className="font-semibold text-zinc-300 mb-4">📊 Summary</h3>
-                            <div className="grid grid-cols-3 gap-3 text-center">
-                                <div><p className="text-3xl font-bold text-white">{completedSets}</p><p className="text-xs text-zinc-500 mt-1">Sets</p></div>
-                                <div><p className="text-3xl font-bold text-white">{exercises.filter((e) => e.sets.some((s) => s.completed)).length}</p><p className="text-xs text-zinc-500 mt-1">Exercises</p></div>
-                                <div>
-                                    <p className="text-3xl font-bold text-white">
-                                        {completedVolume > 0 ? `${Math.round(completedVolume / 1000 * 10) / 10}k` : "—"}
-                                    </p>
-                                    <p className="text-xs text-zinc-500 mt-1">lbs vol</p>
+                        {completedSets > 0 && (
+                            <div className="sm:hidden mt-6 p-5 bg-zinc-800/60 border border-zinc-700/50 rounded-2xl">
+                                <h3 className="font-semibold text-zinc-300 mb-4">📊 Summary</h3>
+                                <div className="grid grid-cols-3 gap-3 text-center">
+                                    <div><p className="text-3xl font-bold text-white">{completedSets}</p><p className="text-xs text-zinc-500 mt-1">Sets</p></div>
+                                    <div><p className="text-3xl font-bold text-white">{exercises.filter((e) => e.sets.some((s) => s.completed)).length}</p><p className="text-xs text-zinc-500 mt-1">Exercises</p></div>
+                                    <div>
+                                        <p className="text-3xl font-bold text-white">
+                                            {completedVolume > 0 ? `${Math.round(completedVolume / 1000 * 10) / 10}k` : "—"}
+                                        </p>
+                                        <p className="text-xs text-zinc-500 mt-1">lbs vol</p>
+                                    </div>
                                 </div>
+                                {savedId && <p className="text-center text-xs text-red-400 mt-4">✅ Workout #{savedId}</p>}
                             </div>
-                            {savedId && <p className="text-center text-xs text-red-400 mt-4">✅ Workout #{savedId}</p>}
-                        </div>
-                    )}
-                </>
+                        )}
+                    </section>
+                </div>
             )}
 
             {plan && (

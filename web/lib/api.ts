@@ -149,6 +149,15 @@ export interface ExerciseItem {
     total_sets: number;
 }
 
+export interface CreateExercisePayload {
+    name: string;
+    primary_muscle?: string;
+    type?: string;
+    movement_pattern?: string;
+    is_anchor?: boolean;
+    is_staple?: boolean;
+}
+
 export interface AnchorProgress {
     exercise: string;
     exercise_id: number;
@@ -196,6 +205,12 @@ export const api = {
     getWorkouts: (limit = 30) => fetchApi<WorkoutSummary[]>(`/workouts?limit=${limit}`),
     getWorkout: (id: number) => fetchApi<WorkoutDetail>(`/workouts/${id}`),
     getExercises: () => fetchApi<ExerciseItem[]>("/exercises"),
+    createExercise: (payload: CreateExercisePayload) =>
+        fetchApi<ExerciseItem>("/exercises", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        }),
     getProgress: () => fetchApi<AnchorProgress[]>("/progress"),
     getWeeklyStats: () => fetchApi<WeeklyStats>("/stats/weekly"),
     getTodayPlan: () => fetchApi<TodayPlan>("/today"),
