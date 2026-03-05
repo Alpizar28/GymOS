@@ -27,9 +27,9 @@ TestSession = async_sessionmaker(TEST_ENGINE, class_=AsyncSession, expire_on_com
 
 # Paths to real JSON files
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-ATHLETE_PROFILE = PROJECT_ROOT / "ATHLETE_PROFILE.json"
-EXERCISE_LIBRARY = PROJECT_ROOT / "EXERCISE_LIBRARY.json"
-PROGRAM_CONSTRAINTS = PROJECT_ROOT / "PROGRAM_CONSTRAINTS.json"
+ATHLETE_PROFILE = PROJECT_ROOT / "data" / "ATHLETE_PROFILE.json"
+EXERCISE_LIBRARY = PROJECT_ROOT / "data" / "EXERCISE_LIBRARY.json"
+PROGRAM_CONSTRAINTS = PROJECT_ROOT / "data" / "PROGRAM_CONSTRAINTS.json"
 
 
 @pytest_asyncio.fixture

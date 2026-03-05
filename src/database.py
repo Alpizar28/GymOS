@@ -65,9 +65,9 @@ async def _auto_seed_if_empty() -> None:
     logger.info("Empty database detected — running auto-seed...")
 
     project_root = Path(__file__).resolve().parent.parent
-    athlete_profile = project_root / "ATHLETE_PROFILE.json"
-    exercise_library = project_root / "EXERCISE_LIBRARY.json"
-    program_constraints = project_root / "PROGRAM_CONSTRAINTS.json"
+    athlete_profile = project_root / "data" / "ATHLETE_PROFILE.json"
+    exercise_library = project_root / "data" / "EXERCISE_LIBRARY.json"
+    program_constraints = project_root / "data" / "PROGRAM_CONSTRAINTS.json"
 
     missing = [p for p in [athlete_profile, exercise_library, program_constraints] if not p.exists()]
     if missing:

@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir .
 
 # Copy source code and data files
 COPY src/ ./src/
-COPY ATHLETE_PROFILE.json EXERCISE_LIBRARY.json PROGRAM_CONSTRAINTS.json ./
+COPY data/ATHLETE_PROFILE.json data/EXERCISE_LIBRARY.json data/PROGRAM_CONSTRAINTS.json ./
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data
