@@ -19,6 +19,21 @@ INDEX_STATEMENTS = [
     "CREATE INDEX IF NOT EXISTS idx_plan_days_template_name ON plan_days(template_day_name)",
     "CREATE INDEX IF NOT EXISTS idx_routine_exercises_routine_sort ON routine_exercises(routine_id, sort_order)",
     "CREATE INDEX IF NOT EXISTS idx_routine_sets_exercise_index ON routine_sets(routine_exercise_id, set_index)",
+    "CREATE INDEX IF NOT EXISTS idx_routines_training_type ON routines(training_type)",
+    "CREATE INDEX IF NOT EXISTS idx_workouts_training_type ON workouts(training_type)",
+]
+
+SCHEMA_PATCHES = [
+    {
+        "table": "routines",
+        "column": "training_type",
+        "statement": "ALTER TABLE routines ADD COLUMN training_type TEXT NOT NULL DEFAULT 'custom'",
+    },
+    {
+        "table": "workouts",
+        "column": "training_type",
+        "statement": "ALTER TABLE workouts ADD COLUMN training_type TEXT",
+    },
 ]
 
 
@@ -43,6 +58,14 @@ WHERE id NOT IN (SELECT DISTINCT plan_id FROM plan_days)
 
 async def run_database_hygiene(session: AsyncSession) -> dict:
     """Run lightweight DB optimization and cleanup tasks."""
+    schema_patches_applied = 0
+    for patch in SCHEMA_PATCHES:
+        result = await session.execute(text(f"PRAGMA table_info({patch['table']})"))
+        columns = {row[1] for row in result.fetchall()}
+        if patch["column"] not in columns:
+            await session.execute(text(patch["statement"]))
+            schema_patches_applied += 1
+
     for statement in INDEX_STATEMENTS:
         await session.execute(text(statement))
 
@@ -53,4 +76,5 @@ async def run_database_hygiene(session: AsyncSession) -> dict:
         "plan_days_deduped": dedupe_result.rowcount or 0,
         "orphan_plans_removed": orphan_result.rowcount or 0,
         "indexes_checked": len(INDEX_STATEMENTS),
+        "schema_patches_applied": schema_patches_applied,
     }

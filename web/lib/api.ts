@@ -114,6 +114,7 @@ export interface RoutineCard {
     name: string;
     subtitle: string | null;
     notes: string | null;
+    training_type: "push" | "pull" | "legs" | "custom";
     sort_order: number;
     exercise_count: number;
     total_sets: number;
@@ -128,6 +129,7 @@ export interface RoutineDetail {
     name: string;
     subtitle: string | null;
     notes: string | null;
+    training_type: "push" | "pull" | "legs" | "custom";
     sort_order: number;
     exercise_count: number;
     total_sets: number;
@@ -210,6 +212,7 @@ export interface RoutineCreatePayload {
     name: string;
     subtitle?: string | null;
     notes?: string | null;
+    training_type?: "push" | "pull" | "legs" | "custom";
     sort_order?: number | null;
     exercises: RoutineExerciseInput[];
 }
@@ -219,6 +222,7 @@ export interface RoutineUpdatePayload {
     name?: string;
     subtitle?: string | null;
     notes?: string | null;
+    training_type?: "push" | "pull" | "legs" | "custom";
     sort_order?: number;
     exercises?: RoutineExerciseInput[];
 }
@@ -559,6 +563,7 @@ export interface ProtectionRule {
 export interface TodayPlan {
     plan_id: number;
     day_name: string;
+    training_type?: "push" | "pull" | "legs" | "custom";
     estimated_duration_min: number | null;
     total_sets: number | null;
     exercises: TodayExercise[];
@@ -595,5 +600,6 @@ export interface ExerciseLogEntry {
 
 export interface TodayLogPayload {
     day_name: string;
+    training_type?: "push" | "pull" | "legs" | "custom";
     exercises: ExerciseLogEntry[];
 }

@@ -1395,7 +1395,7 @@ export default function TodayPage() {
                 sets: e.sets.filter((s) => s.completed || hasSetData(s)),
             }))
             .filter((e) => e.sets.length > 0);
-        return { day_name: plan.day_name, exercises: exEntries };
+        return { day_name: plan.day_name, training_type: plan.training_type, exercises: exEntries };
     }, [plan, exercises]);
 
     const save = useCallback(async (silent = false) => {

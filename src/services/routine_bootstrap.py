@@ -23,6 +23,17 @@ def _display_name(template_name: str) -> str:
     return template_name.replace("_", " ").strip()
 
 
+def _infer_training_type(name: str, focus: str | None) -> str:
+    text = f"{name} {focus or ''}".lower()
+    if "push" in text:
+        return "push"
+    if "pull" in text:
+        return "pull"
+    if "leg" in text or "quad" in text or "posterior" in text:
+        return "legs"
+    return "custom"
+
+
 async def ensure_default_routines(session: AsyncSession) -> int:
     """Create initial routines from non-system templates once."""
     count_result = await session.execute(
@@ -51,6 +62,7 @@ async def ensure_default_routines(session: AsyncSession) -> int:
             name=_display_name(template.name),
             subtitle=template.focus,
             notes=f"Imported from template: {template.name}",
+            training_type=_infer_training_type(template.name, template.focus),
             sort_order=created,
             is_deleted=False,
         )

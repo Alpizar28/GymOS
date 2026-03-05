@@ -43,6 +43,7 @@ class Routine(Base):
     subtitle: Mapped[str | None] = mapped_column(String(220), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    training_type: Mapped[str] = mapped_column(String(20), nullable=False, default="custom")
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

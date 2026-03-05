@@ -8,6 +8,7 @@ from src.api.routes import (
     DayOptionCreate,
     ManualSet,
     ProtectionRequest,
+    RoutineCreateRequest,
     TodayLogRequest,
     _classify_training_type,
 )
@@ -53,6 +54,16 @@ def test_complete_session_request_validates_fatigue_range():
 
     with pytest.raises(ValidationError):
         CompleteSessionRequest(workout_id=10, fatigue=10.5)
+
+
+def test_routine_create_request_rejects_invalid_training_type():
+    with pytest.raises(ValidationError):
+        RoutineCreateRequest(
+            folder_id=1,
+            name="My Routine",
+            training_type="upper",
+            exercises=[],
+        )
 
 
 def test_protection_request_validates_severity_range():

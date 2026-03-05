@@ -6,6 +6,20 @@ import { useEffect, useMemo, useState } from "react";
 
 import { api, type RoutineCard, type RoutineFolder } from "@/lib/api";
 
+const ROUTINE_TYPES = [
+  { value: "push", label: "Push" },
+  { value: "pull", label: "Pull" },
+  { value: "legs", label: "Legs" },
+  { value: "custom", label: "Custom" },
+] as const;
+
+const ROUTINE_TYPE_LABEL: Record<string, string> = {
+  push: "Push",
+  pull: "Pull",
+  legs: "Legs",
+  custom: "Custom",
+};
+
 function CreateFolderModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -68,6 +82,7 @@ function CreateRoutineModal({
   const [folderId, setFolderId] = useState<number>(folders[0]?.id ?? 0);
   const [name, setName] = useState("");
   const [subtitle, setSubtitle] = useState("");
+  const [trainingType, setTrainingType] = useState<"push" | "pull" | "legs" | "custom">("custom");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -88,6 +103,7 @@ function CreateRoutineModal({
         name: name.trim(),
         subtitle: subtitle.trim() || null,
         notes: null,
+        training_type: trainingType,
         exercises: [],
       });
       onCreated();
@@ -125,6 +141,17 @@ function CreateRoutineModal({
           placeholder="Subtitulo (opcional)"
           className="w-full px-3 py-3 rounded-xl bg-zinc-900 border border-zinc-700 text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
         />
+        <select
+          value={trainingType}
+          onChange={(e) => setTrainingType(e.target.value as "push" | "pull" | "legs" | "custom")}
+          className="w-full px-3 py-3 rounded-xl bg-zinc-900 border border-zinc-700 text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
+        >
+          {ROUTINE_TYPES.map((option) => (
+            <option key={option.value} value={option.value}>
+              Tipo: {option.label}
+            </option>
+          ))}
+        </select>
         {error && <p className="text-xs text-red-400">{error}</p>}
         <div className="grid grid-cols-2 gap-2">
           <button onClick={onClose} className="py-2.5 rounded-lg border border-zinc-700 text-zinc-400 text-sm">
@@ -257,6 +284,9 @@ export default function RoutinesPage() {
                             <div className="min-w-0">
                               <p className="font-semibold truncate">{routine.name}</p>
                               {routine.subtitle && <p className="text-xs text-zinc-500 mt-0.5 truncate">{routine.subtitle}</p>}
+                              <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border border-zinc-700 text-zinc-400 bg-zinc-900">
+                                {ROUTINE_TYPE_LABEL[routine.training_type] ?? "Custom"}
+                              </span>
                             </div>
                             <button
                               onClick={() => void startRoutine(routine.id)}

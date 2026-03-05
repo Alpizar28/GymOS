@@ -19,6 +19,7 @@ class Workout(Base):
     bodyweight: Mapped[float | None] = mapped_column(Float, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     template_day_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    training_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )

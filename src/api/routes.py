@@ -29,6 +29,7 @@ from src.services.workout_logger import log_manual_workout
 router = APIRouter(prefix="/api", tags=["api"])
 
 TRAINING_TYPE_VALUES = {"all", "push", "pull", "legs", "custom"}
+ROUTINE_TRAINING_TYPE_VALUES = {"push", "pull", "legs", "custom"}
 
 
 def _classify_training_type(template_day_name: str | None) -> str:
@@ -81,6 +82,7 @@ async def _aggregate_week_window(
         select(
             Workout.id,
             Workout.template_day_name,
+            Workout.training_type,
             func.count(WorkoutSet.id).label("set_count"),
             func.sum(
                 func.coalesce(WorkoutSet.actual_weight, WorkoutSet.weight)
@@ -98,7 +100,12 @@ async def _aggregate_week_window(
     total_sets = 0
     total_volume = 0.0
     for row in result.all():
-        detected_type = _classify_training_type(row.template_day_name)
+        stored_type = (row.training_type or "").strip().lower()
+        detected_type = (
+            stored_type
+            if stored_type in ROUTINE_TRAINING_TYPE_VALUES
+            else _classify_training_type(row.template_day_name)
+        )
         if training_type != "all" and detected_type != training_type:
             continue
         sessions += 1
@@ -247,6 +254,7 @@ class RoutineCreateRequest(StrictRequestModel):
     name: str = Field(min_length=1, max_length=100)
     subtitle: str | None = Field(default=None, max_length=140)
     notes: str | None = Field(default=None, max_length=2000)
+    training_type: str = Field(default="custom", pattern=r"^(push|pull|legs|custom)$")
     sort_order: int | None = Field(default=None, ge=0, le=10000)
     exercises: list[RoutineExerciseInput] = Field(default_factory=list, max_length=60)
 
@@ -256,6 +264,7 @@ class RoutineUpdateRequest(StrictRequestModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     subtitle: str | None = Field(default=None, max_length=140)
     notes: str | None = Field(default=None, max_length=2000)
+    training_type: str | None = Field(default=None, pattern=r"^(push|pull|legs|custom)$")
     sort_order: int | None = Field(default=None, ge=0, le=10000)
     exercises: list[RoutineExerciseInput] | None = Field(default=None, max_length=60)
 
@@ -468,6 +477,7 @@ class ExerciseLogEntry(StrictRequestModel):
 
 class TodayLogRequest(StrictRequestModel):
     day_name: str = Field(min_length=1, max_length=80)
+    training_type: str | None = Field(default=None, pattern=r"^(push|pull|legs|custom)$")
     exercises: list[ExerciseLogEntry] = Field(min_length=1, max_length=60)
 
 
@@ -489,6 +499,7 @@ async def get_today_plan() -> dict:
         return {
             "plan_id": plan_day.id,
             "day_name": content.get("day_name", ""),
+            "training_type": content.get("training_type"),
             "estimated_duration_min": content.get("estimated_duration_min"),
             "total_sets": content.get("total_sets"),
             "exercises": [
@@ -532,9 +543,15 @@ async def log_today_workout(payload: TodayLogRequest) -> dict:
         created = workout is None
 
         if created:
-            workout = Workout(date=today, template_day_name=payload.day_name)
+            workout = Workout(
+                date=today,
+                template_day_name=payload.day_name,
+                training_type=payload.training_type,
+            )
             session.add(workout)
             await session.flush()
+        else:
+            workout.training_type = payload.training_type
 
         kept_workout_exercise_ids: set[int] = set()
 
@@ -1018,6 +1035,7 @@ async def get_calendar(
                 Workout.id,
                 Workout.date,
                 Workout.template_day_name,
+                Workout.training_type,
                 Workout.duration_min,
                 func.count(WorkoutSet.id).label("set_count"),
                 func.sum(
@@ -1035,7 +1053,12 @@ async def get_calendar(
 
         workouts_by_date: dict[date, list[dict]] = {}
         for row in result.all():
-            detected_type = _classify_training_type(row.template_day_name)
+            stored_type = (row.training_type or "").strip().lower()
+            detected_type = (
+                stored_type
+                if stored_type in ROUTINE_TRAINING_TYPE_VALUES
+                else _classify_training_type(row.template_day_name)
+            )
             if normalized_training_type != "all" and detected_type != normalized_training_type:
                 continue
             workouts_by_date.setdefault(row.date, []).append({
@@ -1203,6 +1226,7 @@ def _routine_to_detail_payload(routine: Routine) -> dict:
         "name": routine.name,
         "subtitle": routine.subtitle,
         "notes": routine.notes,
+        "training_type": routine.training_type,
         "sort_order": routine.sort_order,
         "exercise_count": len(exercise_payload),
         "total_sets": total_sets,
@@ -1413,6 +1437,7 @@ async def list_routines(folder_id: int | None = None) -> list[dict]:
                     "name": routine.name,
                     "subtitle": routine.subtitle,
                     "notes": routine.notes,
+                    "training_type": routine.training_type,
                     "sort_order": routine.sort_order,
                     "exercise_count": len(exercises),
                     "total_sets": total_sets,
@@ -1449,6 +1474,7 @@ async def create_routine(payload: RoutineCreateRequest) -> dict:
             name=name,
             subtitle=payload.subtitle,
             notes=payload.notes,
+            training_type=payload.training_type,
             sort_order=sort_order,
             is_deleted=False,
         )
@@ -1490,6 +1516,8 @@ async def update_routine(routine_id: int, payload: RoutineUpdateRequest) -> dict
             routine.subtitle = payload.subtitle
         if payload.notes is not None:
             routine.notes = payload.notes
+        if payload.training_type is not None:
+            routine.training_type = payload.training_type
         if payload.sort_order is not None:
             routine.sort_order = payload.sort_order
 
@@ -1530,6 +1558,7 @@ async def duplicate_routine(routine_id: int) -> dict:
             name=f"{source.name} Copy",
             subtitle=source.subtitle,
             notes=source.notes,
+            training_type=source.training_type,
             sort_order=sort_order,
             is_deleted=False,
         )
@@ -1632,6 +1661,7 @@ async def start_routine(routine_id: int) -> dict:
 
         plan_json = {
             "day_name": routine.name,
+            "training_type": routine.training_type,
             "estimated_duration_min": int(max(15, round(estimated_minutes))),
             "exercises": exercises_payload,
             "total_sets": total_sets,
