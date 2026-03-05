@@ -125,7 +125,13 @@ export interface WorkoutDetail {
 export interface WorkoutExerciseDetail {
     name: string;
     order: number;
-    sets: { set_type: string; weight: number; reps: number; rir: number | null }[];
+    sets: {
+        set_type: string;
+        weight: number | null;
+        reps: number | null;
+        rir: number | null;
+        completed: boolean;
+    }[];
 }
 
 export interface ExerciseItem {

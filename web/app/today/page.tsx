@@ -29,6 +29,92 @@ interface ExerciseState {
     lastSession: LastSessionSet[] | null; // null = not fetched yet
 }
 
+interface TodayDraft {
+    version: 1;
+    dayName: string;
+    date: string;
+    savedId: number | null;
+    savedAt: number;
+    exercises: ExerciseState[];
+}
+
+const DRAFT_PREFIX = "gymos:today-draft";
+
+function localDateISO() {
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 10);
+}
+
+function draftKey(dayName: string, date = localDateISO()) {
+    return `${DRAFT_PREFIX}:${date}:${dayName}`;
+}
+
+function normalizeName(name: string) {
+    return name.trim().toLowerCase();
+}
+
+function hasSetData(s: ActualSet) {
+    return s.actual_weight !== null || s.actual_reps !== null || s.actual_rir !== null;
+}
+
+function normalizeIndices(sets: ActualSet[]) {
+    return sets.map((s, i) => ({ ...s, index: i }));
+}
+
+function mergeExercises(base: ExerciseState[], incoming: ExerciseState[]) {
+    const mergeSetRows = (baseSets: ActualSet[], incomingSets: ActualSet[]) => {
+        const max = Math.max(baseSets.length, incomingSets.length);
+        const merged: ActualSet[] = [];
+        for (let i = 0; i < max; i += 1) {
+            const baseSet = baseSets[i];
+            const incomingSet = incomingSets[i];
+            if (incomingSet && (incomingSet.completed || hasSetData(incomingSet))) {
+                merged.push({ ...incomingSet, index: i });
+            } else if (baseSet) {
+                merged.push({ ...baseSet, index: i });
+            } else if (incomingSet) {
+                merged.push({ ...incomingSet, index: i });
+            }
+        }
+        return merged;
+    };
+
+    const used = new Array(incoming.length).fill(false);
+    const merged = base.map((baseEx) => {
+        const matchIndex = incoming.findIndex(
+            (cand, i) => !used[i] && normalizeName(cand.name) === normalizeName(baseEx.name)
+        );
+
+        if (matchIndex === -1) {
+            return baseEx;
+        }
+
+        used[matchIndex] = true;
+        const from = incoming[matchIndex];
+        return {
+            ...baseEx,
+            is_anchor: from.is_anchor,
+            notes: from.notes || baseEx.notes,
+            plannedSets: from.plannedSets.length > 0 ? from.plannedSets : baseEx.plannedSets,
+            sets: mergeSetRows(baseEx.sets, from.sets),
+            open: from.open,
+        };
+    });
+
+    for (let i = 0; i < incoming.length; i += 1) {
+        if (!used[i]) {
+            merged.push({
+                ...incoming[i],
+                sets: normalizeIndices(incoming[i].sets),
+                lastSession: null,
+            });
+        }
+    }
+
+    return merged;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function newSet(index: number): ActualSet {
@@ -693,17 +779,143 @@ export default function TodayPage() {
     // Rest timer: null = hidden, number = seconds remaining start value
     const [restTimer, setRestTimer] = useState<number | null>(null);
     const restDismissed = useRef(false);
+    const draftReadyRef = useRef(false);
+    const [lastDraftSaveAt, setLastDraftSaveAt] = useState<number | null>(null);
+    const [restoredDraft, setRestoredDraft] = useState(false);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
-    const applyPlan = useCallback((data: TodayPlan) => {
-        setPlan(data);
-        setExercises(data.exercises.map((ex) => ({
-            name: ex.name, is_anchor: ex.is_anchor, notes: ex.notes,
-            plannedSets: ex.sets, sets: initSets(ex.sets),
-            open: false, lastSession: null,
-        })));
+    const buildExerciseStateFromPlan = useCallback((data: TodayPlan): ExerciseState[] => (
+        data.exercises.map((ex) => ({
+            name: ex.name,
+            is_anchor: ex.is_anchor,
+            notes: ex.notes,
+            plannedSets: ex.sets,
+            sets: initSets(ex.sets),
+            open: false,
+            lastSession: null,
+        }))
+    ), []);
+
+    const readDraft = useCallback((dayName: string): TodayDraft | null => {
+        if (typeof window === "undefined") return null;
+        const raw = window.localStorage.getItem(draftKey(dayName));
+        if (!raw) return null;
+        try {
+            const parsed = JSON.parse(raw) as TodayDraft;
+            if (parsed.version !== 1 || parsed.dayName !== dayName || !Array.isArray(parsed.exercises)) {
+                return null;
+            }
+            return parsed;
+        } catch {
+            return null;
+        }
     }, []);
+
+    const writeDraftNow = useCallback((
+        dayName: string,
+        exerciseState: ExerciseState[],
+        draftSavedId: number | null
+    ) => {
+        if (typeof window === "undefined") return;
+        const draft: TodayDraft = {
+            version: 1,
+            dayName,
+            date: localDateISO(),
+            savedId: draftSavedId,
+            savedAt: Date.now(),
+            exercises: exerciseState.map((ex) => ({
+                ...ex,
+                lastSession: null,
+                sets: normalizeIndices(ex.sets),
+            })),
+        };
+        window.localStorage.setItem(draftKey(dayName), JSON.stringify(draft));
+        setLastDraftSaveAt(draft.savedAt);
+    }, []);
+
+    const clearDraft = useCallback((dayName?: string) => {
+        if (typeof window === "undefined") return;
+        const keyDay = dayName ?? plan?.day_name;
+        if (!keyDay) return;
+        window.localStorage.removeItem(draftKey(keyDay));
+    }, [plan?.day_name]);
+
+    const hydrateFromLoggedWorkout = useCallback(async (dayName: string, base: ExerciseState[]) => {
+        const today = localDateISO();
+        const workouts = await api.getWorkouts(40);
+        const match = workouts.find((w) => w.date === today && w.template_day_name === dayName);
+        if (!match) {
+            return { exercises: base, workoutId: null as number | null };
+        }
+
+        const detail = await api.getWorkout(match.id);
+        const fromWorkout: ExerciseState[] = detail.exercises.map((ex) => {
+            const baseEx = base.find((b) => normalizeName(b.name) === normalizeName(ex.name));
+            const sets = normalizeIndices(
+                ex.sets.map((s, i) => ({
+                    index: i,
+                    actual_weight: s.weight,
+                    actual_reps: s.reps,
+                    actual_rir: s.rir,
+                    completed: s.completed,
+                }))
+            );
+
+            return {
+                name: ex.name,
+                is_anchor: baseEx?.is_anchor ?? false,
+                notes: baseEx?.notes ?? "",
+                plannedSets: baseEx?.plannedSets ?? [],
+                sets,
+                open: false,
+                lastSession: null,
+            };
+        });
+
+        return {
+            exercises: mergeExercises(base, fromWorkout),
+            workoutId: detail.id,
+        };
+    }, []);
+
+    const applyPlanWithRecovery = useCallback(async (data: TodayPlan, showRestoreToast = false) => {
+        draftReadyRef.current = false;
+
+        const base = buildExerciseStateFromPlan(data);
+
+        let merged = base;
+        let recoveredWorkoutId: number | null = null;
+
+        try {
+            const serverProgress = await hydrateFromLoggedWorkout(data.day_name, merged);
+            merged = serverProgress.exercises;
+            recoveredWorkoutId = serverProgress.workoutId;
+        } catch {
+            // Non-blocking; local draft can still recover state
+        }
+
+        const localDraft = readDraft(data.day_name);
+        if (localDraft) {
+            merged = mergeExercises(merged, localDraft.exercises);
+            recoveredWorkoutId = localDraft.savedId ?? recoveredWorkoutId;
+            setRestoredDraft(true);
+            if (showRestoreToast) {
+                showToast("📝 Borrador restaurado");
+            }
+        } else {
+            setRestoredDraft(false);
+        }
+
+        setPlan(data);
+        setExercises(merged);
+        setSavedId(recoveredWorkoutId);
+        setCompleted(false);
+        setNextDay(null);
+
+        writeDraftNow(data.day_name, merged, recoveredWorkoutId);
+        draftReadyRef.current = true;
+    }, [buildExerciseStateFromPlan, hydrateFromLoggedWorkout, readDraft, writeDraftNow]);
 
     const loadDayMeta = useCallback(async () => {
         const [options, rec] = await Promise.all([
@@ -715,6 +927,25 @@ export default function TodayPage() {
         const initial = rec?.day_name || options[0]?.name || "";
         setSelectedDay((prev) => prev || initial);
     }, []);
+
+    useEffect(() => {
+        if (!plan || !draftReadyRef.current) return;
+        const timer = window.setTimeout(() => {
+            writeDraftNow(plan.day_name, exercises, savedId);
+        }, 400);
+        return () => window.clearTimeout(timer);
+    }, [plan, exercises, savedId, writeDraftNow]);
+
+    useEffect(() => {
+        if (!plan) return;
+        const handler = () => {
+            writeDraftNow(plan.day_name, exercises, savedId);
+        };
+        window.addEventListener("beforeunload", handler);
+        return () => {
+            window.removeEventListener("beforeunload", handler);
+        };
+    }, [plan, exercises, savedId, writeDraftNow]);
 
     useEffect(() => {
         let cancelled = false;
@@ -730,7 +961,7 @@ export default function TodayPage() {
             try {
                 const data = await api.getTodayPlan();
                 if (!cancelled) {
-                    applyPlan(data);
+                    await applyPlanWithRecovery(data, true);
                     setSelectedDay(data.day_name);
                 }
             } catch {
@@ -741,17 +972,14 @@ export default function TodayPage() {
         }
         load();
         return () => { cancelled = true; };
-    }, [applyPlan, loadDayMeta]);
+    }, [applyPlanWithRecovery, loadDayMeta]);
 
     const handleGenerate = async () => {
         if (!selectedDay) return;
         setGenerating(true);
         try {
             const planData = await api.generateDay(selectedDay);
-            setSavedId(null);
-            setCompleted(false);
-            setNextDay(null);
-            applyPlan({
+            await applyPlanWithRecovery({
                 plan_id: 0,
                 day_name: planData.day_name,
                 estimated_duration_min: planData.estimated_duration_min,
@@ -769,7 +997,7 @@ export default function TodayPage() {
                         rest_seconds: s.rest_seconds ?? null,
                     })),
                 })),
-            });
+            }, true);
             showToast(`⚡ Plan generado: ${formatDayName(planData.day_name)}`);
         } catch (e: unknown) {
             showToast(e instanceof Error ? e.message : "Generation failed");
@@ -847,19 +1075,25 @@ export default function TodayPage() {
     const buildPayload = useCallback(() => {
         if (!plan) return null;
         const exEntries: ExerciseLogEntry[] = exercises
-            .filter((e) => e.sets.some((s) => s.completed))
-            .map((e) => ({ name: e.name, sets: e.sets.filter((s) => s.completed) }));
+            .map((e) => ({
+                name: e.name,
+                sets: e.sets.filter((s) => s.completed || hasSetData(s)),
+            }))
+            .filter((e) => e.sets.length > 0);
         return { day_name: plan.day_name, exercises: exEntries };
     }, [plan, exercises]);
 
     const save = useCallback(async (silent = false) => {
         const payload = buildPayload();
         if (!payload) { if (!silent) showToast("Genera un plan primero."); return; }
-        if (payload.exercises.length === 0) { if (!silent) showToast("Complete at least one set first."); return; }
+        if (payload.exercises.length === 0) { if (!silent) showToast("Ingresa al menos un set para guardar."); return; }
         if (!silent) setSaving(true);
         try {
             const res = await api.logToday(payload);
             setSavedId(res.workout_id);
+            if (plan) {
+                writeDraftNow(plan.day_name, exercises, res.workout_id);
+            }
             if (res.prs && res.prs.length > 0) {
                 setPrs(res.prs);
             } else if (!silent) {
@@ -867,7 +1101,7 @@ export default function TodayPage() {
             }
         } catch { if (!silent) showToast("❌ Save failed."); }
         finally { if (!silent) setSaving(false); }
-    }, [buildPayload]);
+    }, [buildPayload, writeDraftNow, plan, exercises]);
 
     const startRestTimer = (secs: number) => {
         restDismissed.current = false;
@@ -875,6 +1109,7 @@ export default function TodayPage() {
     };
 
     const totalSets = exercises.reduce((n, e) => n + e.sets.length, 0);
+    const enteredSets = exercises.reduce((n, e) => n + e.sets.filter((s) => hasSetData(s)).length, 0);
     const completedSets = exercises.reduce((n, e) => n + e.sets.filter((s) => s.completed).length, 0);
     const completedVolume = exercises.reduce(
         (n, e) => n + e.sets.filter((s) => s.completed && s.actual_weight && s.actual_reps)
@@ -915,7 +1150,12 @@ export default function TodayPage() {
             )}
             {showComplete && savedId !== null && (
                 <CompleteModal workoutId={savedId}
-                    onComplete={(nd) => { setCompleted(true); setNextDay(nd); setShowComplete(false); }}
+                    onComplete={(nd) => {
+                        clearDraft();
+                        setCompleted(true);
+                        setNextDay(nd);
+                        setShowComplete(false);
+                    }}
                     onClose={() => setShowComplete(false)} />
             )}
             {showAddExercise && <AddExerciseModal onAdd={addExercise} onClose={() => setShowAddExercise(false)} />}
@@ -1034,9 +1274,9 @@ export default function TodayPage() {
                             className="flex-1 py-3 border border-zinc-700 text-zinc-300 font-semibold rounded-xl active:bg-zinc-800 touch-manipulation text-sm">
                             ➕ Exercise
                         </button>
-                        <button onClick={() => save(false)} disabled={saving || completedSets === 0}
+                        <button onClick={() => save(false)} disabled={saving || enteredSets === 0}
                             className="flex-1 py-3 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-bold rounded-xl active:opacity-80 disabled:opacity-40 touch-manipulation text-sm">
-                            {saving ? "Saving..." : `💾 Save (${completedSets})`}
+                            {saving ? "Saving..." : `💾 Save (${enteredSets})`}
                         </button>
                         {savedId !== null && (
                             <button onClick={() => setShowComplete(true)}
@@ -1045,6 +1285,11 @@ export default function TodayPage() {
                             </button>
                         )}
                     </div>
+
+                    <p className="text-xs text-zinc-600 mb-5">
+                        {restoredDraft ? "Borrador restaurado" : "Borrador activo"}
+                        {lastDraftSaveAt ? ` · guardado ${new Date(lastDraftSaveAt).toLocaleTimeString()}` : ""}
+                    </p>
 
                     {/* Exercises */}
                     <div className="space-y-3">

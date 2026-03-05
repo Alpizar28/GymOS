@@ -256,9 +256,10 @@ async def get_workout(workout_id: int) -> WorkoutDetail:
             sets = [
                 {
                     "set_type": s.set_type,
-                    "weight": s.weight,
-                    "reps": s.reps,
-                    "rir": s.rir,
+                    "weight": s.actual_weight if s.actual_weight is not None else s.weight,
+                    "reps": s.actual_reps if s.actual_reps is not None else s.reps,
+                    "rir": s.actual_rir if s.actual_rir is not None else s.rir,
+                    "completed": bool(s.completed),
                 }
                 for s in sets_result.scalars().all()
             ]
@@ -359,7 +360,9 @@ async def log_today_workout(payload: TodayLogRequest) -> dict:
             session.add(workout)
             await session.flush()
 
-        for ex_entry in payload.exercises:
+        kept_workout_exercise_ids: set[int] = set()
+
+        for ex_idx, ex_entry in enumerate(payload.exercises):
             ex_result = await session.execute(
                 select(Exercise).where(
                     Exercise.name_canonical.ilike(ex_entry.name)
@@ -377,10 +380,14 @@ async def log_today_workout(payload: TodayLogRequest) -> dict:
             we = we_result.scalar_one_or_none()
             if not we:
                 we = WorkoutExercise(
-                    workout_id=workout.id, exercise_id=exercise.id, order_index=0
+                    workout_id=workout.id, exercise_id=exercise.id, order_index=ex_idx
                 )
                 session.add(we)
                 await session.flush()
+            else:
+                we.order_index = ex_idx
+
+            kept_workout_exercise_ids.add(we.id)
 
             existing_sets_result = await session.execute(
                 select(WorkoutSet)
@@ -397,16 +404,24 @@ async def log_today_workout(payload: TodayLogRequest) -> dict:
                     s = WorkoutSet(workout_exercise_id=we.id, set_type="normal")
                     session.add(s)
 
-                if set_entry.actual_weight is not None:
-                    s.actual_weight = set_entry.actual_weight
-                    s.weight = set_entry.actual_weight
-                if set_entry.actual_reps is not None:
-                    s.actual_reps = set_entry.actual_reps
-                    s.reps = set_entry.actual_reps
-                if set_entry.actual_rir is not None:
-                    s.actual_rir = set_entry.actual_rir
-                    s.rir = set_entry.actual_rir
+                s.actual_weight = set_entry.actual_weight
+                s.weight = set_entry.actual_weight
+                s.actual_reps = set_entry.actual_reps
+                s.reps = set_entry.actual_reps
+                s.actual_rir = set_entry.actual_rir
+                s.rir = set_entry.actual_rir
                 s.completed = set_entry.completed
+
+            if len(existing_sets) > len(ex_entry.sets):
+                for stale_set in existing_sets[len(ex_entry.sets):]:
+                    await session.delete(stale_set)
+
+        all_workout_exercises_result = await session.execute(
+            select(WorkoutExercise).where(WorkoutExercise.workout_id == workout.id)
+        )
+        for workout_exercise in all_workout_exercises_result.scalars().all():
+            if workout_exercise.id not in kept_workout_exercise_ids:
+                await session.delete(workout_exercise)
 
         await session.commit()
 
