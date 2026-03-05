@@ -1357,7 +1357,7 @@ export default function TodayPage() {
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-6">
             <p className="text-red-400 text-xl">No plan found</p>
             <p className="text-zinc-500 text-sm">{error}</p>
-            <a href="/" className="mt-2 px-6 py-3.5 bg-red-600 text-white text-base font-semibold rounded-xl">Generate on Dashboard</a>
+            <a href="/today" className="mt-2 px-6 py-3.5 bg-red-600 text-white text-base font-semibold rounded-xl">Generate in Today</a>
         </div>
     );
 
@@ -1365,7 +1365,7 @@ export default function TodayPage() {
         <div className="flex flex-col items-center justify-center min-h-[70vh] text-center gap-5 px-6">
             <h2 className="text-3xl font-bold text-white">Done!</h2>
             <p className="text-zinc-400 text-lg">Day advanced → Day {nextDay}</p>
-            <a href="/" className="mt-2 px-8 py-4 bg-red-600 text-white rounded-xl font-bold text-lg">Dashboard</a>
+            <a href="/today" className="mt-2 px-8 py-4 bg-red-600 text-white rounded-xl font-bold text-lg">Today</a>
         </div>
     );
 

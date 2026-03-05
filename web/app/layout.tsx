@@ -28,7 +28,6 @@ export const viewport: Viewport = {
 const bottomTabs = [
   { href: "/today",    label: "Today",    icon: "🏋️" },
   { href: "/routines", label: "Rutinas",  icon: "📚" },
-  { href: "/",         label: "Home",     icon: "📊" },
   { href: "/settings", label: "Historial", icon: "📅" },
   { href: "/profile",  label: "Perfil",   icon: "👤" },
 ];
@@ -37,7 +36,6 @@ const bottomTabs = [
 const topNavLinks = [
   { href: "/today",    label: "Today",    icon: "🏋️" },
   { href: "/routines", label: "Routines", icon: "📚" },
-  { href: "/",         label: "Dashboard", icon: "📊" },
   { href: "/workouts", label: "Workouts", icon: "📝" },
   { href: "/settings", label: "Settings", icon: "⚙️" },
   { href: "/profile",  label: "Perfil",   icon: "👤" },
