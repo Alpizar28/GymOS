@@ -30,13 +30,13 @@ function CreateFolderModal({ onClose, onCreated }: { onClose: () => void; onCrea
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm p-4 flex items-center justify-center">
-      <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-        <h3 className="text-sm font-semibold mb-3">Nueva carpeta</h3>
+      <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl space-y-3">
+        <h3 className="text-base font-semibold">Nueva carpeta</h3>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Ej: Mamá"
-          className="w-full px-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 text-sm"
+          className="w-full px-3 py-3 rounded-xl bg-zinc-900 border border-zinc-700 text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
         />
         {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
         <div className="grid grid-cols-2 gap-2 mt-4">
@@ -100,12 +100,12 @@ function CreateRoutineModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm p-4 flex items-center justify-center">
-      <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-950 p-4 space-y-3">
-        <h3 className="text-sm font-semibold">Nueva rutina</h3>
+      <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl space-y-3">
+        <h3 className="text-base font-semibold">Nueva rutina</h3>
         <select
           value={folderId}
           onChange={(e) => setFolderId(parseInt(e.target.value, 10))}
-          className="w-full px-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 text-sm"
+          className="w-full px-3 py-3 rounded-xl bg-zinc-900 border border-zinc-700 text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
         >
           {folders.map((folder) => (
             <option key={folder.id} value={folder.id}>
@@ -117,13 +117,13 @@ function CreateRoutineModal({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Nombre de rutina"
-          className="w-full px-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 text-sm"
+          className="w-full px-3 py-3 rounded-xl bg-zinc-900 border border-zinc-700 text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
         />
         <input
           value={subtitle}
           onChange={(e) => setSubtitle(e.target.value)}
           placeholder="Subtitulo (opcional)"
-          className="w-full px-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 text-sm"
+          className="w-full px-3 py-3 rounded-xl bg-zinc-900 border border-zinc-700 text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
         />
         {error && <p className="text-xs text-red-400">{error}</p>}
         <div className="grid grid-cols-2 gap-2">
@@ -216,7 +216,7 @@ export default function RoutinesPage() {
             onClick={() => setShowFolderModal(true)}
             className="px-3 py-1.5 text-xs rounded-lg border border-zinc-700 text-zinc-300"
           >
-            📁
+            Folder
           </button>
           <button
             onClick={() => setShowRoutineModal(true)}
@@ -252,7 +252,7 @@ export default function RoutinesPage() {
                       <p className="text-xs text-zinc-600 py-2 px-1">Sin rutinas en esta carpeta.</p>
                     ) : (
                       list.map((routine) => (
-                        <div key={routine.id} className="rounded-xl border border-zinc-800 bg-zinc-950/80 p-3">
+                        <div key={routine.id} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <p className="font-semibold truncate">{routine.name}</p>
@@ -270,7 +270,7 @@ export default function RoutinesPage() {
                           <div className="mt-2 space-y-1.5">
                             {(routine.preview_items ?? []).map((item) => (
                               <p key={`${routine.id}-${item.name}`} className="text-xs text-zinc-400 flex items-center justify-between">
-                                <span>🏋️ {item.name}</span>
+                                <span>{item.name}</span>
                                 <span>{item.set_count} sets</span>
                               </p>
                             ))}

@@ -164,13 +164,13 @@ export default function ProgressPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-600/25 to-emerald-500/10 p-5 mb-4">
+      <div className="rounded-2xl border border-red-500/25 bg-gradient-to-br from-red-600/25 to-red-500/10 p-5 mb-4">
         <div className="flex items-start justify-between">
           <p className="text-6xl leading-none font-black text-white">{streak.current}</p>
           <span className="text-4xl">🔥</span>
         </div>
-        <p className="text-base font-semibold mt-2 text-emerald-100">current streak!</p>
-        <p className="text-xs text-emerald-200/80 mt-1">Longest: {streak.longest}</p>
+        <p className="text-base font-semibold mt-2 text-red-100">current streak!</p>
+        <p className="text-xs text-red-200/80 mt-1">Longest: {streak.longest}</p>
       </div>
 
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
@@ -203,13 +203,13 @@ export default function ProgressPage() {
                     let content: string = String(cell.getDate());
 
                     if (isWorkout && isToday) {
-                      className += "bg-emerald-500 border-emerald-300 text-emerald-950 ring-2 ring-emerald-300/60";
+                      className += "bg-red-500 border-red-300 text-red-950 ring-2 ring-red-300/60";
                       content = "💪";
                     } else if (isWorkout) {
-                      className += "bg-yellow-400 border-yellow-300 text-yellow-950";
+                      className += "bg-red-500/80 border-red-400 text-red-950";
                       content = "💪";
                     } else if (isToday) {
-                      className += "bg-zinc-900 border-emerald-500 text-emerald-300";
+                      className += "bg-zinc-900 border-red-500 text-red-300";
                     } else if (isFuture) {
                       className += "bg-zinc-900 border-zinc-800 text-zinc-600";
                     } else {

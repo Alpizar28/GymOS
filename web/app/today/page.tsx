@@ -132,10 +132,34 @@ function initSets(planned: TodaySet[]): ActualSet[] {
     }));
 }
 
-function setColors(type: string) {
-    if (type === "warmup") return { badge: "text-zinc-300 bg-zinc-800", bar: "border-l-zinc-500" };
-    if (type === "drop") return { badge: "text-red-300 bg-red-950/40", bar: "border-l-red-500" };
-    return { badge: "text-red-300 bg-red-950/40", bar: "border-l-red-500" };
+function setTypeVisual(planned: TodaySet | null, actual: ActualSet) {
+    const setType = planned?.set_type ?? "normal";
+    const rir = planned?.rir_target ?? actual.actual_rir ?? null;
+
+    if (setType === "warmup") {
+        return {
+            code: "W",
+            label: "Warm Up",
+            badge: "text-zinc-300 bg-zinc-800 border border-zinc-700",
+            bar: "border-l-zinc-500",
+        };
+    }
+
+    if ((rir ?? 0) >= 3) {
+        return {
+            code: "A",
+            label: "Approach",
+            badge: "text-red-200 bg-red-950/30 border border-red-500/20",
+            bar: "border-l-red-400",
+        };
+    }
+
+    return {
+        code: "E",
+        label: "Effective",
+        badge: "text-red-100 bg-red-600/20 border border-red-500/30",
+        bar: "border-l-red-500",
+    };
 }
 
 const DAY_LABELS: Record<string, string> = {
@@ -757,16 +781,14 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onCopyA
     onComplete: () => void; // triggers rest timer
 }) {
     const upd = (f: Partial<ActualSet>) => onChange({ ...actual, ...f });
-    const type = planned?.set_type ?? "normal";
-    const { badge, bar } = setColors(type);
-    const label = type === "warmup" ? "Warmup" : type === "drop" ? "Drop" : "Work";
+    const visual = setTypeVisual(planned, actual);
 
     return (
-        <div className={`border-l-4 ${bar} bg-zinc-900/60 rounded-r-xl`}>
+        <div className={`border-l-4 ${visual.bar} bg-zinc-900/60 rounded-r-xl`}>
             {/* Top row */}
             <div className="flex items-center justify-between px-3 pt-3 pb-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${badge}`}>{label} #{index + 1}</span>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${visual.badge}`}>{visual.code} · {visual.label}</span>
                     {lastData && (
                         <span className="text-xs text-zinc-600">
                             Last: {lastData.weight && `${lastData.weight}lb`}{lastData.reps && ` × ${lastData.reps}`}
@@ -780,7 +802,7 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onCopyA
                         disabled={index === 0}
                         className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-600 active:text-red-400 active:bg-red-900/30 disabled:opacity-30 disabled:active:text-zinc-600 disabled:active:bg-zinc-800 flex items-center justify-center text-base touch-manipulation"
                     >
-                        ↑
+                        ⧉
                     </button>
                     <button onClick={onRemove} title="Remove set"
                         className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-600 active:text-red-400 active:bg-red-900/30 flex items-center justify-center text-xl touch-manipulation">
