@@ -31,11 +31,16 @@ Se agregaron constraints con `Field(...)` en requests criticos:
   - fechas con parse defensivo (`Invalid date format`)
   - validacion de rango y `training_type` permitido.
 
+### 5) Endpoints de historial para soporte operativo
+- `POST /api/history/backfill-training-type` para normalizar `workouts.training_type` historico.
+- `GET /api/history/training-type-stats` para auditar conteos por tipo (`push/pull/legs/custom`).
+
 ## Riesgo mitigado
 - Menor probabilidad de payloads maliciosos o gigantes.
 - Menor superficie de bugs por inputs fuera de rango.
 - Menor riesgo de aceptar campos no contemplados por error.
 - Menor riesgo de consultas costosas por `limit` arbitrario.
+- Menor riesgo de decisiones a ciegas sobre clasificacion historica (ahora hay observabilidad).
 
 ## Validacion tecnica ejecutada
 - `python3 -m py_compile src/api/routes.py` -> OK

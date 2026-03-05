@@ -12,6 +12,17 @@ Este documento traduce el roadmap en backlog ejecutable con epicas, tickets, dep
   - `BM-*` = Body metrics manual-first
   - `AN-*` = Analitica cruzada
 
+## Estado actual (Mar 2026)
+- Completado:
+  - HIS-01, HIS-02, HIS-03, HIS-04, HIS-05, HIS-06, HIS-07, HIS-08
+  - UX-03 (hardening de hooks/cargas en `settings`, `calendar`, `progress`, `routines/[id]`)
+- Implementado adicional (fuera del scope original de E1):
+  - Seleccion y edicion rapida de `training_type` en rutinas
+  - Backfill historico (`POST /api/history/backfill-training-type`)
+  - Stats de clasificacion (`GET /api/history/training-type-stats`)
+- Pendiente para cierre formal:
+  - HIS-09 QA manual documentado con evidencia final
+
 ## Definicion de Done (aplica a todos los tickets)
 - Frontend: `npm run lint` y `npm run build` en `web/`
 - Backend: `ruff check src tests` y `pytest tests -v`
@@ -25,6 +36,7 @@ Este documento traduce el roadmap en backlog ejecutable con epicas, tickets, dep
 Objetivo: que el usuario entienda progreso semanal y mensual en menos de 20 segundos.
 
 ### HIS-01 — Clasificacion de sesiones (Push/Pull/Legs/Custom)
+- Estado: COMPLETADO
 - Tipo: Backend
 - Estimacion: 3 pts
 - Dependencias: ninguna
@@ -34,6 +46,7 @@ Objetivo: que el usuario entienda progreso semanal y mensual en menos de 20 segu
   - La clasificacion se reutiliza en endpoints de historial
 
 ### HIS-02 — Filtro por tipo en `/api/calendar`
+- Estado: COMPLETADO
 - Tipo: Backend
 - Estimacion: 5 pts
 - Dependencias: HIS-01
@@ -43,6 +56,7 @@ Objetivo: que el usuario entienda progreso semanal y mensual en menos de 20 segu
   - Compatible con clientes actuales (sin romper consumo existente)
 
 ### HIS-03 — Endpoint de comparacion semanal
+- Estado: COMPLETADO
 - Tipo: Backend
 - Estimacion: 5 pts
 - Dependencias: HIS-01
@@ -53,6 +67,7 @@ Objetivo: que el usuario entienda progreso semanal y mensual en menos de 20 segu
   - Maneja division por cero en `delta_pct`
 
 ### HIS-04 — Tipos y cliente API en frontend
+- Estado: COMPLETADO
 - Tipo: Frontend
 - Estimacion: 2 pts
 - Dependencias: HIS-02, HIS-03
@@ -62,6 +77,7 @@ Objetivo: que el usuario entienda progreso semanal y mensual en menos de 20 segu
   - Manejo de errores consistente en llamadas nuevas
 
 ### HIS-05 — Filtros de historial (chips)
+- Estado: COMPLETADO
 - Tipo: Frontend
 - Estimacion: 5 pts
 - Dependencias: HIS-04
@@ -72,6 +88,7 @@ Objetivo: que el usuario entienda progreso semanal y mensual en menos de 20 segu
   - No hay overflow horizontal en mobile
 
 ### HIS-06 — Bloque “Esta semana vs Semana pasada”
+- Estado: COMPLETADO
 - Tipo: Frontend
 - Estimacion: 5 pts
 - Dependencias: HIS-04
@@ -82,6 +99,7 @@ Objetivo: que el usuario entienda progreso semanal y mensual en menos de 20 segu
   - Tiene `loading` y fallback de error
 
 ### HIS-07 — Leyenda de intensidad en calendario
+- Estado: COMPLETADO
 - Tipo: Frontend
 - Estimacion: 3 pts
 - Dependencias: HIS-05
@@ -91,6 +109,7 @@ Objetivo: que el usuario entienda progreso semanal y mensual en menos de 20 segu
   - Estilo consistente con tema actual
 
 ### HIS-08 — Persistencia de preferencias de historial
+- Estado: COMPLETADO
 - Tipo: Frontend
 - Estimacion: 3 pts
 - Dependencias: HIS-05
@@ -100,6 +119,7 @@ Objetivo: que el usuario entienda progreso semanal y mensual en menos de 20 segu
   - Fallback seguro cuando `localStorage` no esta disponible
 
 ### HIS-09 — QA funcional del flujo historial
+- Estado: EN PROGRESO
 - Tipo: QA
 - Estimacion: 3 pts
 - Dependencias: HIS-05, HIS-06, HIS-07, HIS-08
@@ -130,6 +150,7 @@ Objetivo: bajar deuda tecnica de interfaz y unificar feedback visual.
   - Estados `disabled/loading/active` homogeneos
 
 ### UX-03 — Hardening de `settings/page.tsx`
+- Estado: COMPLETADO
 - Tipo: Frontend
 - Estimacion: 5 pts
 - Dependencias: ninguna
@@ -300,6 +321,10 @@ Objetivo: cruzar training + body metrics con recomendaciones simples y accionabl
 8. PR8: BM-05 + BM-06 + BM-07
 9. PR9: AN-01 + AN-03
 10. PR10: AN-02 + AN-04 + QA final
+
+## Siguiente bloque recomendado
+1. Cerrar HIS-09 con checklist manual final (mobile + desktop) y evidencia.
+2. Iniciar E3 (BM-01 y BM-02) para desbloquear body metrics.
 
 ## Riesgos y mitigaciones
 - Riesgo: mapeo ambiguo de `template_day_name`

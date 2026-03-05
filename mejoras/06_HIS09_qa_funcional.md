@@ -5,6 +5,8 @@
 - Comparativa semanal (`/api/history/weekly-compare`)
 - Persistencia de preferencias en historial (`mode`, `trainingType`, `selectedDate`)
 - Leyenda de intensidad en modo detalle
+- Backfill desde Settings (`POST /api/history/backfill-training-type`)
+- Stats de clasificacion (`GET /api/history/training-type-stats`)
 
 ## Estado
 - QA tecnico automatizado: **completado**
@@ -32,6 +34,7 @@ Resultado:
 
 Observacion:
 - Se mantienen warnings de calidad en distintas paginas para atender en hardening (`UX-03`), pero no bloquean QA tecnico.
+- Se agrego navegacion por tabs en Settings para acceso directo a Historial/Semana/Racha/Library/Proteccion.
 
 ### 3) Verificacion sintactica backend
 Comandos:
