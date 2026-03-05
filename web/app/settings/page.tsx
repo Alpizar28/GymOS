@@ -818,7 +818,7 @@ function LibraryTab() {
         className="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
       />
 
-      <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+      <div className="flex flex-wrap gap-1.5 pb-1">
         {MUSCLE_FILTERS.map((m) => (
           <button
             key={m}
@@ -1031,7 +1031,7 @@ function ProtectionTab() {
       </div>
 
       {toast && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-5 py-3 bg-zinc-800 border border-zinc-600 rounded-xl shadow-2xl text-sm font-medium text-white whitespace-nowrap">
+        <div className="fixed bottom-24 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50 px-5 py-3 bg-zinc-800 border border-zinc-600 rounded-xl shadow-2xl text-sm font-medium text-white text-center break-words">
           {toast}
         </div>
       )}
@@ -1051,14 +1051,14 @@ export default function SettingsPage() {
   const [active, setActive] = useState<TabId>("calendar");
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto overflow-x-hidden">
       <div className="mb-5 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.16),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(239,68,68,0.12)]">
         <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">GymOS</p>
         <h1 className="text-2xl font-bold tracking-tight">Historial</h1>
         <p className="text-sm text-zinc-500 mt-1">Tu calendario, biblioteca y protecciones</p>
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto pb-1 mb-5 no-scrollbar">
+      <div className="flex flex-wrap gap-1.5 pb-1 mb-5">
         {TABS.map((tab) => (
           <button
             key={tab.id}

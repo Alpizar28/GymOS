@@ -254,7 +254,7 @@ export default function RoutineDetailPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto overflow-x-hidden">
       <div className="flex items-center justify-between mb-4">
         <button onClick={() => router.push("/routines")} className="w-10 h-10 rounded-full border border-zinc-800">
           ←
@@ -308,11 +308,11 @@ export default function RoutineDetailPage() {
 
       {editMode && (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3 mb-4 space-y-3">
-          <div className="grid grid-cols-[1fr_auto] gap-2">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 min-w-0">
             <select
               value={selectedExerciseName}
               onChange={(e) => setSelectedExerciseName(e.target.value)}
-              className="px-3 py-2.5 rounded-lg bg-zinc-950 border border-zinc-700 text-sm"
+              className="min-w-0 w-full px-3 py-2.5 rounded-lg bg-zinc-950 border border-zinc-700 text-sm"
             >
               <option value="">Agregar ejercicio desde biblioteca...</option>
               {library.map((ex) => (

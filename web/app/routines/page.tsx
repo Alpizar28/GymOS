@@ -198,7 +198,7 @@ export default function RoutinesPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto overflow-x-hidden">
       <div className="flex items-center justify-between mb-4">
         <button onClick={() => router.back()} className="w-10 h-10 rounded-full border border-zinc-800">
           ←

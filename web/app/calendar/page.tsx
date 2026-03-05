@@ -615,7 +615,7 @@ export default function CalendarPage() {
   }, [days]);
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto overflow-x-hidden">
       <WorkoutModal workout={selectedWorkout} onClose={() => setSelectedWorkout(null)} />
       {selectedDay && (
         <ManualWorkoutModal

@@ -1329,7 +1329,7 @@ export default function TodayPage() {
     );
 
     return (
-        <div className="max-w-6xl mx-auto pb-36 sm:pb-8">
+        <div className="max-w-6xl mx-auto pb-36 sm:pb-8 overflow-x-hidden">
             {/* Modals */}
             {swapFor !== null && swapIndex >= 0 && (
                 <SwapModal exerciseName={swapFor} onClose={() => setSwapFor(null)} onSwap={(alt) => swapExercise(swapIndex, alt)} />
