@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException
 from fastapi import Query
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import selectinload
 
@@ -27,6 +27,89 @@ from src.services.stats_service import get_anchor_progress, get_weekly_summary
 from src.services.workout_logger import log_manual_workout
 
 router = APIRouter(prefix="/api", tags=["api"])
+
+TRAINING_TYPE_VALUES = {"all", "push", "pull", "legs", "custom"}
+
+
+def _classify_training_type(template_day_name: str | None) -> str:
+    if not template_day_name:
+        return "custom"
+
+    normalized = template_day_name.replace("_", " ").lower()
+    push_tokens = ["push", "pecho", "hombro", "tricep", "triceps"]
+    pull_tokens = ["pull", "espalda", "biceps", "dorsal", "row"]
+    legs_tokens = [
+        "legs",
+        "leg",
+        "pierna",
+        "cuadriceps",
+        "femorales",
+        "hamstring",
+        "glute",
+        "calf",
+        "squat",
+    ]
+
+    is_push = any(token in normalized for token in push_tokens)
+    is_pull = any(token in normalized for token in pull_tokens)
+    is_legs = any(token in normalized for token in legs_tokens)
+
+    matched = [is_push, is_pull, is_legs].count(True)
+    if matched != 1:
+        return "custom"
+    if is_push:
+        return "push"
+    if is_pull:
+        return "pull"
+    return "legs"
+
+
+def _compute_delta_pct(current: float, previous: float) -> float | None:
+    if previous == 0:
+        return None
+    return round(((current - previous) / previous) * 100, 2)
+
+
+async def _aggregate_week_window(
+    *,
+    session,
+    start: date,
+    end: date,
+    training_type: str,
+) -> dict:
+    result = await session.execute(
+        select(
+            Workout.id,
+            Workout.template_day_name,
+            func.count(WorkoutSet.id).label("set_count"),
+            func.sum(
+                func.coalesce(WorkoutSet.actual_weight, WorkoutSet.weight)
+                * func.coalesce(WorkoutSet.actual_reps, WorkoutSet.reps)
+            ).label("volume"),
+        )
+        .join(WorkoutExercise, WorkoutExercise.workout_id == Workout.id)
+        .join(WorkoutSet, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
+        .where(Workout.date >= start, Workout.date <= end)
+        .where(WorkoutSet.set_type == "normal")
+        .group_by(Workout.id)
+    )
+
+    sessions = 0
+    total_sets = 0
+    total_volume = 0.0
+    for row in result.all():
+        detected_type = _classify_training_type(row.template_day_name)
+        if training_type != "all" and detected_type != training_type:
+            continue
+        sessions += 1
+        total_sets += int(row.set_count or 0)
+        total_volume += float(row.volume or 0)
+
+    return {
+        "sessions": sessions,
+        "sets": total_sets,
+        "volume": round(total_volume, 2),
+    }
 
 
 @router.get("/health", include_in_schema=False)
@@ -62,9 +145,13 @@ class DayOptionResponse(BaseModel):
     exercises: list[str] = []
 
 
-class DayOptionCreate(BaseModel):
-    name: str | None = None
-    focus: str
+class StrictRequestModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class DayOptionCreate(StrictRequestModel):
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    focus: str = Field(min_length=1, max_length=80)
     rules: dict
 
 
@@ -78,24 +165,24 @@ HIDDEN_SYSTEM_TEMPLATE_NAMES = {
 }
 
 
-class ManualSet(BaseModel):
-    weight: float | None = None
-    reps: int | None = None
-    rir: int | None = None
-    set_type: str | None = None
+class ManualSet(StrictRequestModel):
+    weight: float | None = Field(default=None, ge=0, le=2000)
+    reps: int | None = Field(default=None, ge=0, le=200)
+    rir: int | None = Field(default=None, ge=0, le=10)
+    set_type: str | None = Field(default=None, pattern=r"^(normal|warmup|drop)$")
 
 
-class ManualExercise(BaseModel):
-    name: str
-    sets: list[ManualSet]
+class ManualExercise(StrictRequestModel):
+    name: str = Field(min_length=1, max_length=120)
+    sets: list[ManualSet] = Field(min_length=1, max_length=30)
 
 
-class ManualWorkoutRequest(BaseModel):
+class ManualWorkoutRequest(StrictRequestModel):
     date: str
-    day_name: str | None = None
-    notes: str | None = None
-    text: str | None = None
-    exercises: list[ManualExercise] | None = None
+    day_name: str | None = Field(default=None, min_length=1, max_length=80)
+    notes: str | None = Field(default=None, max_length=2000)
+    text: str | None = Field(default=None, max_length=12000)
+    exercises: list[ManualExercise] | None = Field(default=None, max_length=60)
 
 
 class ExerciseResponse(BaseModel):
@@ -113,11 +200,11 @@ class ExerciseResponse(BaseModel):
     total_sets: int
 
 
-class ExerciseCreateRequest(BaseModel):
-    name: str
-    primary_muscle: str | None = None
-    type: str | None = None
-    movement_pattern: str | None = None
+class ExerciseCreateRequest(StrictRequestModel):
+    name: str = Field(min_length=1, max_length=120)
+    primary_muscle: str | None = Field(default=None, min_length=1, max_length=50)
+    type: str | None = Field(default=None, min_length=1, max_length=50)
+    movement_pattern: str | None = Field(default=None, min_length=1, max_length=50)
     is_anchor: bool = False
     is_staple: bool = False
 
@@ -140,46 +227,46 @@ class WorkoutDetail(BaseModel):
     exercises: list[dict]
 
 
-class RoutineSetInput(BaseModel):
-    set_type: str = "normal"
-    target_weight_lbs: float | None = None
-    target_reps: int | None = None
-    rir_target: int | None = None
+class RoutineSetInput(StrictRequestModel):
+    set_type: str = Field(default="normal", pattern=r"^(normal|warmup|drop)$")
+    target_weight_lbs: float | None = Field(default=None, ge=0, le=2000)
+    target_reps: int | None = Field(default=None, ge=0, le=200)
+    rir_target: int | None = Field(default=None, ge=0, le=10)
 
 
-class RoutineExerciseInput(BaseModel):
-    name: str
-    exercise_id: int | None = None
-    rest_seconds: int | None = None
-    notes: str | None = None
-    sets: list[RoutineSetInput]
+class RoutineExerciseInput(StrictRequestModel):
+    name: str = Field(min_length=1, max_length=120)
+    exercise_id: int | None = Field(default=None, ge=1)
+    rest_seconds: int | None = Field(default=None, ge=15, le=900)
+    notes: str | None = Field(default=None, max_length=500)
+    sets: list[RoutineSetInput] = Field(min_length=1, max_length=30)
 
 
-class RoutineCreateRequest(BaseModel):
-    folder_id: int
-    name: str
-    subtitle: str | None = None
-    notes: str | None = None
-    sort_order: int | None = None
-    exercises: list[RoutineExerciseInput] = []
+class RoutineCreateRequest(StrictRequestModel):
+    folder_id: int = Field(ge=1)
+    name: str = Field(min_length=1, max_length=100)
+    subtitle: str | None = Field(default=None, max_length=140)
+    notes: str | None = Field(default=None, max_length=2000)
+    sort_order: int | None = Field(default=None, ge=0, le=10000)
+    exercises: list[RoutineExerciseInput] = Field(default_factory=list, max_length=60)
 
 
-class RoutineUpdateRequest(BaseModel):
-    folder_id: int | None = None
-    name: str | None = None
-    subtitle: str | None = None
-    notes: str | None = None
-    sort_order: int | None = None
-    exercises: list[RoutineExerciseInput] | None = None
+class RoutineUpdateRequest(StrictRequestModel):
+    folder_id: int | None = Field(default=None, ge=1)
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    subtitle: str | None = Field(default=None, max_length=140)
+    notes: str | None = Field(default=None, max_length=2000)
+    sort_order: int | None = Field(default=None, ge=0, le=10000)
+    exercises: list[RoutineExerciseInput] | None = Field(default=None, max_length=60)
 
 
-class RoutineFolderCreateRequest(BaseModel):
-    name: str
+class RoutineFolderCreateRequest(StrictRequestModel):
+    name: str = Field(min_length=1, max_length=80)
 
 
-class RoutineFolderUpdateRequest(BaseModel):
-    name: str | None = None
-    sort_order: int | None = None
+class RoutineFolderUpdateRequest(StrictRequestModel):
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    sort_order: int | None = Field(default=None, ge=0, le=10000)
 
 
 class PersonalProfileResponse(BaseModel):
@@ -192,14 +279,14 @@ class PersonalProfileResponse(BaseModel):
     notes: str | None = None
 
 
-class PersonalProfileUpdateRequest(BaseModel):
-    full_name: str | None = None
-    photo_url: str | None = None
-    age: int | None = None
-    height_cm: float | None = None
-    weight_lbs: float | None = None
-    goal: str | None = None
-    notes: str | None = None
+class PersonalProfileUpdateRequest(StrictRequestModel):
+    full_name: str | None = Field(default=None, min_length=1, max_length=80)
+    photo_url: str | None = Field(default=None, max_length=2048)
+    age: int | None = Field(default=None, ge=10, le=110)
+    height_cm: float | None = Field(default=None, ge=90, le=260)
+    weight_lbs: float | None = Field(default=None, ge=50, le=900)
+    goal: str | None = Field(default=None, max_length=200)
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class AnchorProgressResponse(BaseModel):
@@ -267,8 +354,8 @@ async def api_generate_today() -> dict:
         return plan
 
 
-class GenerateDayRequest(BaseModel):
-    day_name: str
+class GenerateDayRequest(StrictRequestModel):
+    day_name: str = Field(min_length=1, max_length=80)
 
 
 @router.post("/generate-day")
@@ -285,7 +372,7 @@ async def api_generate_day(payload: GenerateDayRequest) -> dict:
 
 
 @router.get("/workouts")
-async def list_workouts(limit: int = 30) -> list[WorkoutSummary]:
+async def list_workouts(limit: int = Query(default=30, ge=1, le=200)) -> list[WorkoutSummary]:
     """List recent workouts."""
     async with async_session() as session:
         result = await session.execute(
@@ -366,22 +453,22 @@ async def get_workout(workout_id: int) -> WorkoutDetail:
 # --- Today's Workout Logger ---
 
 
-class SetLogEntry(BaseModel):
-    index: int
-    actual_weight: float | None = None
-    actual_reps: int | None = None
-    actual_rir: int | None = None
+class SetLogEntry(StrictRequestModel):
+    index: int = Field(ge=0, le=100)
+    actual_weight: float | None = Field(default=None, ge=0, le=2000)
+    actual_reps: int | None = Field(default=None, ge=0, le=200)
+    actual_rir: int | None = Field(default=None, ge=0, le=10)
     completed: bool = False
 
 
-class ExerciseLogEntry(BaseModel):
-    name: str
-    sets: list[SetLogEntry]
+class ExerciseLogEntry(StrictRequestModel):
+    name: str = Field(min_length=1, max_length=120)
+    sets: list[SetLogEntry] = Field(min_length=1, max_length=30)
 
 
-class TodayLogRequest(BaseModel):
-    day_name: str
-    exercises: list[ExerciseLogEntry]
+class TodayLogRequest(StrictRequestModel):
+    day_name: str = Field(min_length=1, max_length=80)
+    exercises: list[ExerciseLogEntry] = Field(min_length=1, max_length=60)
 
 
 @router.get("/today")
@@ -911,12 +998,19 @@ async def get_day_recommendation() -> DayRecommendationResponse:
 async def get_calendar(
     from_date: str = Query(..., alias="from"),
     to_date: str = Query(..., alias="to"),
+    training_type: str = Query("all"),
 ) -> list[dict]:
     """Get workouts grouped by day within a date range."""
-    start = date.fromisoformat(from_date)
-    end = date.fromisoformat(to_date)
+    try:
+        start = date.fromisoformat(from_date)
+        end = date.fromisoformat(to_date)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid date format") from exc
     if end < start:
         raise HTTPException(status_code=400, detail="Invalid date range")
+    normalized_training_type = training_type.strip().lower()
+    if normalized_training_type not in TRAINING_TYPE_VALUES:
+        raise HTTPException(status_code=400, detail="Invalid training_type")
 
     async with async_session() as session:
         result = await session.execute(
@@ -941,10 +1035,14 @@ async def get_calendar(
 
         workouts_by_date: dict[date, list[dict]] = {}
         for row in result.all():
+            detected_type = _classify_training_type(row.template_day_name)
+            if normalized_training_type != "all" and detected_type != normalized_training_type:
+                continue
             workouts_by_date.setdefault(row.date, []).append({
                 "id": row.id,
                 "date": row.date.isoformat(),
                 "day_name": row.template_day_name,
+                "training_type": detected_type,
                 "duration_min": row.duration_min,
                 "total_sets": int(row.set_count or 0),
                 "total_volume_lbs": float(row.volume or 0),
@@ -960,6 +1058,70 @@ async def get_calendar(
             current += timedelta(days=1)
 
         return days
+
+
+@router.get("/history/weekly-compare")
+async def get_weekly_compare(
+    ref: str | None = Query(None),
+    training_type: str = Query("all"),
+) -> dict:
+    normalized_training_type = training_type.strip().lower()
+    if normalized_training_type not in TRAINING_TYPE_VALUES:
+        raise HTTPException(status_code=400, detail="Invalid training_type")
+
+    reference_date = date.today()
+    if ref:
+        try:
+            reference_date = date.fromisoformat(ref)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid ref date") from exc
+
+    current_start = reference_date - timedelta(days=reference_date.weekday())
+    current_end = current_start + timedelta(days=6)
+    previous_start = current_start - timedelta(days=7)
+    previous_end = current_start - timedelta(days=1)
+
+    async with async_session() as session:
+        current = await _aggregate_week_window(
+            session=session,
+            start=current_start,
+            end=current_end,
+            training_type=normalized_training_type,
+        )
+        previous = await _aggregate_week_window(
+            session=session,
+            start=previous_start,
+            end=previous_end,
+            training_type=normalized_training_type,
+        )
+
+    delta = {
+        "sessions": current["sessions"] - previous["sessions"],
+        "sets": current["sets"] - previous["sets"],
+        "volume": round(current["volume"] - previous["volume"], 2),
+    }
+    delta_pct = {
+        "sessions": _compute_delta_pct(current["sessions"], previous["sessions"]),
+        "sets": _compute_delta_pct(current["sets"], previous["sets"]),
+        "volume": _compute_delta_pct(current["volume"], previous["volume"]),
+    }
+
+    return {
+        "reference_date": reference_date.isoformat(),
+        "training_type": normalized_training_type,
+        "current_week": {
+            "from": current_start.isoformat(),
+            "to": current_end.isoformat(),
+            **current,
+        },
+        "previous_week": {
+            "from": previous_start.isoformat(),
+            "to": previous_end.isoformat(),
+            **previous,
+        },
+        "delta": delta,
+        "delta_pct": delta_pct,
+    }
 
 
 @router.post("/workouts/manual")
@@ -1542,9 +1704,9 @@ async def routine_progression_apply(
 # ─── Complete Session (advance day + fatigue) ─────────────────────────────────
 
 
-class CompleteSessionRequest(BaseModel):
-    workout_id: int
-    fatigue: float  # 1-10
+class CompleteSessionRequest(StrictRequestModel):
+    workout_id: int = Field(ge=1)
+    fatigue: float = Field(ge=1, le=10)
 
 
 @router.post("/today/complete")
@@ -1653,14 +1815,23 @@ async def generate_week() -> list[dict]:
 
 
 @router.get("/exercises/{exercise_name}/alternatives")
-async def get_exercise_alternatives(exercise_name: str, limit: int = 5) -> list[dict]:
+async def get_exercise_alternatives(
+    exercise_name: str,
+    limit: int = Query(default=5, ge=1, le=20),
+) -> list[dict]:
     """Find swap candidates for a given exercise name."""
     from src.services.swap_service import find_swap_candidates
+
+    normalized_exercise_name = exercise_name.strip()
+    if not normalized_exercise_name:
+        raise HTTPException(status_code=400, detail="Exercise name is required")
+    if len(normalized_exercise_name) > 120:
+        raise HTTPException(status_code=400, detail="Exercise name too long")
 
     async with async_session() as session:
         # Find exercise by name
         result = await session.execute(
-            select(Exercise).where(Exercise.name_canonical.ilike(exercise_name)).limit(1)
+            select(Exercise).where(Exercise.name_canonical.ilike(normalized_exercise_name)).limit(1)
         )
         exercise = result.scalar_one_or_none()
         if not exercise:
@@ -1673,9 +1844,9 @@ async def get_exercise_alternatives(exercise_name: str, limit: int = 5) -> list[
 # ─── Protection Manager ────────────────────────────────────────────────────────
 
 
-class ProtectionRequest(BaseModel):
-    muscle_group: str
-    severity: int = 5  # 1-10
+class ProtectionRequest(StrictRequestModel):
+    muscle_group: str = Field(min_length=1, max_length=50)
+    severity: int = Field(default=5, ge=1, le=10)
 
 
 @router.get("/protection")

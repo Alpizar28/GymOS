@@ -227,6 +227,7 @@ export interface CalendarWorkoutSummary {
     id: number;
     date: string;
     day_name: string | null;
+    training_type?: "push" | "pull" | "legs" | "custom";
     duration_min: number | null;
     total_sets: number;
     total_volume_lbs: number;
@@ -235,6 +236,33 @@ export interface CalendarWorkoutSummary {
 export interface CalendarDay {
     date: string;
     workouts: CalendarWorkoutSummary[];
+}
+
+export type TrainingType = "all" | "push" | "pull" | "legs" | "custom";
+
+export interface WeeklyWindowSummary {
+    from: string;
+    to: string;
+    sessions: number;
+    sets: number;
+    volume: number;
+}
+
+export interface WeeklyCompareResponse {
+    reference_date: string;
+    training_type: TrainingType;
+    current_week: WeeklyWindowSummary;
+    previous_week: WeeklyWindowSummary;
+    delta: {
+        sessions: number;
+        sets: number;
+        volume: number;
+    };
+    delta_pct: {
+        sessions: number | null;
+        sets: number | null;
+        volume: number | null;
+    };
 }
 
 export interface ManualSet {
@@ -421,8 +449,14 @@ export const api = {
                 method: "POST",
             }
         ),
-    getCalendar: (from: string, to: string) =>
-        fetchApi<CalendarDay[]>(`/calendar?from=${from}&to=${to}`),
+    getCalendar: (from: string, to: string, trainingType: TrainingType = "all") =>
+        fetchApi<CalendarDay[]>(
+            `/calendar?from=${from}&to=${to}&training_type=${encodeURIComponent(trainingType)}`
+        ),
+    getWeeklyCompare: (ref: string, trainingType: TrainingType = "all") =>
+        fetchApi<WeeklyCompareResponse>(
+            `/history/weekly-compare?ref=${ref}&training_type=${encodeURIComponent(trainingType)}`
+        ),
     createManualWorkout: (payload: ManualWorkoutPayload) =>
         fetchApi<{ workout_id: number }>("/workouts/manual", {
             method: "POST",

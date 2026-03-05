@@ -9,6 +9,8 @@ import {
   type ManualExercise,
   type ManualWorkoutPayload,
   type ProtectionRule,
+  type TrainingType,
+  type WeeklyCompareResponse,
   type WorkoutDetail,
 } from "@/lib/api";
 import { FlameIcon } from "@/components/icons";
@@ -85,6 +87,45 @@ const MUSCLE_GROUPS = [
   "calves",
   "core",
 ];
+
+const TRAINING_TYPE_FILTERS: { value: TrainingType; label: string }[] = [
+  { value: "all", label: "Todos" },
+  { value: "push", label: "Push" },
+  { value: "pull", label: "Pull" },
+  { value: "legs", label: "Legs" },
+  { value: "custom", label: "Custom" },
+];
+
+const HISTORY_PREFS_KEY = "gymos:history:prefs";
+
+function readHistoryPrefs(): { mode?: "summary" | "detail"; trainingType?: TrainingType; selectedDate?: string } {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(HISTORY_PREFS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as {
+      mode?: "summary" | "detail";
+      trainingType?: TrainingType;
+      selectedDate?: string;
+    };
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
+function writeHistoryPrefs(prefs: {
+  mode: "summary" | "detail";
+  trainingType: TrainingType;
+  selectedDate: string;
+}) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(HISTORY_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    return;
+  }
+}
 
 function formatDayName(name: string) {
   const map: Record<string, string> = {
@@ -861,7 +902,6 @@ function StreakTab() {
   const seasonEnd = useMemo(() => new Date(today.getFullYear(), today.getMonth() + 1, 0), [today]);
 
   useEffect(() => {
-    setLoading(true);
     api
       .getCalendar(calendarDateKey(seasonStart), calendarDateKey(seasonEnd))
       .then(setDays)
@@ -964,9 +1004,12 @@ function StreakTab() {
 function UnifiedHistoryTab() {
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState<CalendarDay[]>([]);
-  const [mode, setMode] = useState<"summary" | "detail">("summary");
-  const [selectedDate, setSelectedDate] = useState<string>(calendarDateKey(new Date()));
+  const [mode, setMode] = useState<"summary" | "detail">(() => readHistoryPrefs().mode ?? "summary");
+  const [trainingType, setTrainingType] = useState<TrainingType>(() => readHistoryPrefs().trainingType ?? "all");
+  const [selectedDate, setSelectedDate] = useState<string>(() => readHistoryPrefs().selectedDate ?? calendarDateKey(new Date()));
   const [selectedWorkout, setSelectedWorkout] = useState<WorkoutDetail | null>(null);
+  const [weeklyCompare, setWeeklyCompare] = useState<WeeklyCompareResponse | null>(null);
+  const [weeklyCompareLoading, setWeeklyCompareLoading] = useState(true);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -977,20 +1020,32 @@ function UnifiedHistoryTab() {
   const seasonEnd = useMemo(() => new Date(today.getFullYear(), today.getMonth() + 1, 0), [today]);
 
   useEffect(() => {
-    setLoading(true);
     api
-      .getCalendar(calendarDateKey(seasonStart), calendarDateKey(seasonEnd))
+      .getCalendar(calendarDateKey(seasonStart), calendarDateKey(seasonEnd), trainingType)
       .then((data) => {
         setDays(data);
         const todayKey = calendarDateKey(today);
-        if (!data.some((d) => d.date === todayKey)) {
+        const todayEntry = data.find((d) => d.date === todayKey);
+        if (!todayEntry || todayEntry.workouts.length === 0) {
           const latest = data.filter((d) => d.workouts.length > 0).slice(-1)[0];
           if (latest) setSelectedDate(latest.date);
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [seasonStart, seasonEnd, today]);
+  }, [seasonStart, seasonEnd, today, trainingType]);
+
+  useEffect(() => {
+    api
+      .getWeeklyCompare(calendarDateKey(today), trainingType)
+      .then((data) => setWeeklyCompare(data))
+      .catch(() => setWeeklyCompare(null))
+      .finally(() => setWeeklyCompareLoading(false));
+  }, [trainingType, today]);
+
+  useEffect(() => {
+    writeHistoryPrefs({ mode, trainingType, selectedDate });
+  }, [mode, trainingType, selectedDate]);
 
   const dayByDate = useMemo(() => {
     const map = new Map<string, CalendarDay>();
@@ -1056,6 +1111,19 @@ function UnifiedHistoryTab() {
     [monthSessions]
   );
 
+  const intensityLegend = useMemo(() => {
+    const low = Math.round(maxDayVolume * 0.35);
+    const mid = Math.round(maxDayVolume * 0.7);
+    return { low, mid };
+  }, [maxDayVolume]);
+
+  const formatDelta = (value: number, pct: number | null) => {
+    const sign = value > 0 ? "+" : "";
+    if (pct === null) return `${sign}${value}`;
+    const pctSign = pct > 0 ? "+" : "";
+    return `${sign}${value} (${pctSign}${pct.toFixed(1)}%)`;
+  };
+
   async function openWorkout(id: number) {
     const detail = await api.getWorkout(id);
     setSelectedWorkout(detail);
@@ -1080,6 +1148,42 @@ function UnifiedHistoryTab() {
         </div>
       </div>
 
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold text-zinc-300">Esta semana vs semana pasada</p>
+          <span className="text-[11px] text-zinc-500 uppercase tracking-wide">{trainingType}</span>
+        </div>
+        {weeklyCompareLoading ? (
+          <p className="text-sm text-zinc-500">Calculando comparativa...</p>
+        ) : weeklyCompare ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-3">
+              <p className="text-[11px] text-zinc-500">Sesiones</p>
+              <p className="text-lg font-bold text-white">{weeklyCompare.current_week.sessions}</p>
+              <p className={`text-xs mt-1 ${weeklyCompare.delta.sessions >= 0 ? "text-red-300" : "text-zinc-400"}`}>
+                {formatDelta(weeklyCompare.delta.sessions, weeklyCompare.delta_pct.sessions)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-3">
+              <p className="text-[11px] text-zinc-500">Sets</p>
+              <p className="text-lg font-bold text-white">{weeklyCompare.current_week.sets}</p>
+              <p className={`text-xs mt-1 ${weeklyCompare.delta.sets >= 0 ? "text-red-300" : "text-zinc-400"}`}>
+                {formatDelta(weeklyCompare.delta.sets, weeklyCompare.delta_pct.sets)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-3">
+              <p className="text-[11px] text-zinc-500">Volumen</p>
+              <p className="text-lg font-bold text-white">{Math.round(weeklyCompare.current_week.volume).toLocaleString()}</p>
+              <p className={`text-xs mt-1 ${weeklyCompare.delta.volume >= 0 ? "text-red-300" : "text-zinc-400"}`}>
+                {formatDelta(Math.round(weeklyCompare.delta.volume), weeklyCompare.delta_pct.volume)}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-zinc-500">No se pudo cargar la comparativa semanal.</p>
+        )}
+      </div>
+
       <div className="flex gap-2">
         <button
           onClick={() => setMode("summary")}
@@ -1101,6 +1205,26 @@ function UnifiedHistoryTab() {
         >
           Detalle
         </button>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {TRAINING_TYPE_FILTERS.map((item) => (
+          <button
+            key={item.value}
+            onClick={() => {
+              setLoading(true);
+              setWeeklyCompareLoading(true);
+              setTrainingType(item.value);
+            }}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
+              trainingType === item.value
+                ? "bg-red-600/25 text-red-200 border-red-500/40"
+                : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50"
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
@@ -1198,6 +1322,26 @@ function UnifiedHistoryTab() {
           </div>
         )}
       </div>
+
+      {mode === "detail" && (
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+          <p className="text-sm font-semibold text-zinc-300 mb-2">Leyenda de intensidad</p>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="rounded-lg border border-zinc-700 bg-zinc-950/70 p-2 text-zinc-400">
+              <p>Baja</p>
+              <p className="text-zinc-500">0 - {intensityLegend.low.toLocaleString()} lbs</p>
+            </div>
+            <div className="rounded-lg border border-zinc-700 bg-zinc-950/70 p-2 text-zinc-300">
+              <p>Media</p>
+              <p className="text-zinc-500">{(intensityLegend.low + 1).toLocaleString()} - {intensityLegend.mid.toLocaleString()} lbs</p>
+            </div>
+            <div className="rounded-lg border border-zinc-700 bg-zinc-950/70 p-2 text-red-200">
+              <p>Alta</p>
+              <p className="text-zinc-500">{(intensityLegend.mid + 1).toLocaleString()}+ lbs</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {mode === "detail" && (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
