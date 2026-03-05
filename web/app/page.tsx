@@ -30,10 +30,10 @@ function PlanExerciseCard({ exercise }: { exercise: PlanExercise }) {
         {exercise.sets.map((s, i) => {
           const borderClass =
             s.set_type === "warmup"
-              ? "border-l-2 border-l-amber-400"
+              ? "border-l-2 border-l-red-400"
               : s.set_type === "drop"
                 ? "border-l-2 border-l-red-400"
-                : "border-l-2 border-l-violet-500";
+                : "border-l-2 border-l-red-500";
           return (
             <span
               key={i}
@@ -130,7 +130,7 @@ export default function DashboardPage() {
   if (!data) {
     return (
       <div className="flex items-center justify-center h-64 gap-3 text-zinc-500">
-        <div className="w-5 h-5 border-2 border-zinc-600 border-t-violet-500 rounded-full animate-spin" />
+        <div className="w-5 h-5 border-2 border-zinc-600 border-t-red-500 rounded-full animate-spin" />
         Loading...
       </div>
     );
@@ -141,7 +141,7 @@ export default function DashboardPage() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-6 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(16,185,129,0.12)]">
+      <div className="mb-6 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.16),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(239,68,68,0.12)]">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">GymOS</p>
@@ -153,7 +153,7 @@ export default function DashboardPage() {
               <button
                 onClick={handleGenerateRecommended}
                 disabled={generatingRec}
-                className="px-4 py-2.5 bg-emerald-600/20 text-emerald-300 font-semibold rounded-lg border border-emerald-500/30 hover:bg-emerald-600/30 transition-all duration-200 disabled:opacity-50"
+                className="px-4 py-2.5 bg-red-600/20 text-red-300 font-semibold rounded-lg border border-red-500/30 hover:bg-red-600/30 transition-all duration-200 disabled:opacity-50"
               >
                 {generatingRec
                   ? "⏳ Generating..."
@@ -163,7 +163,7 @@ export default function DashboardPage() {
             <button
               onClick={handleGenerate}
               disabled={generating}
-              className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-violet-500/25 hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
+              className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-red-500/25 hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
             >
               {generating ? "⏳ Generating..." : "⚡ Generate Today"}
             </button>
@@ -172,12 +172,12 @@ export default function DashboardPage() {
       </div>
 
       {data.recommendation?.day_name && (
-        <div className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-          <p className="text-sm text-emerald-300 font-semibold">
+        <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+          <p className="text-sm text-red-300 font-semibold">
             Recomendado hoy: {formatDayName(data.recommendation.day_name)}
           </p>
           {data.recommendation.reason && (
-            <p className="text-xs text-emerald-200/70 mt-1">{data.recommendation.reason}</p>
+            <p className="text-xs text-red-200/70 mt-1">{data.recommendation.reason}</p>
           )}
         </div>
       )}
@@ -217,7 +217,7 @@ export default function DashboardPage() {
             <PlanExerciseCard key={i} exercise={ex} />
           ))}
           {plan.note && (
-            <p className="text-sm text-amber-400 mt-2">⚠️ {plan.note}</p>
+            <p className="text-sm text-red-400 mt-2">⚠️ {plan.note}</p>
           )}
         </div>
       ) : (

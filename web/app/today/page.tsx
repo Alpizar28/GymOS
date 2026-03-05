@@ -9,7 +9,6 @@ import {
     type ExerciseLogEntry,
     type AlternativeExercise,
     type LastSessionSet,
-    type PrRecord,
     type DayOption,
     type DayRecommendation,
     type DayOptionCreate,
@@ -132,12 +131,10 @@ function initSets(planned: TodaySet[]): ActualSet[] {
 }
 
 function setColors(type: string) {
-    if (type === "warmup") return { badge: "text-amber-400 bg-amber-900/30", bar: "border-l-amber-400" };
-    if (type === "drop") return { badge: "text-red-400 bg-red-900/30", bar: "border-l-red-400" };
-    return { badge: "text-violet-400 bg-violet-900/30", bar: "border-l-violet-500" };
+    if (type === "warmup") return { badge: "text-zinc-300 bg-zinc-800", bar: "border-l-zinc-500" };
+    if (type === "drop") return { badge: "text-red-300 bg-red-950/40", bar: "border-l-red-500" };
+    return { badge: "text-red-300 bg-red-950/40", bar: "border-l-red-500" };
 }
-
-function e1rm(w: number, r: number) { return Math.round(w * (1 + r / 30)); }
 
 const DAY_LABELS: Record<string, string> = {
     Push_Heavy: "Push Heavy",
@@ -203,7 +200,7 @@ function TogglePill({
             onClick={onClick}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
                 active
-                    ? "bg-violet-600/30 text-violet-200 border-violet-500/40"
+                    ? "bg-red-600/30 text-red-200 border-red-500/40"
                     : "bg-zinc-800 text-zinc-500 border-zinc-700/60"
             }`}
         >
@@ -240,7 +237,7 @@ function RestTimer({ seconds: initial, onDismiss }: { seconds: number; onDismiss
         <div className="fixed bottom-20 left-4 right-4 z-50 sm:left-auto sm:right-6 sm:w-72">
             <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl p-4 overflow-hidden">
                 {/* Progress bar */}
-                <div className="absolute top-0 left-0 h-1 bg-gradient-to-r from-violet-500 to-teal-500 transition-all duration-1000"
+                <div className="absolute top-0 left-0 h-1 bg-gradient-to-r from-red-500 to-red-500 transition-all duration-1000"
                     style={{ width: `${pct}%` }} />
                 <div className="flex items-center justify-between">
                     <div>
@@ -265,33 +262,6 @@ function RestTimer({ seconds: initial, onDismiss }: { seconds: number; onDismiss
     );
 }
 
-// ─── PR Banner ────────────────────────────────────────────────────────────────
-
-function PrBanner({ prs, onDismiss }: { prs: PrRecord[]; onDismiss: () => void }) {
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-6">
-            <div className="bg-gradient-to-br from-amber-900/80 to-orange-900/80 border border-amber-500/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center">
-                <div className="text-6xl mb-3">🏆</div>
-                <h2 className="text-2xl font-bold text-white mb-1">Personal Record!</h2>
-                <div className="space-y-2 my-4">
-                    {prs.map((pr, i) => (
-                        <div key={i} className="bg-black/30 rounded-xl px-4 py-2.5">
-                            <p className="font-semibold text-amber-300">{pr.exercise}</p>
-                            <p className="text-sm text-amber-200/70 mt-0.5">
-                                {pr.type === "weight" ? `New max weight: ${pr.value} lbs` : `New estimated 1RM: ${pr.value} lbs`}
-                            </p>
-                        </div>
-                    ))}
-                </div>
-                <button onClick={onDismiss}
-                    className="w-full py-3.5 bg-amber-500 text-black font-bold rounded-xl active:opacity-80 touch-manipulation text-base">
-                    Let's go! 🔥
-                </button>
-            </div>
-        </div>
-    );
-}
-
 // ─── Add Exercise Modal ───────────────────────────────────────────────────────
 
 function AddExerciseModal({ onAdd, onClose }: { onAdd: (name: string) => void; onClose: () => void }) {
@@ -307,9 +277,9 @@ function AddExerciseModal({ onAdd, onClose }: { onAdd: (name: string) => void; o
                     <input autoFocus type="text" placeholder="Exercise name…" value={q}
                         onChange={(e) => setQ(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter" && q.trim()) onAdd(q.trim()); }}
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-base text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500" />
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-base text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-red-500" />
                     <button onClick={() => q.trim() && onAdd(q.trim())}
-                        className="w-full py-3.5 bg-violet-600 text-white font-bold rounded-xl active:opacity-80 touch-manipulation text-base">
+                        className="w-full py-3.5 bg-red-600 text-white font-bold rounded-xl active:opacity-80 touch-manipulation text-base">
                         ➕ Add to Workout
                     </button>
                 </div>
@@ -490,19 +460,19 @@ function CreateTemplateModal({
                                 type="checkbox"
                                 checked={allowDropSets}
                                 onChange={(e) => setAllowDropSets(e.target.checked)}
-                                className="accent-violet-500"
+                                className="accent-red-500"
                             />
                             Permitir drop sets
                         </label>
                     </div>
                     <button
                         onClick={handleCreate}
-                        className="w-full py-3.5 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-bold rounded-xl active:opacity-80 touch-manipulation text-base"
+                        className="w-full py-3.5 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold rounded-xl active:opacity-80 touch-manipulation text-base"
                     >
                         Crear template
                     </button>
                     {error && (
-                        <p className="text-xs text-amber-400 mt-3">⚠️ {error}</p>
+                        <p className="text-xs text-red-400 mt-3">⚠️ {error}</p>
                     )}
                 </div>
             </div>
@@ -572,12 +542,12 @@ function CompleteModal({ workoutId, onComplete, onClose }: {
                         </div>
                         <input type="range" min={1} max={10} value={fatigue}
                             onChange={(e) => setFatigue(parseInt(e.target.value))}
-                            className="w-full h-8 accent-violet-500 touch-manipulation" />
+                            className="w-full h-8 accent-red-500 touch-manipulation" />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <button onClick={onClose} className="py-4 rounded-xl bg-zinc-800 text-zinc-400 font-semibold active:bg-zinc-700 touch-manipulation">Cancel</button>
                         <button onClick={go} disabled={saving}
-                            className="py-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-bold active:opacity-80 disabled:opacity-50 touch-manipulation">
+                            className="py-4 rounded-xl bg-gradient-to-r from-red-600 to-red-500 text-white font-bold active:opacity-80 disabled:opacity-50 touch-manipulation">
                             {saving ? "Saving..." : "Done! →"}
                         </button>
                     </div>
@@ -604,10 +574,6 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onDupli
     const { badge, bar } = setColors(type);
     const label = type === "warmup" ? "Warmup" : type === "drop" ? "Drop" : "Work";
 
-    // Estimated 1RM for this set
-    const est1rm = actual.actual_weight && actual.actual_reps
-        ? e1rm(actual.actual_weight, actual.actual_reps) : null;
-
     return (
         <div className={`border-l-4 ${bar} bg-zinc-900/60 rounded-r-xl`}>
             {/* Top row */}
@@ -619,13 +585,10 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onDupli
                             Last: {lastData.weight && `${lastData.weight}lb`}{lastData.reps && ` × ${lastData.reps}`}
                         </span>
                     )}
-                    {est1rm && (
-                        <span className="text-xs text-zinc-700">~{est1rm} 1RM</span>
-                    )}
                 </div>
                 <div className="flex items-center gap-1.5">
                     <button onClick={onDuplicate} title="Duplicate set"
-                        className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-600 active:text-violet-400 active:bg-violet-900/30 flex items-center justify-center text-base touch-manipulation">
+                        className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-600 active:text-red-400 active:bg-red-900/30 flex items-center justify-center text-base touch-manipulation">
                         ⧉
                     </button>
                     <button onClick={onRemove} title="Remove set"
@@ -643,7 +606,7 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onDupli
                         value={actual.actual_weight ?? ""}
                         onChange={(e) => upd({ actual_weight: e.target.value ? parseFloat(e.target.value) : null })}
                         placeholder={planned?.weight_lbs ? String(planned.weight_lbs) : "lb"}
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" />
                 </div>
                 <div>
                     <label className="block text-xs text-zinc-600 mb-1">reps</label>
@@ -651,7 +614,7 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onDupli
                         value={actual.actual_reps ?? ""}
                         onChange={(e) => upd({ actual_reps: e.target.value ? parseInt(e.target.value) : null })}
                         placeholder={planned?.target_reps ? String(planned.target_reps) : "reps"}
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" />
                 </div>
                 <div>
                     <label className="block text-xs text-zinc-600 mb-1">RIR</label>
@@ -659,7 +622,7 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onDupli
                         value={actual.actual_rir ?? ""}
                         onChange={(e) => upd({ actual_rir: e.target.value ? parseInt(e.target.value) : null })}
                         placeholder={planned?.rir_target != null ? String(planned.rir_target) : "RIR"}
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500" />
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" />
                 </div>
                 {/* Done button */}
                 <div>
@@ -670,7 +633,7 @@ function SetCard({ index, planned, actual, lastData, onChange, onRemove, onDupli
                             if (!actual.completed) onDone(); // trigger rest timer on marking done
                         }}
                         className={`w-full py-2.5 rounded-lg font-bold text-base transition-colors touch-manipulation ${actual.completed
-                                ? "bg-emerald-600 text-white"
+                                ? "bg-red-600 text-white"
                                 : "bg-zinc-800 border border-zinc-700 text-zinc-500"
                             }`}
                     >
@@ -702,7 +665,7 @@ function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet
     const defaultRestSecs = plannedSets[0]?.rest_seconds ?? 90;
 
     return (
-        <div className={`rounded-xl border overflow-hidden ${allDone ? "border-emerald-600/50 bg-emerald-950/10" : "border-zinc-700/50 bg-zinc-800/50"}`}>
+        <div className={`rounded-xl border overflow-hidden ${allDone ? "border-red-600/50 bg-red-950/10" : "border-zinc-700/50 bg-zinc-800/50"}`}>
             <button onClick={onToggle} className="w-full flex items-center gap-3 px-4 py-4 text-left touch-manipulation active:bg-zinc-700/20">
                 <span className="text-xl flex-shrink-0">{state.is_anchor ? "🔴" : "⚪"}</span>
                 <div className="flex-1 min-w-0">
@@ -715,7 +678,7 @@ function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet
                         </p>
                     )}
                 </div>
-                <div className={`px-2.5 py-1 rounded-full text-sm font-bold flex-shrink-0 ${allDone ? "bg-emerald-600/30 text-emerald-400" : done > 0 ? "bg-violet-600/20 text-violet-300" : "bg-zinc-700/60 text-zinc-500"}`}>
+                <div className={`px-2.5 py-1 rounded-full text-sm font-bold flex-shrink-0 ${allDone ? "bg-red-600/30 text-red-400" : done > 0 ? "bg-red-600/20 text-red-300" : "bg-zinc-700/60 text-zinc-500"}`}>
                     {done}/{total}
                 </div>
                 <span className={`text-zinc-500 text-lg flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
@@ -724,11 +687,9 @@ function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet
             {open && (
                 <div className="px-4 pb-4 space-y-3">
                     <div className="flex gap-2">
-                        <button onClick={onSwap} className="flex-1 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-violet-900/30 active:text-violet-300 touch-manipulation">🔄 Swap</button>
+                        <button onClick={onSwap} className="flex-1 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">🔄 Swap</button>
                         <button onClick={onRemoveExercise} className="flex-1 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-400 touch-manipulation">🗑️ Remove</button>
                     </div>
-                    {state.notes && <p className="text-xs text-zinc-500 italic">💡 {state.notes}</p>}
-
                     <div className="space-y-3">
                         {sets.map((actual, i) => (
                             <SetCard
@@ -746,7 +707,7 @@ function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet
                     </div>
 
                     <button onClick={onAddSet}
-                        className="w-full py-3 rounded-xl border border-dashed border-zinc-700 text-zinc-500 text-sm active:border-violet-500 active:text-violet-400 touch-manipulation">
+                        className="w-full py-3 rounded-xl border border-dashed border-zinc-700 text-zinc-500 text-sm active:border-red-500 active:text-red-400 touch-manipulation">
                         + Add set
                     </button>
                 </div>
@@ -775,7 +736,6 @@ export default function TodayPage() {
     const [nextDay, setNextDay] = useState<number | null>(null);
     const [swapFor, setSwapFor] = useState<string | null>(null);
     const [showAddExercise, setShowAddExercise] = useState(false);
-    const [prs, setPrs] = useState<PrRecord[]>([]);
     // Rest timer: null = hidden, number = seconds remaining start value
     const [restTimer, setRestTimer] = useState<number | null>(null);
     const restDismissed = useRef(false);
@@ -1094,9 +1054,7 @@ export default function TodayPage() {
             if (plan) {
                 writeDraftNow(plan.day_name, exercises, res.workout_id);
             }
-            if (res.prs && res.prs.length > 0) {
-                setPrs(res.prs);
-            } else if (!silent) {
+            if (!silent) {
                 showToast(`✅ Saved as Workout #${res.workout_id}`);
             }
         } catch { if (!silent) showToast("❌ Save failed."); }
@@ -1120,16 +1078,16 @@ export default function TodayPage() {
 
     if (loading) return (
         <div className="flex items-center justify-center h-64 gap-3 text-zinc-500">
-            <div className="w-6 h-6 border-2 border-zinc-600 border-t-violet-500 rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-zinc-600 border-t-red-500 rounded-full animate-spin" />
             Loading...
         </div>
     );
 
     if (error) return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-6">
-            <p className="text-amber-400 text-xl">⚠️ No plan found</p>
+            <p className="text-red-400 text-xl">⚠️ No plan found</p>
             <p className="text-zinc-500 text-sm">{error}</p>
-            <a href="/" className="mt-2 px-6 py-3.5 bg-violet-600 text-white text-base font-semibold rounded-xl">→ Generate on Dashboard</a>
+            <a href="/" className="mt-2 px-6 py-3.5 bg-red-600 text-white text-base font-semibold rounded-xl">→ Generate on Dashboard</a>
         </div>
     );
 
@@ -1138,12 +1096,12 @@ export default function TodayPage() {
             <div className="text-7xl">🎉</div>
             <h2 className="text-3xl font-bold text-white">Done!</h2>
             <p className="text-zinc-400 text-lg">Day advanced → Day {nextDay}</p>
-            <a href="/" className="mt-2 px-8 py-4 bg-violet-600 text-white rounded-xl font-bold text-lg">Dashboard →</a>
+            <a href="/" className="mt-2 px-8 py-4 bg-red-600 text-white rounded-xl font-bold text-lg">Dashboard →</a>
         </div>
     );
 
     return (
-        <div className="max-w-2xl mx-auto pb-4">
+        <div className="max-w-2xl mx-auto pb-36">
             {/* Modals */}
             {swapFor !== null && swapIndex >= 0 && (
                 <SwapModal exerciseName={swapFor} onClose={() => setSwapFor(null)} onSwap={(alt) => swapExercise(swapIndex, alt)} />
@@ -1159,7 +1117,6 @@ export default function TodayPage() {
                     onClose={() => setShowComplete(false)} />
             )}
             {showAddExercise && <AddExerciseModal onAdd={addExercise} onClose={() => setShowAddExercise(false)} />}
-            {prs.length > 0 && <PrBanner prs={prs} onDismiss={() => { setPrs([]); showToast(`✅ Saved as Workout #${savedId}`); }} />}
             {restTimer !== null && <RestTimer seconds={restTimer} onDismiss={() => setRestTimer(null)} />}
             {creatingTemplate && (
                 <CreateTemplateModal
@@ -1169,7 +1126,7 @@ export default function TodayPage() {
             )}
 
             {/* Header */}
-            <div className="mb-5 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(139,92,246,0.15),_transparent_60%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(99,102,241,0.15)]">
+            <div className="mb-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
                 <div className="flex items-start justify-between gap-4">
                     <div>
                         <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">GymOS</p>
@@ -1192,7 +1149,7 @@ export default function TodayPage() {
             </div>
 
             {/* Day selector */}
-            <div className="mb-6 rounded-2xl border border-zinc-700/50 bg-gradient-to-br from-zinc-900/70 to-zinc-950/80 p-5 shadow-[0_10px_40px_rgba(0,0,0,0.35)]">
+            <div className="mb-5 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
                 <div className="flex items-start justify-between gap-3 mb-4">
                     <div>
                         <p className="text-sm text-zinc-400">Que entrenar hoy</p>
@@ -1203,11 +1160,6 @@ export default function TodayPage() {
                         )}
                     </div>
                     <div className="flex items-center gap-2">
-                        {recommendation?.reason && (
-                            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                {recommendation.reason}
-                            </span>
-                        )}
                         {recommendation?.day_name && (
                             <button
                                 onClick={() => setSelectedDay(recommendation.day_name)}
@@ -1223,7 +1175,7 @@ export default function TodayPage() {
                         <select
                             value={selectedDay}
                             onChange={(e) => setSelectedDay(e.target.value)}
-                            className="w-full bg-zinc-900/70 border border-zinc-700 rounded-xl px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            className="w-full bg-zinc-900/70 border border-zinc-700 rounded-xl px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-red-500"
                         >
                             <option value="" disabled>Selecciona un dia</option>
                             {dayOptions.map((opt) => (
@@ -1240,7 +1192,7 @@ export default function TodayPage() {
                         <button
                             onClick={handleGenerate}
                             disabled={!selectedDay || generating}
-                            className="px-5 py-3 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-violet-500/25 hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
+                            className="px-5 py-3 bg-gradient-to-r from-red-600 to-red-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-red-500/25 hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
                         >
                             {generating ? "⏳ Generando..." : plan ? "Regenerar plan" : "Generar plan"}
                         </button>
@@ -1263,24 +1215,24 @@ export default function TodayPage() {
                             <span>{totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0}%</span>
                         </div>
                         <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-violet-500 to-emerald-500 rounded-full transition-all duration-500"
+                            <div className="h-full bg-gradient-to-r from-red-500 to-red-500 rounded-full transition-all duration-500"
                                 style={{ width: `${totalSets > 0 ? (completedSets / totalSets) * 100 : 0}%` }} />
                         </div>
                     </div>
 
                     {/* Action bar */}
-                    <div className="flex gap-2 mb-5">
+                    <div className="hidden sm:flex gap-2 mb-5">
                         <button onClick={() => setShowAddExercise(true)}
                             className="flex-1 py-3 border border-zinc-700 text-zinc-300 font-semibold rounded-xl active:bg-zinc-800 touch-manipulation text-sm">
                             ➕ Exercise
                         </button>
                         <button onClick={() => save(false)} disabled={saving || enteredSets === 0}
-                            className="flex-1 py-3 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-bold rounded-xl active:opacity-80 disabled:opacity-40 touch-manipulation text-sm">
+                            className="flex-1 py-3 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold rounded-xl active:opacity-80 disabled:opacity-40 touch-manipulation text-sm">
                             {saving ? "Saving..." : `💾 Save (${enteredSets})`}
                         </button>
                         {savedId !== null && (
                             <button onClick={() => setShowComplete(true)}
-                                className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-bold rounded-xl active:opacity-80 touch-manipulation text-sm">
+                                className="flex-1 py-3 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold rounded-xl active:opacity-80 touch-manipulation text-sm">
                                 ✅ Done
                             </button>
                         )}
@@ -1329,10 +1281,37 @@ export default function TodayPage() {
                                     <p className="text-xs text-zinc-500 mt-1">lbs vol</p>
                                 </div>
                             </div>
-                            {savedId && <p className="text-center text-xs text-emerald-400 mt-4">✅ Workout #{savedId}</p>}
+                            {savedId && <p className="text-center text-xs text-red-400 mt-4">✅ Workout #{savedId}</p>}
                         </div>
                     )}
                 </>
+            )}
+
+            {plan && (
+                <div className="sm:hidden fixed left-3 right-3 bottom-20 z-40 rounded-2xl border border-zinc-800 bg-zinc-950/95 backdrop-blur-xl p-2">
+                    <div className="grid grid-cols-3 gap-2">
+                        <button
+                            onClick={() => setShowAddExercise(true)}
+                            className="py-3 rounded-xl border border-zinc-700 text-zinc-200 text-sm font-semibold"
+                        >
+                            Add
+                        </button>
+                        <button
+                            onClick={() => save(false)}
+                            disabled={saving || enteredSets === 0}
+                            className="py-3 rounded-xl bg-red-600 text-white text-sm font-bold disabled:opacity-40"
+                        >
+                            {saving ? "Saving" : `Save ${enteredSets}`}
+                        </button>
+                        <button
+                            onClick={() => savedId !== null && setShowComplete(true)}
+                            disabled={savedId === null}
+                            className="py-3 rounded-xl bg-zinc-800 text-zinc-100 text-sm font-bold disabled:opacity-40"
+                        >
+                            Done
+                        </button>
+                    </div>
+                </div>
             )}
 
             {toast && (

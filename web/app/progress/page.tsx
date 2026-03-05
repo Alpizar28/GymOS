@@ -11,9 +11,9 @@ function AnchorCard({ anchor }: { anchor: AnchorProgress }) {
     const chartInstance = useRef<InstanceType<typeof Chart> | null>(null);
 
     const statusColors: Record<string, string> = {
-        active: "bg-emerald-500/15 text-emerald-400",
-        deload: "bg-amber-500/15 text-amber-400",
-        consolidate: "bg-violet-500/15 text-violet-400",
+        active: "bg-red-500/15 text-red-400",
+        deload: "bg-red-500/15 text-red-400",
+        consolidate: "bg-red-500/15 text-red-400",
     };
 
     useEffect(() => {
@@ -94,7 +94,7 @@ function AnchorCard({ anchor }: { anchor: AnchorProgress }) {
                     </div>
                 </div>
                 <div className="text-right">
-                    <p className="text-2xl font-bold font-mono text-violet-400">
+                    <p className="text-2xl font-bold font-mono text-red-400">
                         {anchor.target_weight}lb
                     </p>
                     <p className="text-sm text-zinc-500">× {anchor.reps_range}</p>
@@ -136,7 +136,7 @@ export default function ProgressPage() {
 
             {loading ? (
                 <div className="flex items-center justify-center h-40 gap-3 text-zinc-500">
-                    <div className="w-5 h-5 border-2 border-zinc-600 border-t-violet-500 rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-zinc-600 border-t-red-500 rounded-full animate-spin" />
                     Loading...
                 </div>
             ) : anchors.length === 0 ? (

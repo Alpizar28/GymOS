@@ -32,12 +32,12 @@ export default function LibraryPage() {
                 placeholder="Search exercises, muscles, or patterns..."
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-xl text-zinc-100 placeholder-zinc-500 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all mb-4"
+                className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-xl text-zinc-100 placeholder-zinc-500 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all mb-4"
             />
 
             {loading ? (
                 <div className="flex items-center justify-center h-40 gap-3 text-zinc-500">
-                    <div className="w-5 h-5 border-2 border-zinc-600 border-t-violet-500 rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-zinc-600 border-t-red-500 rounded-full animate-spin" />
                     Loading...
                 </div>
             ) : (
@@ -81,7 +81,7 @@ export default function LibraryPage() {
                                                     </span>
                                                 )}
                                                 {ex.is_staple && (
-                                                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-500/15 text-emerald-400">
+                                                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-500/15 text-red-400">
                                                         Staple
                                                     </span>
                                                 )}

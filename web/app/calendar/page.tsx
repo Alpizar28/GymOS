@@ -97,7 +97,7 @@ function WorkoutModal({
                 {ex.sets.map((s, j) => (
                   <span
                     key={j}
-                    className="border-l-2 border-l-violet-500 bg-zinc-900/70 px-2 py-1 rounded text-sm font-mono text-zinc-300"
+                    className="border-l-2 border-l-red-500 bg-zinc-900/70 px-2 py-1 rounded text-sm font-mono text-zinc-300"
                   >
                     {s.weight || 0}lb × {s.reps || 0}
                     {s.rir !== null && <span className="text-zinc-500"> RIR{s.rir}</span>}
@@ -251,7 +251,7 @@ function ManualWorkoutModal({
               onClick={() => setTab("text")}
               className={`px-3 py-2 rounded-lg text-xs font-semibold border ${
                 tab === "text"
-                  ? "bg-violet-600/30 text-violet-200 border-violet-500/40"
+                  ? "bg-red-600/30 text-red-200 border-red-500/40"
                   : "bg-zinc-800 text-zinc-500 border-zinc-700/60"
               }`}
             >
@@ -261,7 +261,7 @@ function ManualWorkoutModal({
               onClick={() => setTab("form")}
               className={`px-3 py-2 rounded-lg text-xs font-semibold border ${
                 tab === "form"
-                  ? "bg-violet-600/30 text-violet-200 border-violet-500/40"
+                  ? "bg-red-600/30 text-red-200 border-red-500/40"
                   : "bg-zinc-800 text-zinc-500 border-zinc-700/60"
               }`}
             >
@@ -360,12 +360,12 @@ function ManualWorkoutModal({
             </div>
           )}
 
-          {error && <p className="text-xs text-amber-400">⚠️ {error}</p>}
+          {error && <p className="text-xs text-red-400">⚠️ {error}</p>}
 
           <button
             onClick={save}
             disabled={saving}
-            className="w-full py-3.5 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-bold rounded-xl"
+            className="w-full py-3.5 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold rounded-xl"
           >
             {saving ? "Saving..." : "Guardar"}
           </button>
@@ -437,7 +437,7 @@ export default function CalendarPage() {
         />
       )}
 
-      <div className="mb-6 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.18),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(14,165,233,0.15)]">
+      <div className="mb-6 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.16),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(239,68,68,0.14)]">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">GymOS</p>
@@ -487,7 +487,7 @@ export default function CalendarPage() {
 
       {loading ? (
         <div className="flex items-center justify-center h-40 gap-3 text-zinc-500">
-          <div className="w-5 h-5 border-2 border-zinc-600 border-t-violet-500 rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-zinc-600 border-t-red-500 rounded-full animate-spin" />
           Loading...
         </div>
       ) : (
@@ -516,7 +516,7 @@ export default function CalendarPage() {
 
                 <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden mb-4">
                   <div
-                    className="h-full bg-gradient-to-r from-sky-500 to-emerald-400 rounded-full"
+                    className="h-full bg-gradient-to-r from-red-500 to-red-400 rounded-full"
                     style={{ width: `${pct}%` }}
                   />
                 </div>

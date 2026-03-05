@@ -21,8 +21,8 @@
 
 /* Glow on interactive cards */
 .card-glow:hover {
-  box-shadow: 0 0 20px rgba(139, 92, 246, 0.15);
-  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.5);
 }
 
 .no-scrollbar::-webkit-scrollbar {

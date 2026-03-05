@@ -45,10 +45,10 @@ function WorkoutModal({
                                 {ex.sets.map((s, j) => {
                                     const borderClass =
                                         s.set_type === "warmup"
-                                            ? "border-l-2 border-l-amber-400"
+                                            ? "border-l-2 border-l-red-400"
                                             : s.set_type === "drop"
                                                 ? "border-l-2 border-l-red-400"
-                                                : "border-l-2 border-l-violet-500";
+                                                : "border-l-2 border-l-red-500";
                                     return (
                                         <span
                                             key={j}
@@ -88,13 +88,13 @@ export default function WorkoutsPage() {
 
             {loading ? (
                 <div className="flex items-center justify-center h-40 gap-3 text-zinc-500">
-                    <div className="w-5 h-5 border-2 border-zinc-600 border-t-violet-500 rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-zinc-600 border-t-red-500 rounded-full animate-spin" />
                     Loading...
                 </div>
             ) : workouts.length === 0 ? (
                 <div className="text-center py-16 text-zinc-600">
                     <p className="text-lg mb-2">No workouts logged yet</p>
-                    <p className="text-sm">Use <code className="text-violet-400">/log</code> in Telegram to record your first workout!</p>
+                    <p className="text-sm">Use <code className="text-red-400">/log</code> in Telegram to record your first workout!</p>
                 </div>
             ) : (
                 <div className="overflow-x-auto rounded-xl border border-zinc-800">

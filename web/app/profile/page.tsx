@@ -60,7 +60,7 @@ type SectionId = typeof SECTIONS[number]["id"];
 function Spinner() {
   return (
     <div className="flex items-center justify-center h-20 gap-2 text-zinc-500 text-sm">
-      <div className="w-4 h-4 border-2 border-zinc-600 border-t-violet-500 rounded-full animate-spin" />
+      <div className="w-4 h-4 border-2 border-zinc-600 border-t-red-500 rounded-full animate-spin" />
       Cargando...
     </div>
   );
@@ -204,22 +204,22 @@ function MiniCalendarSection() {
                 disabled={!hasWorkout}
                 className={`
                   relative flex flex-col items-center justify-start rounded-lg py-2 px-0.5 min-h-[56px] transition-all
-                  ${isToday ? "ring-1 ring-violet-500" : ""}
+                  ${isToday ? "ring-1 ring-red-500" : ""}
                   ${hasWorkout
-                    ? "bg-violet-500/15 border border-violet-500/30 active:bg-violet-500/25"
+                    ? "bg-red-500/15 border border-red-500/30 active:bg-red-500/25"
                     : inRange
                       ? "bg-zinc-800/40 border border-zinc-800/60"
                       : "bg-transparent border border-transparent opacity-30"
                   }
                 `}
               >
-                <span className={`text-xs font-semibold ${isToday ? "text-violet-400" : inRange ? "text-zinc-300" : "text-zinc-600"}`}>
+                <span className={`text-xs font-semibold ${isToday ? "text-red-400" : inRange ? "text-zinc-300" : "text-zinc-600"}`}>
                   {date.getDate()}
                 </span>
                 {hasWorkout && (
                   <>
-                    <div className="w-1.5 h-1.5 rounded-full bg-violet-400 mt-0.5" />
-                    <span className="text-[9px] text-violet-300 mt-0.5 leading-tight text-center px-0.5 truncate w-full">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-400 mt-0.5" />
+                    <span className="text-[9px] text-red-300 mt-0.5 leading-tight text-center px-0.5 truncate w-full">
                       {label}
                     </span>
                   </>
@@ -253,7 +253,7 @@ function MiniCalendarSection() {
                   <p className="font-semibold text-sm mb-2">{ex.name}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {ex.sets.map((s, j) => (
-                      <span key={j} className="border-l-2 border-violet-500 bg-zinc-900/70 px-2 py-0.5 rounded text-xs font-mono text-zinc-300">
+                      <span key={j} className="border-l-2 border-red-500 bg-zinc-900/70 px-2 py-0.5 rounded text-xs font-mono text-zinc-300">
                         {s.weight}lb × {s.reps}
                         {s.rir !== null && <span className="text-zinc-500"> RIR{s.rir}</span>}
                       </span>
@@ -285,10 +285,10 @@ function TemplatesSection() {
     return <p className="text-sm text-zinc-600 text-center py-6">No hay plantillas configuradas.</p>;
 
   const SPLIT_COLORS: Record<string, string> = {
-    push: "bg-orange-500/15 text-orange-300 border-orange-500/30",
-    pull: "bg-sky-500/15 text-sky-300 border-sky-500/30",
-    leg:  "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-    arm:  "bg-purple-500/15 text-purple-300 border-purple-500/30",
+    push: "bg-red-500/15 text-red-300 border-red-500/30",
+    pull: "bg-red-500/15 text-red-300 border-red-500/30",
+    leg:  "bg-red-500/15 text-red-300 border-red-500/30",
+    arm:  "bg-red-500/15 text-red-300 border-red-500/30",
   };
 
   function splitColor(name: string) {
@@ -384,7 +384,7 @@ function LibrarySection() {
         placeholder="Buscar ejercicio..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/20 transition-all"
+        className="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
       />
 
       {/* Muscle filter pills */}
@@ -395,7 +395,7 @@ function LibrarySection() {
             onClick={() => setMuscle(m)}
             className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
               muscle === m
-                ? "bg-violet-600/30 text-violet-200 border-violet-500/50"
+                ? "bg-red-600/30 text-red-200 border-red-500/50"
                 : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50"
             }`}
           >
@@ -435,7 +435,7 @@ function LibrarySection() {
                   </span>
                 )}
                 {ex.is_staple && (
-                  <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                  <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-red-500/15 text-red-400 border border-red-500/20">
                     STAPLE
                   </span>
                 )}
@@ -520,8 +520,8 @@ function ProtectionSection() {
           {protections.map((p) => {
             const color =
               p.severity >= 8 ? "border-red-600/50 bg-red-950/30 text-red-300"
-              : p.severity >= 5 ? "border-amber-600/50 bg-amber-950/30 text-amber-300"
-              : "border-yellow-600/50 bg-yellow-950/30 text-yellow-300";
+              : p.severity >= 5 ? "border-red-600/50 bg-red-950/30 text-red-300"
+              : "border-red-600/50 bg-red-950/30 text-red-300";
             return (
               <div key={p.muscle_group} className={`flex items-center justify-between p-4 rounded-xl border ${color}`}>
                 <div>
@@ -556,7 +556,7 @@ function ProtectionSection() {
             <select
               value={muscle}
               onChange={(e) => setMuscle(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-violet-500 capitalize"
+              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500 capitalize"
             >
               {MUSCLE_GROUPS.map((m) => (
                 <option key={m} value={m} className="capitalize">{m}</option>
@@ -570,7 +570,7 @@ function ProtectionSection() {
             <input
               type="range" min={1} max={10} value={severity}
               onChange={(e) => setSeverity(parseInt(e.target.value))}
-              className="w-full accent-violet-500 mt-2"
+              className="w-full accent-red-500 mt-2"
             />
           </div>
         </div>
@@ -580,7 +580,7 @@ function ProtectionSection() {
         <button
           onClick={handleAdd}
           disabled={adding}
-          className="w-full py-2.5 bg-gradient-to-r from-amber-600 to-orange-500 text-white font-semibold rounded-lg hover:opacity-90 transition disabled:opacity-50"
+          className="w-full py-2.5 bg-gradient-to-r from-red-600 to-red-500 text-white font-semibold rounded-lg hover:opacity-90 transition disabled:opacity-50"
         >
           {adding ? "Añadiendo..." : `🛡️ Proteger ${muscle}`}
         </button>
@@ -603,7 +603,7 @@ export default function ProfilePage() {
   return (
     <div className="max-w-2xl mx-auto">
       {/* Header */}
-      <div className="mb-5 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(139,92,246,0.18),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(139,92,246,0.12)]">
+      <div className="mb-5 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.16),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(239,68,68,0.12)]">
         <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">GymOS</p>
         <h1 className="text-2xl font-bold tracking-tight">Perfil</h1>
         <p className="text-sm text-zinc-500 mt-1">Tu historial, ejercicios y configuración</p>
@@ -617,7 +617,7 @@ export default function ProfilePage() {
             onClick={() => setActive(s.id)}
             className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
               active === s.id
-                ? "bg-violet-600/25 text-violet-200 border-violet-500/40 shadow-[0_0_12px_rgba(139,92,246,0.2)]"
+                ? "bg-red-600/25 text-red-200 border-red-500/40 shadow-[0_0_12px_rgba(239,68,68,0.2)]"
                 : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50 hover:text-zinc-300"
             }`}
           >

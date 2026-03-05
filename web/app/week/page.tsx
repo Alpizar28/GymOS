@@ -50,7 +50,7 @@ function DayCard({ day, onGenerate, loading }: { day: WeekDay; onGenerate: () =>
                         <button
                             onClick={onGenerate}
                             disabled={loading}
-                            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600/20 text-violet-300 hover:bg-violet-600/40 transition disabled:opacity-50"
+                            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600/20 text-red-300 hover:bg-red-600/40 transition disabled:opacity-50"
                         >
                             {loading ? "Generating..." : "⚡ Generate"}
                         </button>
@@ -132,7 +132,7 @@ export default function WeekPage() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64 gap-3 text-zinc-500">
-                <div className="w-5 h-5 border-2 border-zinc-600 border-t-violet-500 rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-zinc-600 border-t-red-500 rounded-full animate-spin" />
                 Loading week plan...
             </div>
         );
@@ -159,7 +159,7 @@ export default function WeekPage() {
                 <button
                     onClick={handleGenerateAll}
                     disabled={generatingAll}
-                    className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-violet-500/25 hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
+                    className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-red-500/25 hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
                 >
                     {generatingAll ? "⏳ Generating..." : "⚡ Generate All 6 Days"}
                 </button>
@@ -169,7 +169,7 @@ export default function WeekPage() {
             <div className="mb-6">
                 <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                     <div
-                        className="h-full bg-gradient-to-r from-violet-500 to-indigo-400 rounded-full transition-all duration-500"
+                        className="h-full bg-gradient-to-r from-red-500 to-red-400 rounded-full transition-all duration-500"
                         style={{ width: `${week.length > 0 ? (daysWithPlan / 6) * 100 : 0}%` }}
                     />
                 </div>

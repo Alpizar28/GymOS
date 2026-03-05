@@ -108,7 +108,7 @@ function formatLabel(d: Date) {
 function Spinner() {
   return (
     <div className="flex items-center justify-center h-20 gap-2 text-zinc-500 text-sm">
-      <div className="w-4 h-4 border-2 border-zinc-600 border-t-violet-500 rounded-full animate-spin" />
+      <div className="w-4 h-4 border-2 border-zinc-600 border-t-red-500 rounded-full animate-spin" />
       Cargando...
     </div>
   );
@@ -153,7 +153,7 @@ function WorkoutModal({
                 {ex.sets.map((s, j) => (
                   <span
                     key={j}
-                    className="border-l-2 border-l-violet-500 bg-zinc-900/70 px-2 py-1 rounded text-sm font-mono text-zinc-300"
+                    className="border-l-2 border-l-red-500 bg-zinc-900/70 px-2 py-1 rounded text-sm font-mono text-zinc-300"
                   >
                     {s.weight || 0}lb x {s.reps || 0}
                     {s.rir !== null && <span className="text-zinc-500"> RIR{s.rir}</span>}
@@ -311,7 +311,7 @@ function ManualWorkoutModal({
               onClick={() => setTab("text")}
               className={`px-3 py-2 rounded-lg text-xs font-semibold border ${
                 tab === "text"
-                  ? "bg-violet-600/30 text-violet-200 border-violet-500/40"
+                  ? "bg-red-600/30 text-red-200 border-red-500/40"
                   : "bg-zinc-800 text-zinc-500 border-zinc-700/60"
               }`}
             >
@@ -321,7 +321,7 @@ function ManualWorkoutModal({
               onClick={() => setTab("form")}
               className={`px-3 py-2 rounded-lg text-xs font-semibold border ${
                 tab === "form"
-                  ? "bg-violet-600/30 text-violet-200 border-violet-500/40"
+                  ? "bg-red-600/30 text-red-200 border-red-500/40"
                   : "bg-zinc-800 text-zinc-500 border-zinc-700/60"
               }`}
             >
@@ -419,12 +419,12 @@ function ManualWorkoutModal({
             </div>
           )}
 
-          {error && <p className="text-xs text-amber-400">{error}</p>}
+          {error && <p className="text-xs text-red-400">{error}</p>}
 
           <button
             onClick={save}
             disabled={saving}
-            className="w-full py-3.5 bg-gradient-to-r from-violet-600 to-indigo-500 text-white font-bold rounded-xl"
+            className="w-full py-3.5 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold rounded-xl"
           >
             {saving ? "Saving..." : "Guardar"}
           </button>
@@ -568,7 +568,7 @@ function CalendarTab() {
 
                 <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden mb-4">
                   <div
-                    className="h-full bg-gradient-to-r from-sky-500 to-emerald-400 rounded-full"
+                    className="h-full bg-gradient-to-r from-red-500 to-red-400 rounded-full"
                     style={{ width: `${pct}%` }}
                   />
                 </div>
@@ -641,7 +641,7 @@ function LibraryTab() {
         placeholder="Buscar ejercicio..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/20 transition-all"
+        className="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
       />
 
       <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
@@ -651,7 +651,7 @@ function LibraryTab() {
             onClick={() => setMuscle(m)}
             className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
               muscle === m
-                ? "bg-violet-600/30 text-violet-200 border-violet-500/50"
+                ? "bg-red-600/30 text-red-200 border-red-500/50"
                 : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50"
             }`}
           >
@@ -688,7 +688,7 @@ function LibraryTab() {
                   </span>
                 )}
                 {ex.is_staple && (
-                  <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                  <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-red-500/15 text-red-400 border border-red-500/20">
                     STAPLE
                   </span>
                 )}
@@ -783,8 +783,8 @@ function ProtectionTab() {
               p.severity >= 8
                 ? "border-red-600/50 bg-red-950/30 text-red-300"
                 : p.severity >= 5
-                  ? "border-amber-600/50 bg-amber-950/30 text-amber-300"
-                  : "border-yellow-600/50 bg-yellow-950/30 text-yellow-300";
+                  ? "border-red-600/50 bg-red-950/30 text-red-300"
+                  : "border-red-600/50 bg-red-950/30 text-red-300";
 
             return (
               <div key={p.muscle_group} className={`flex items-center justify-between p-4 rounded-xl border ${color}`}>
@@ -819,7 +819,7 @@ function ProtectionTab() {
             <select
               value={muscle}
               onChange={(e) => setMuscle(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-violet-500 capitalize"
+              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500 capitalize"
             >
               {MUSCLE_GROUPS.map((m) => (
                 <option key={m} value={m} className="capitalize">
@@ -838,7 +838,7 @@ function ProtectionTab() {
               max={10}
               value={severity}
               onChange={(e) => setSeverity(parseInt(e.target.value, 10))}
-              className="w-full accent-violet-500 mt-2"
+              className="w-full accent-red-500 mt-2"
             />
           </div>
         </div>
@@ -850,7 +850,7 @@ function ProtectionTab() {
         <button
           onClick={handleAdd}
           disabled={adding}
-          className="w-full py-2.5 bg-gradient-to-r from-amber-600 to-orange-500 text-white font-semibold rounded-lg hover:opacity-90 transition disabled:opacity-50"
+          className="w-full py-2.5 bg-gradient-to-r from-red-600 to-red-500 text-white font-semibold rounded-lg hover:opacity-90 transition disabled:opacity-50"
         >
           {adding ? "Agregando..." : `Proteger ${muscle}`}
         </button>
@@ -878,7 +878,7 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="mb-5 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.18),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(14,165,233,0.12)]">
+      <div className="mb-5 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.16),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(239,68,68,0.12)]">
         <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">GymOS</p>
         <h1 className="text-2xl font-bold tracking-tight">Historial</h1>
         <p className="text-sm text-zinc-500 mt-1">Tu calendario, biblioteca y protecciones</p>
@@ -891,7 +891,7 @@ export default function SettingsPage() {
             onClick={() => setActive(tab.id)}
             className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
               active === tab.id
-                ? "bg-violet-600/25 text-violet-200 border-violet-500/40"
+                ? "bg-red-600/25 text-red-200 border-red-500/40"
                 : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50 hover:text-zinc-300"
             }`}
           >
