@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 const DEFAULT_BACKEND = "http://backend:8000";
+const DEFAULT_PROXY_TIMEOUT_MS = 60000;
 
 function backendBaseUrl() {
   return (
@@ -11,12 +12,19 @@ function backendBaseUrl() {
   ).replace(/\/$/, "");
 }
 
+function proxyTimeoutMs() {
+  const raw = process.env.PROXY_TIMEOUT_MS;
+  const parsed = raw ? Number(raw) : NaN;
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_PROXY_TIMEOUT_MS;
+  return parsed;
+}
+
 async function proxy(request: NextRequest, method: string, path: string[]) {
   const url = new URL(request.url);
   const target = `${backendBaseUrl()}/api/${path.join("/")}${url.search}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), proxyTimeoutMs());
 
   try {
     const headers = new Headers(request.headers);
@@ -40,7 +48,14 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
       statusText: response.statusText,
       headers: resHeaders,
     });
-  } catch {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return Response.json(
+        { detail: "Backend timeout" },
+        { status: 504 }
+      );
+    }
+
     return Response.json(
       { detail: "Backend unavailable" },
       { status: 502 }
