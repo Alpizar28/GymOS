@@ -34,7 +34,7 @@ const bottomTabs = [
 // Top nav (desktop only)
 const topNavLinks = [
   { href: "/today",    label: "Today",    icon: "🏋️" },
-  { href: "/week",     label: "Week",     icon: "📅" },
+  { href: "/routines", label: "Routines", icon: "📚" },
   { href: "/",         label: "Dashboard", icon: "📊" },
   { href: "/workouts", label: "Workouts", icon: "📝" },
   { href: "/progress", label: "Progress", icon: "📈" },

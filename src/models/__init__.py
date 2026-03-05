@@ -4,6 +4,7 @@ from src.models.workouts import Workout, WorkoutExercise, WorkoutSet
 from src.models.progression import AnchorTarget
 from src.models.plans import Plan, PlanDay
 from src.models.feedback import SessionFeedback
+from src.models.routines import RoutineFolder, Routine, RoutineExercise, RoutineSet
 
 __all__ = [
     "Setting",
@@ -18,4 +19,8 @@ __all__ = [
     "Plan",
     "PlanDay",
     "SessionFeedback",
+    "RoutineFolder",
+    "Routine",
+    "RoutineExercise",
+    "RoutineSet",
 ]

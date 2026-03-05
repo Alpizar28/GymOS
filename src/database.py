@@ -92,8 +92,12 @@ async def _auto_seed_if_empty() -> None:
 
 async def _ensure_templates() -> None:
     from src.services.import_service import ensure_week_template
+    from src.services.routine_bootstrap import ensure_default_routines
 
     async with async_session() as session:
         inserted = await ensure_week_template(session)
+        routine_inserted = await ensure_default_routines(session)
         if inserted:
+            await session.commit()
+        elif routine_inserted:
             await session.commit()

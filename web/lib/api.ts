@@ -71,6 +71,93 @@ export interface DayOptionCreate {
     rules: Record<string, unknown>;
 }
 
+export interface RoutineFolder {
+    id: number;
+    name: string;
+    sort_order: number;
+    routine_count: number;
+}
+
+export interface RoutineSetTemplate {
+    id?: number;
+    set_index: number;
+    set_type: string;
+    target_weight_lbs: number | null;
+    target_reps: number | null;
+    rir_target: number | null;
+}
+
+export interface RoutineExerciseTemplate {
+    id?: number;
+    name: string;
+    exercise_id: number | null;
+    rest_seconds: number | null;
+    notes: string | null;
+    primary_muscle?: string;
+    is_anchor?: boolean;
+    sets: RoutineSetTemplate[];
+}
+
+export interface RoutineCard {
+    id: number;
+    folder_id: number;
+    name: string;
+    subtitle: string | null;
+    notes: string | null;
+    sort_order: number;
+    exercise_count: number;
+    total_sets: number;
+    preview_exercises: string[];
+    preview_items?: { name: string; set_count: number }[];
+    remaining_exercises?: number;
+}
+
+export interface RoutineDetail {
+    id: number;
+    folder_id: number;
+    name: string;
+    subtitle: string | null;
+    notes: string | null;
+    sort_order: number;
+    exercise_count: number;
+    total_sets: number;
+    muscles: string[];
+    exercises: RoutineExerciseTemplate[];
+}
+
+export interface RoutineSetInput {
+    set_type: string;
+    target_weight_lbs: number | null;
+    target_reps: number | null;
+    rir_target: number | null;
+}
+
+export interface RoutineExerciseInput {
+    name: string;
+    exercise_id?: number | null;
+    rest_seconds?: number | null;
+    notes?: string | null;
+    sets: RoutineSetInput[];
+}
+
+export interface RoutineCreatePayload {
+    folder_id: number;
+    name: string;
+    subtitle?: string | null;
+    notes?: string | null;
+    sort_order?: number | null;
+    exercises: RoutineExerciseInput[];
+}
+
+export interface RoutineUpdatePayload {
+    folder_id?: number;
+    name?: string;
+    subtitle?: string | null;
+    notes?: string | null;
+    sort_order?: number;
+    exercises?: RoutineExerciseInput[];
+}
+
 export interface CalendarWorkoutSummary {
     id: number;
     date: string;
@@ -195,6 +282,62 @@ export const api = {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         }),
+    getRoutineFolders: () => fetchApi<RoutineFolder[]>("/routines/folders"),
+    createRoutineFolder: (name: string) =>
+        fetchApi<RoutineFolder>("/routines/folders", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name }),
+        }),
+    updateRoutineFolder: (folder_id: number, payload: { name?: string; sort_order?: number }) =>
+        fetchApi<RoutineFolder>(`/routines/folders/${folder_id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        }),
+    deleteRoutineFolder: (folder_id: number) =>
+        fetchApi<{ removed: number }>(`/routines/folders/${folder_id}`, {
+            method: "DELETE",
+        }),
+    getRoutines: (folder_id?: number) =>
+        fetchApi<RoutineCard[]>(
+            folder_id !== undefined ? `/routines?folder_id=${folder_id}` : "/routines"
+        ),
+    createRoutine: (payload: RoutineCreatePayload) =>
+        fetchApi<RoutineDetail>("/routines", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        }),
+    getRoutine: (routine_id: number) => fetchApi<RoutineDetail>(`/routines/${routine_id}`),
+    updateRoutine: (routine_id: number, payload: RoutineUpdatePayload) =>
+        fetchApi<RoutineDetail>(`/routines/${routine_id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        }),
+    deleteRoutine: (routine_id: number) =>
+        fetchApi<{ removed: number }>(`/routines/${routine_id}`, {
+            method: "DELETE",
+        }),
+    duplicateRoutine: (routine_id: number) =>
+        fetchApi<RoutineDetail>(`/routines/${routine_id}/duplicate`, {
+            method: "POST",
+        }),
+    shareRoutine: (routine_id: number) =>
+        fetchApi<{ version: number; exported_at: string; routine: RoutineDetail }>(
+            `/routines/${routine_id}/share`,
+            {
+                method: "POST",
+            }
+        ),
+    startRoutine: (routine_id: number) =>
+        fetchApi<{ routine_id: number; plan_day_id: number; plan: PlanData }>(
+            `/routines/${routine_id}/start`,
+            {
+                method: "POST",
+            }
+        ),
     getCalendar: (from: string, to: string) =>
         fetchApi<CalendarDay[]>(`/calendar?from=${from}&to=${to}`),
     createManualWorkout: (payload: ManualWorkoutPayload) =>

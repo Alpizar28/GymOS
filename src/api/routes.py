@@ -8,11 +8,13 @@ from fastapi import APIRouter, HTTPException
 from fastapi import Query
 from pydantic import BaseModel
 from sqlalchemy import desc, func, select
+from sqlalchemy.orm import selectinload
 
 from src.database import async_session
 from src.models.exercises import Exercise, ExerciseStats
 from src.models.plans import Plan, PlanDay
 from src.models.progression import AnchorTarget
+from src.models.routines import Routine, RoutineExercise, RoutineFolder, RoutineSet
 from src.models.settings import AthleteState, WeekTemplate
 from src.models.workouts import Workout, WorkoutExercise, WorkoutSet
 from src.services.plan_generator import generate_day_plan
@@ -132,6 +134,48 @@ class WorkoutDetail(BaseModel):
     duration_min: int | None
     notes: str | None
     exercises: list[dict]
+
+
+class RoutineSetInput(BaseModel):
+    set_type: str = "normal"
+    target_weight_lbs: float | None = None
+    target_reps: int | None = None
+    rir_target: int | None = None
+
+
+class RoutineExerciseInput(BaseModel):
+    name: str
+    exercise_id: int | None = None
+    rest_seconds: int | None = None
+    notes: str | None = None
+    sets: list[RoutineSetInput]
+
+
+class RoutineCreateRequest(BaseModel):
+    folder_id: int
+    name: str
+    subtitle: str | None = None
+    notes: str | None = None
+    sort_order: int | None = None
+    exercises: list[RoutineExerciseInput] = []
+
+
+class RoutineUpdateRequest(BaseModel):
+    folder_id: int | None = None
+    name: str | None = None
+    subtitle: str | None = None
+    notes: str | None = None
+    sort_order: int | None = None
+    exercises: list[RoutineExerciseInput] | None = None
+
+
+class RoutineFolderCreateRequest(BaseModel):
+    name: str
+
+
+class RoutineFolderUpdateRequest(BaseModel):
+    name: str | None = None
+    sort_order: int | None = None
 
 
 class AnchorProgressResponse(BaseModel):
@@ -831,6 +875,506 @@ async def create_manual_workout(payload: ManualWorkoutRequest) -> dict:
             raise HTTPException(status_code=400, detail="Unable to parse workout")
         await session.commit()
         return {"workout_id": workout.id}
+
+
+# --- Routines ---
+
+
+def _clean_name(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip())
+
+
+def _to_template_name(name: str, routine_id: int) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9_ ]+", "", name.strip())
+    normalized = re.sub(r"\s+", "_", normalized)
+    normalized = normalized[:50]
+    return normalized or f"Routine_{routine_id}"
+
+
+def _routine_to_detail_payload(routine: Routine) -> dict:
+    sorted_exercises = sorted(routine.exercises, key=lambda ex: ex.sort_order)
+    exercise_payload = []
+    for routine_exercise in sorted_exercises:
+        sorted_sets = sorted(routine_exercise.sets, key=lambda s: s.set_index)
+        exercise_payload.append(
+            {
+                "id": routine_exercise.id,
+                "name": routine_exercise.display_name,
+                "exercise_id": routine_exercise.exercise_id,
+                "rest_seconds": routine_exercise.rest_seconds,
+                "notes": routine_exercise.notes,
+                "primary_muscle": routine_exercise.exercise.primary_muscle
+                if routine_exercise.exercise
+                else "unknown",
+                "is_anchor": routine_exercise.exercise.is_anchor if routine_exercise.exercise else False,
+                "sets": [
+                    {
+                        "id": routine_set.id,
+                        "set_index": routine_set.set_index,
+                        "set_type": routine_set.set_type,
+                        "target_weight_lbs": routine_set.target_weight_lbs,
+                        "target_reps": routine_set.target_reps,
+                        "rir_target": routine_set.rir_target,
+                    }
+                    for routine_set in sorted_sets
+                ],
+            }
+        )
+
+    total_sets = sum(len(ex["sets"]) for ex in exercise_payload)
+    muscles = sorted({ex["primary_muscle"] for ex in exercise_payload if ex["primary_muscle"] != "unknown"})
+
+    return {
+        "id": routine.id,
+        "folder_id": routine.folder_id,
+        "name": routine.name,
+        "subtitle": routine.subtitle,
+        "notes": routine.notes,
+        "sort_order": routine.sort_order,
+        "exercise_count": len(exercise_payload),
+        "total_sets": total_sets,
+        "muscles": muscles,
+        "exercises": exercise_payload,
+    }
+
+
+async def _fetch_routine_or_404(session, routine_id: int) -> Routine:
+    result = await session.execute(
+        select(Routine)
+        .options(
+            selectinload(Routine.exercises).selectinload(RoutineExercise.sets),
+            selectinload(Routine.exercises).selectinload(RoutineExercise.exercise),
+        )
+        .where(Routine.id == routine_id, Routine.is_deleted.is_(False))
+    )
+    routine = result.scalar_one_or_none()
+    if not routine:
+        raise HTTPException(status_code=404, detail="Routine not found")
+    return routine
+
+
+async def _upsert_routine_exercises(session, routine: Routine, exercises: list[RoutineExerciseInput]) -> None:
+    for ex in list(routine.exercises):
+        await session.delete(ex)
+    await session.flush()
+
+    for ex_idx, ex in enumerate(exercises):
+        ex_name = _clean_name(ex.name)
+        if not ex_name:
+            continue
+
+        linked_exercise = None
+        if ex.exercise_id is not None:
+            linked_exercise = await session.get(Exercise, ex.exercise_id)
+        if linked_exercise is None:
+            lookup = await session.execute(
+                select(Exercise)
+                .where(func.lower(Exercise.name_canonical) == ex_name.lower())
+                .limit(1)
+            )
+            linked_exercise = lookup.scalar_one_or_none()
+
+        routine_exercise = RoutineExercise(
+            routine_id=routine.id,
+            exercise_id=linked_exercise.id if linked_exercise else None,
+            display_name=ex_name,
+            sort_order=ex_idx,
+            rest_seconds=ex.rest_seconds,
+            notes=ex.notes,
+        )
+        session.add(routine_exercise)
+        await session.flush()
+
+        for set_idx, set_payload in enumerate(ex.sets):
+            session.add(
+                RoutineSet(
+                    routine_exercise_id=routine_exercise.id,
+                    set_index=set_idx,
+                    set_type=set_payload.set_type,
+                    target_weight_lbs=set_payload.target_weight_lbs,
+                    target_reps=set_payload.target_reps,
+                    rir_target=set_payload.rir_target,
+                )
+            )
+
+
+@router.get("/routines/folders")
+async def list_routine_folders() -> list[dict]:
+    """List non-deleted routine folders with active routine counts."""
+    async with async_session() as session:
+        folders_result = await session.execute(
+            select(RoutineFolder)
+            .where(RoutineFolder.is_deleted.is_(False))
+            .order_by(RoutineFolder.sort_order, RoutineFolder.id)
+        )
+
+        folders = []
+        for folder in folders_result.scalars().all():
+            count_result = await session.execute(
+                select(func.count())
+                .select_from(Routine)
+                .where(Routine.folder_id == folder.id, Routine.is_deleted.is_(False))
+            )
+            folders.append(
+                {
+                    "id": folder.id,
+                    "name": folder.name,
+                    "sort_order": folder.sort_order,
+                    "routine_count": int(count_result.scalar_one() or 0),
+                }
+            )
+        return folders
+
+
+@router.post("/routines/folders")
+async def create_routine_folder(payload: RoutineFolderCreateRequest) -> dict:
+    """Create a routine folder."""
+    name = _clean_name(payload.name)
+    if not name:
+        raise HTTPException(status_code=400, detail="Folder name is required")
+
+    async with async_session() as session:
+        existing = await session.execute(
+            select(RoutineFolder).where(
+                func.lower(RoutineFolder.name) == name.lower(),
+                RoutineFolder.is_deleted.is_(False),
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail="Folder already exists")
+
+        max_sort_result = await session.execute(select(func.max(RoutineFolder.sort_order)))
+        sort_order = int(max_sort_result.scalar_one() or 0) + 1
+
+        folder = RoutineFolder(name=name, sort_order=sort_order, is_deleted=False)
+        session.add(folder)
+        await session.commit()
+        await session.refresh(folder)
+        return {"id": folder.id, "name": folder.name, "sort_order": folder.sort_order, "routine_count": 0}
+
+
+@router.patch("/routines/folders/{folder_id}")
+async def update_routine_folder(folder_id: int, payload: RoutineFolderUpdateRequest) -> dict:
+    """Update routine folder metadata."""
+    async with async_session() as session:
+        folder = await session.get(RoutineFolder, folder_id)
+        if not folder or folder.is_deleted:
+            raise HTTPException(status_code=404, detail="Folder not found")
+
+        if payload.name is not None:
+            name = _clean_name(payload.name)
+            if not name:
+                raise HTTPException(status_code=400, detail="Folder name is required")
+            folder.name = name
+        if payload.sort_order is not None:
+            folder.sort_order = payload.sort_order
+
+        await session.commit()
+
+        count_result = await session.execute(
+            select(func.count())
+            .select_from(Routine)
+            .where(Routine.folder_id == folder.id, Routine.is_deleted.is_(False))
+        )
+        return {
+            "id": folder.id,
+            "name": folder.name,
+            "sort_order": folder.sort_order,
+            "routine_count": int(count_result.scalar_one() or 0),
+        }
+
+
+@router.delete("/routines/folders/{folder_id}")
+async def delete_routine_folder(folder_id: int) -> dict:
+    """Soft-delete a folder and all routines inside it."""
+    async with async_session() as session:
+        folder = await session.get(RoutineFolder, folder_id)
+        if not folder or folder.is_deleted:
+            raise HTTPException(status_code=404, detail="Folder not found")
+
+        folder.is_deleted = True
+        routines_result = await session.execute(select(Routine).where(Routine.folder_id == folder_id))
+        for routine in routines_result.scalars().all():
+            routine.is_deleted = True
+
+        await session.commit()
+        return {"removed": folder_id}
+
+
+@router.get("/routines")
+async def list_routines(folder_id: int | None = None) -> list[dict]:
+    """List non-deleted routines with card preview data."""
+    async with async_session() as session:
+        query = select(Routine).where(Routine.is_deleted.is_(False))
+        if folder_id is not None:
+            query = query.where(Routine.folder_id == folder_id)
+
+        routines_result = await session.execute(query.order_by(Routine.sort_order, Routine.id))
+        routines = routines_result.scalars().all()
+
+        cards: list[dict] = []
+        for routine in routines:
+            ex_result = await session.execute(
+                select(RoutineExercise)
+                .where(RoutineExercise.routine_id == routine.id)
+                .order_by(RoutineExercise.sort_order, RoutineExercise.id)
+            )
+            exercises = ex_result.scalars().all()
+            total_sets = 0
+            preview_items: list[dict] = []
+            for ex in exercises:
+                set_count_result = await session.execute(
+                    select(func.count())
+                    .select_from(RoutineSet)
+                    .where(RoutineSet.routine_exercise_id == ex.id)
+                )
+                set_count = int(set_count_result.scalar_one() or 0)
+                total_sets += set_count
+                if len(preview_items) < 3:
+                    preview_items.append({"name": ex.display_name, "set_count": set_count})
+
+            cards.append(
+                {
+                    "id": routine.id,
+                    "folder_id": routine.folder_id,
+                    "name": routine.name,
+                    "subtitle": routine.subtitle,
+                    "notes": routine.notes,
+                    "sort_order": routine.sort_order,
+                    "exercise_count": len(exercises),
+                    "total_sets": total_sets,
+                    "preview_exercises": [ex.display_name for ex in exercises[:3]],
+                    "preview_items": preview_items,
+                    "remaining_exercises": max(0, len(exercises) - len(preview_items)),
+                }
+            )
+        return cards
+
+
+@router.post("/routines")
+async def create_routine(payload: RoutineCreateRequest) -> dict:
+    """Create a routine with ordered exercises and sets."""
+    name = _clean_name(payload.name)
+    if not name:
+        raise HTTPException(status_code=400, detail="Routine name is required")
+
+    async with async_session() as session:
+        folder = await session.get(RoutineFolder, payload.folder_id)
+        if not folder or folder.is_deleted:
+            raise HTTPException(status_code=404, detail="Folder not found")
+
+        if payload.sort_order is not None:
+            sort_order = payload.sort_order
+        else:
+            max_sort_result = await session.execute(
+                select(func.max(Routine.sort_order)).where(Routine.folder_id == payload.folder_id)
+            )
+            sort_order = int(max_sort_result.scalar_one() or 0) + 1
+
+        routine = Routine(
+            folder_id=payload.folder_id,
+            name=name,
+            subtitle=payload.subtitle,
+            notes=payload.notes,
+            sort_order=sort_order,
+            is_deleted=False,
+        )
+        session.add(routine)
+        await session.flush()
+
+        await _upsert_routine_exercises(session, routine, payload.exercises)
+        await session.commit()
+
+        routine_full = await _fetch_routine_or_404(session, routine.id)
+        return _routine_to_detail_payload(routine_full)
+
+
+@router.get("/routines/{routine_id}")
+async def get_routine(routine_id: int) -> dict:
+    """Get detailed routine including all exercises and sets."""
+    async with async_session() as session:
+        routine = await _fetch_routine_or_404(session, routine_id)
+        return _routine_to_detail_payload(routine)
+
+
+@router.patch("/routines/{routine_id}")
+async def update_routine(routine_id: int, payload: RoutineUpdateRequest) -> dict:
+    """Update routine metadata and optionally replace exercise structure."""
+    async with async_session() as session:
+        routine = await _fetch_routine_or_404(session, routine_id)
+
+        if payload.folder_id is not None:
+            folder = await session.get(RoutineFolder, payload.folder_id)
+            if not folder or folder.is_deleted:
+                raise HTTPException(status_code=404, detail="Folder not found")
+            routine.folder_id = payload.folder_id
+        if payload.name is not None:
+            name = _clean_name(payload.name)
+            if not name:
+                raise HTTPException(status_code=400, detail="Routine name is required")
+            routine.name = name
+        if payload.subtitle is not None:
+            routine.subtitle = payload.subtitle
+        if payload.notes is not None:
+            routine.notes = payload.notes
+        if payload.sort_order is not None:
+            routine.sort_order = payload.sort_order
+
+        if payload.exercises is not None:
+            await _upsert_routine_exercises(session, routine, payload.exercises)
+
+        await session.commit()
+        routine = await _fetch_routine_or_404(session, routine_id)
+        return _routine_to_detail_payload(routine)
+
+
+@router.delete("/routines/{routine_id}")
+async def delete_routine(routine_id: int) -> dict:
+    """Soft-delete a routine."""
+    async with async_session() as session:
+        routine = await session.get(Routine, routine_id)
+        if not routine or routine.is_deleted:
+            raise HTTPException(status_code=404, detail="Routine not found")
+
+        routine.is_deleted = True
+        await session.commit()
+        return {"removed": routine_id}
+
+
+@router.post("/routines/{routine_id}/duplicate")
+async def duplicate_routine(routine_id: int) -> dict:
+    """Duplicate an existing routine in the same folder."""
+    async with async_session() as session:
+        source = await _fetch_routine_or_404(session, routine_id)
+
+        max_sort_result = await session.execute(
+            select(func.max(Routine.sort_order)).where(Routine.folder_id == source.folder_id)
+        )
+        sort_order = int(max_sort_result.scalar_one() or 0) + 1
+
+        clone = Routine(
+            folder_id=source.folder_id,
+            name=f"{source.name} Copy",
+            subtitle=source.subtitle,
+            notes=source.notes,
+            sort_order=sort_order,
+            is_deleted=False,
+        )
+        session.add(clone)
+        await session.flush()
+
+        for ex in sorted(source.exercises, key=lambda item: item.sort_order):
+            clone_ex = RoutineExercise(
+                routine_id=clone.id,
+                exercise_id=ex.exercise_id,
+                display_name=ex.display_name,
+                sort_order=ex.sort_order,
+                rest_seconds=ex.rest_seconds,
+                notes=ex.notes,
+            )
+            session.add(clone_ex)
+            await session.flush()
+
+            for set_row in sorted(ex.sets, key=lambda row: row.set_index):
+                session.add(
+                    RoutineSet(
+                        routine_exercise_id=clone_ex.id,
+                        set_index=set_row.set_index,
+                        set_type=set_row.set_type,
+                        target_weight_lbs=set_row.target_weight_lbs,
+                        target_reps=set_row.target_reps,
+                        rir_target=set_row.rir_target,
+                    )
+                )
+
+        await session.commit()
+        clone = await _fetch_routine_or_404(session, clone.id)
+        return _routine_to_detail_payload(clone)
+
+
+@router.post("/routines/{routine_id}/share")
+async def share_routine(routine_id: int) -> dict:
+    """Return JSON payload to share/export a routine."""
+    async with async_session() as session:
+        routine = await _fetch_routine_or_404(session, routine_id)
+        payload = _routine_to_detail_payload(routine)
+        return {
+            "version": 1,
+            "exported_at": date.today().isoformat(),
+            "routine": payload,
+        }
+
+
+@router.post("/routines/{routine_id}/start")
+async def start_routine(routine_id: int) -> dict:
+    """Convert a saved routine into today's active plan and persist it."""
+    async with async_session() as session:
+        routine = await _fetch_routine_or_404(session, routine_id)
+        if not routine.exercises:
+            raise HTTPException(status_code=400, detail="Routine has no exercises")
+
+        total_sets = 0
+        total_volume = 0.0
+        estimated_minutes = 0.0
+        exercises_payload = []
+
+        for ex in sorted(routine.exercises, key=lambda item: item.sort_order):
+            rest_seconds = ex.rest_seconds or 90
+            sets_payload = []
+            for set_row in sorted(ex.sets, key=lambda row: row.set_index):
+                total_sets += 1
+                if set_row.target_weight_lbs is not None and set_row.target_reps is not None:
+                    total_volume += set_row.target_weight_lbs * set_row.target_reps
+                estimated_minutes += 0.6 + (rest_seconds / 60)
+
+                sets_payload.append(
+                    {
+                        "set_type": set_row.set_type,
+                        "weight_lbs": set_row.target_weight_lbs,
+                        "target_reps": set_row.target_reps,
+                        "rir_target": set_row.rir_target,
+                        "rest_seconds": rest_seconds,
+                    }
+                )
+
+            exercises_payload.append(
+                {
+                    "name": ex.display_name,
+                    "is_anchor": ex.exercise.is_anchor if ex.exercise else False,
+                    "notes": ex.notes or "",
+                    "sets": sets_payload,
+                }
+            )
+
+        plan_json = {
+            "day_name": routine.name,
+            "estimated_duration_min": int(max(15, round(estimated_minutes))),
+            "exercises": exercises_payload,
+            "total_sets": total_sets,
+            "estimated_volume_lbs": round(total_volume, 2),
+            "note": routine.subtitle or "",
+        }
+
+        plan = Plan(
+            start_date=date.today(),
+            end_date=date.today(),
+            goal=f"Routine start: {routine.name}",
+            days_per_week=1,
+        )
+        session.add(plan)
+        await session.flush()
+
+        plan_day = PlanDay(
+            plan_id=plan.id,
+            date=date.today(),
+            template_day_name=_to_template_name(routine.name, routine.id),
+            content_json=json.dumps(plan_json),
+            validation_json=None,
+        )
+        session.add(plan_day)
+        await session.commit()
+
+        return {"routine_id": routine.id, "plan_day_id": plan_day.id, "plan": plan_json}
 
 
 # ─── Complete Session (advance day + fatigue) ─────────────────────────────────
