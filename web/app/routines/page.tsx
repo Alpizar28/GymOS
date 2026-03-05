@@ -179,6 +179,8 @@ export default function RoutinesPage() {
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [showRoutineModal, setShowRoutineModal] = useState(false);
   const [startingRoutine, setStartingRoutine] = useState<number | null>(null);
+  const [updatingTypeRoutineId, setUpdatingTypeRoutineId] = useState<number | null>(null);
+  const [toast, setToast] = useState("");
 
   async function load() {
     setLoading(true);
@@ -221,6 +223,31 @@ export default function RoutinesPage() {
       router.push("/today");
     } finally {
       setStartingRoutine(null);
+    }
+  }
+
+  function showToast(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 2500);
+  }
+
+  async function updateRoutineType(
+    routineId: number,
+    trainingType: "push" | "pull" | "legs" | "custom"
+  ) {
+    setUpdatingTypeRoutineId(routineId);
+    try {
+      await api.updateRoutine(routineId, { training_type: trainingType });
+      setRoutines((prev) =>
+        prev.map((routine) =>
+          routine.id === routineId ? { ...routine, training_type: trainingType } : routine
+        )
+      );
+      showToast("Tipo de rutina actualizado");
+    } catch {
+      showToast("No se pudo actualizar tipo");
+    } finally {
+      setUpdatingTypeRoutineId(null);
     }
   }
 
@@ -309,6 +336,27 @@ export default function RoutinesPage() {
                             ) : null}
                           </div>
 
+                          <div className="mt-3 flex items-center justify-between gap-2">
+                            <p className="text-[11px] text-zinc-500 uppercase tracking-wide">Tipo</p>
+                            <select
+                              value={routine.training_type}
+                              onChange={(e) =>
+                                void updateRoutineType(
+                                  routine.id,
+                                  e.target.value as "push" | "pull" | "legs" | "custom"
+                                )
+                              }
+                              disabled={updatingTypeRoutineId === routine.id}
+                              className="px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-xs text-zinc-300 disabled:opacity-40"
+                            >
+                              {ROUTINE_TYPES.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
                           <div className="mt-3 flex justify-end">
                             <Link
                               href={`/routines/${routine.id}`}
@@ -346,6 +394,12 @@ export default function RoutinesPage() {
             void load();
           }}
         />
+      )}
+
+      {toast && (
+        <div className="fixed bottom-24 left-4 right-4 sm:left-auto sm:right-6 sm:w-auto sm:max-w-sm px-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-sm text-white text-center z-50">
+          {toast}
+        </div>
       )}
     </div>
   );
