@@ -275,6 +275,9 @@ function TemplatesSection() {
   const [options, setOptions] = useState<DayOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
+  const [planByTemplate, setPlanByTemplate] = useState<Record<string, { exercises: { name: string; sets: { set_type: string; weight_lbs: number | null; target_reps: number | null; rir_target?: number | null }[] }[] }>>({});
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [planError, setPlanError] = useState<string | null>(null);
 
   useEffect(() => {
     api.getDayOptions().then(setOptions).catch(() => {}).finally(() => setLoading(false));
@@ -300,17 +303,61 @@ function TemplatesSection() {
     return "bg-zinc-700/30 text-zinc-300 border-zinc-600/40";
   }
 
+  function formatSetLine(
+    set: { set_type: string; weight_lbs: number | null; target_reps: number | null; rir_target?: number | null },
+    idx: number
+  ) {
+    const label = set.set_type === "warmup" ? "Warmup" : set.set_type === "drop" ? "Drop" : `Set ${idx + 1}`;
+    const weight = set.weight_lbs ?? "-";
+    const reps = set.target_reps ?? "-";
+    const rir = set.rir_target ?? "-";
+    return `${label}: ${weight} lb x ${reps} reps (RIR ${rir})`;
+  }
+
+  async function handleToggleTemplate(templateName: string, isCurrentlyOpen: boolean) {
+    if (isCurrentlyOpen) {
+      setOpen(null);
+      return;
+    }
+
+    setOpen(templateName);
+    setPlanError(null);
+
+    if (planByTemplate[templateName]) {
+      return;
+    }
+
+    setLoadingPlan(templateName);
+    try {
+      const plan = await api.generateDay(templateName);
+      setPlanByTemplate((prev) => ({
+        ...prev,
+        [templateName]: {
+          exercises: plan.exercises.map((ex) => ({
+            name: ex.name,
+            sets: ex.sets,
+          })),
+        },
+      }));
+    } catch {
+      setPlanError("No se pudo cargar el detalle de sets de esta plantilla.");
+    } finally {
+      setLoadingPlan((prev) => (prev === templateName ? null : prev));
+    }
+  }
+
   return (
     <div className="space-y-2">
       {options.map((opt) => {
         const isOpen = open === opt.name;
         const color = splitColor(opt.name);
         const focuses = opt.focus.split(",").map((f) => f.trim()).filter(Boolean);
+        const templateExercises = (opt.exercises ?? []).filter((e) => e.trim().length > 0);
         return (
           <div key={opt.name} className={`rounded-xl border ${color} overflow-hidden transition-all`}>
             <button
               className="w-full flex items-center justify-between px-4 py-3.5 text-left"
-              onClick={() => setOpen(isOpen ? null : opt.name)}
+              onClick={() => handleToggleTemplate(opt.name, isOpen)}
             >
               <div>
                 <p className="font-semibold text-sm">{formatDayLabel(opt.name)}</p>
@@ -327,6 +374,45 @@ function TemplatesSection() {
                     </span>
                   ))}
                 </div>
+
+                <details className="mt-3 rounded-lg border border-current/20 bg-black/20 px-3 py-2">
+                  <summary className="text-xs font-semibold cursor-pointer">Ejercicios de la plantilla</summary>
+                  {templateExercises.length > 0 ? (
+                    <div className="mt-2 space-y-1">
+                      {templateExercises.map((exercise) => (
+                        <p key={exercise} className="text-xs opacity-90">- {exercise}</p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs opacity-70">No hay ejercicios definidos en anchors.</p>
+                  )}
+                </details>
+
+                <details className="mt-3 rounded-lg border border-current/20 bg-black/20 px-3 py-2" open>
+                  <summary className="text-xs font-semibold cursor-pointer">Plan de sets (preview)</summary>
+                  {loadingPlan === opt.name ? (
+                    <p className="mt-2 text-xs opacity-70">Cargando sets...</p>
+                  ) : planError ? (
+                    <p className="mt-2 text-xs text-red-300">{planError}</p>
+                  ) : planByTemplate[opt.name]?.exercises?.length ? (
+                    <div className="mt-2 space-y-2">
+                      {planByTemplate[opt.name].exercises.map((exercise) => (
+                        <div key={exercise.name} className="rounded-lg border border-current/20 p-2">
+                          <p className="text-xs font-semibold">{exercise.name}</p>
+                          <div className="mt-1 space-y-0.5">
+                            {exercise.sets.map((set, setIndex) => (
+                              <p key={`${exercise.name}-${setIndex}`} className="text-[11px] opacity-90">
+                                {formatSetLine(set, setIndex)}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs opacity-70">Sin preview de sets disponible.</p>
+                  )}
+                </details>
               </div>
             )}
           </div>

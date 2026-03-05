@@ -62,6 +62,7 @@ export interface DayRecommendation {
 export interface DayOption {
     name: string;
     focus: string;
+    exercises?: string[];
 }
 
 export interface DayOptionCreate {

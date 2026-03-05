@@ -53,12 +53,23 @@ class DayRecommendationResponse(BaseModel):
 class DayOptionResponse(BaseModel):
     name: str
     focus: str
+    exercises: list[str] = []
 
 
 class DayOptionCreate(BaseModel):
     name: str | None = None
     focus: str
     rules: dict
+
+
+HIDDEN_SYSTEM_TEMPLATE_NAMES = {
+    "Push_Heavy",
+    "Pull_Heavy",
+    "Quads_Heavy",
+    "Upper_Complement",
+    "Arms_Shoulders",
+    "Posterior_Heavy",
+}
 
 
 class ManualSet(BaseModel):
@@ -675,10 +686,21 @@ async def get_day_options() -> list[DayOptionResponse]:
     """Get all available day templates for manual selection."""
     async with async_session() as session:
         result = await session.execute(select(WeekTemplate).order_by(WeekTemplate.day_index))
-        return [
-            DayOptionResponse(name=t.name, focus=t.focus)
-            for t in result.scalars().all()
-        ]
+        options: list[DayOptionResponse] = []
+        for template in result.scalars().all():
+            if template.name in HIDDEN_SYSTEM_TEMPLATE_NAMES:
+                continue
+
+            rules = json.loads(template.rules_json)
+            anchors = [a for a in rules.get("anchors", []) if isinstance(a, str) and a.strip()]
+            options.append(
+                DayOptionResponse(
+                    name=template.name,
+                    focus=template.focus,
+                    exercises=anchors,
+                )
+            )
+        return options
 
 
 def _normalize_template_name(name: str) -> str:
@@ -718,7 +740,8 @@ async def create_day_option(payload: DayOptionCreate) -> DayOptionResponse:
         session.add(template)
         await session.commit()
 
-    return DayOptionResponse(name=name, focus=payload.focus.strip())
+    anchors = [a for a in rules.get("anchors", []) if isinstance(a, str) and a.strip()]
+    return DayOptionResponse(name=name, focus=payload.focus.strip(), exercises=anchors)
 
 
 @router.get("/day-recommendation")
