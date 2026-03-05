@@ -690,7 +690,7 @@ function SwapModal({ exerciseName, onClose, onSwap }: {
                                     className="w-full flex justify-between p-4 rounded-xl bg-zinc-800/60 active:bg-zinc-700 border border-zinc-700/30 text-left touch-manipulation">
                                     <div>
                                         <p className="font-medium text-white">{alt.name}</p>
-                                        <p className="text-xs text-zinc-500 mt-0.5">{alt.primary_muscle} · {alt.movement_pattern}{alt.is_anchor && " · 🔴"}</p>
+                                        <p className="text-xs text-zinc-500 mt-0.5">{alt.primary_muscle} · {alt.movement_pattern}{alt.is_anchor && " · anchor"}</p>
                                     </div>
                                     {alt.avg_weight > 0 && <p className="text-xs text-zinc-600 ml-3">{alt.avg_weight} lb avg</p>}
                                 </button>
@@ -718,7 +718,7 @@ function CompleteModal({ workoutId, onComplete, onClose }: {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
             <div className="bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm shadow-2xl">
                 <div className="px-6 py-5 border-b border-zinc-800">
-                    <h3 className="font-bold text-white text-xl">Complete Session 🎉</h3>
+                    <h3 className="font-bold text-white text-xl">Complete Session</h3>
                     <p className="text-sm text-zinc-500 mt-1">Rate fatigue to advance the day</p>
                 </div>
                 <div className="p-6 space-y-6 pb-10">
@@ -860,7 +860,7 @@ function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet
     return (
         <div className={`rounded-xl border overflow-hidden ${allDone ? "border-red-600/50 bg-red-950/10" : "border-zinc-700/50 bg-zinc-800/50"}`}>
             <button onClick={onToggle} className="w-full flex items-center gap-3 px-4 py-4 text-left touch-manipulation active:bg-zinc-700/20">
-                <span className="text-xl flex-shrink-0">{state.is_anchor ? "🔴" : "⚪"}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-500">{state.is_anchor ? "anchor" : "std"}</span>
                 <div className="flex-1 min-w-0">
                     <p className="font-semibold text-white text-base truncate">{state.name}</p>
                     {state.is_anchor && <span className="text-xs text-red-400 font-bold uppercase">Anchor</span>}
@@ -880,10 +880,10 @@ function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet
             {open && (
                 <div className="px-4 pb-4 space-y-3">
                     <div className="flex gap-2">
-                        <button onClick={onSwap} className="flex-1 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">🔄 Swap</button>
+                        <button onClick={onSwap} className="flex-1 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">Swap</button>
                         <button onClick={onMoveUp} className="px-3 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">↑</button>
                         <button onClick={onMoveDown} className="px-3 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">↓</button>
-                        <button onClick={onRemoveExercise} className="flex-1 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-400 touch-manipulation">🗑️ Remove</button>
+                        <button onClick={onRemoveExercise} className="flex-1 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-400 touch-manipulation">Remove</button>
                     </div>
                     <div className="space-y-3">
                         {sets.map((actual, i) => (
@@ -931,6 +931,7 @@ export default function TodayPage() {
     const [nextDay, setNextDay] = useState<number | null>(null);
     const [swapFor, setSwapFor] = useState<string | null>(null);
     const [showAddExercise, setShowAddExercise] = useState(false);
+    const [uiStep, setUiStep] = useState<1 | 2>(1);
     // Rest timer: null = hidden, number = seconds remaining start value
     const [restTimer, setRestTimer] = useState<number | null>(null);
     const restDismissed = useRef(false);
@@ -1118,6 +1119,7 @@ export default function TodayPage() {
                 if (!cancelled) {
                     await applyPlanWithRecovery(data, true);
                     setSelectedDay(data.day_name);
+                    setUiStep(2);
                 }
             } catch {
                 // No plan generated yet
@@ -1153,7 +1155,8 @@ export default function TodayPage() {
                     })),
                 })),
             }, true);
-            showToast(`⚡ Plan generado: ${formatDayName(planData.day_name)}`);
+            setUiStep(2);
+            showToast(`Plan generado: ${formatDayName(planData.day_name)}`);
         } catch (e: unknown) {
             showToast(e instanceof Error ? e.message : "Generation failed");
         } finally {
@@ -1167,7 +1170,7 @@ export default function TodayPage() {
             await loadDayMeta();
             setSelectedDay(created.name);
             setCreatingTemplate(false);
-            showToast(`✅ Template creado: ${formatDayName(created.name)}`);
+            showToast(`Template creado: ${formatDayName(created.name)}`);
         } catch (e: unknown) {
             showToast(e instanceof Error ? e.message : "Failed to create template");
         }
@@ -1241,7 +1244,7 @@ export default function TodayPage() {
             },
         ]);
         setShowAddExercise(false);
-        showToast(`➕ Added ${exercise.name}`);
+        showToast(`Added ${exercise.name}`);
     };
 
     const moveExercise = (idx: number, direction: -1 | 1) => {
@@ -1257,7 +1260,7 @@ export default function TodayPage() {
     const swapExercise = (idx: number, alt: AlternativeExercise) => {
         setExercises((p) => p.map((e, i) => i === idx ? { ...e, name: alt.name, is_anchor: alt.is_anchor } : e));
         setSwapFor(null);
-        showToast(`🔄 Swapped to ${alt.name}`);
+        showToast(`Swapped to ${alt.name}`);
     };
 
     const buildPayload = useCallback(() => {
@@ -1283,9 +1286,9 @@ export default function TodayPage() {
                 writeDraftNow(plan.day_name, exercises, res.workout_id);
             }
             if (!silent) {
-                showToast(`✅ Saved as Workout #${res.workout_id}`);
+                showToast(`Saved as Workout #${res.workout_id}`);
             }
-        } catch { if (!silent) showToast("❌ Save failed."); }
+        } catch { if (!silent) showToast("Save failed."); }
         finally { if (!silent) setSaving(false); }
     }, [buildPayload, writeDraftNow, plan, exercises]);
 
@@ -1313,18 +1316,17 @@ export default function TodayPage() {
 
     if (error) return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-6">
-            <p className="text-red-400 text-xl">⚠️ No plan found</p>
+            <p className="text-red-400 text-xl">No plan found</p>
             <p className="text-zinc-500 text-sm">{error}</p>
-            <a href="/" className="mt-2 px-6 py-3.5 bg-red-600 text-white text-base font-semibold rounded-xl">→ Generate on Dashboard</a>
+            <a href="/" className="mt-2 px-6 py-3.5 bg-red-600 text-white text-base font-semibold rounded-xl">Generate on Dashboard</a>
         </div>
     );
 
     if (completed) return (
         <div className="flex flex-col items-center justify-center min-h-[70vh] text-center gap-5 px-6">
-            <div className="text-7xl">🎉</div>
             <h2 className="text-3xl font-bold text-white">Done!</h2>
             <p className="text-zinc-400 text-lg">Day advanced → Day {nextDay}</p>
-            <a href="/" className="mt-2 px-8 py-4 bg-red-600 text-white rounded-xl font-bold text-lg">Dashboard →</a>
+            <a href="/" className="mt-2 px-8 py-4 bg-red-600 text-white rounded-xl font-bold text-lg">Dashboard</a>
         </div>
     );
 
@@ -1355,150 +1357,129 @@ export default function TodayPage() {
 
             {/* Header */}
             <div className="mb-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start justify-between gap-4 mb-3">
                     <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">GymOS</p>
                         <h1 className="text-2xl font-bold tracking-tight">Today</h1>
-                        {plan ? (
-                            <p className="text-zinc-400 text-sm mt-1">
-                                {formatDayName(plan.day_name)} · ~{plan.estimated_duration_min} min
-                            </p>
-                        ) : (
-                            <p className="text-zinc-500 text-sm mt-1">Elige que entrenar hoy</p>
-                        )}
+                        <p className="text-zinc-500 text-sm mt-1">Simple, focused training flow</p>
                     </div>
-                    {plan && (
-                        <div className="hidden sm:flex items-center gap-2">
-                            <div className="px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-xs text-zinc-400">
-                                Sets <span className="text-zinc-200 font-semibold">{completedSets}/{totalSets}</span>
-                            </div>
-                            <div className="px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-xs text-zinc-400">
-                                Entrados <span className="text-zinc-200 font-semibold">{enteredSets}</span>
-                            </div>
-                        </div>
-                    )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                    <button
+                        onClick={() => setUiStep(1)}
+                        className={`py-2 rounded-lg text-sm font-semibold border ${uiStep === 1
+                            ? "bg-red-600/20 text-red-200 border-red-500/40"
+                            : "bg-zinc-900 text-zinc-400 border-zinc-800"
+                            }`}
+                    >
+                        1. Choose
+                    </button>
+                    <button
+                        onClick={() => setUiStep(2)}
+                        disabled={!plan}
+                        className={`py-2 rounded-lg text-sm font-semibold border ${uiStep === 2
+                            ? "bg-red-600/20 text-red-200 border-red-500/40"
+                            : "bg-zinc-900 text-zinc-400 border-zinc-800"
+                            } disabled:opacity-40`}
+                    >
+                        2. Train
+                    </button>
                 </div>
             </div>
 
-            {/* Day selector */}
-            <div className="mb-5 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-                <div className="flex items-start justify-between gap-3 mb-4">
-                    <div>
-                        <p className="text-sm text-zinc-400">Que entrenar hoy</p>
-                        {recommendation?.day_name && (
-                            <p className="text-xs text-zinc-600 mt-1">
-                                Recomendado: <span className="text-zinc-300 font-semibold">{formatDayName(recommendation.day_name)}</span>
-                            </p>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {recommendation?.day_name && (
-                            <button
-                                onClick={() => setSelectedDay(recommendation.day_name)}
-                                className="text-xs px-2.5 py-1 rounded-full border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500"
-                            >
-                                Usar recomendado
-                            </button>
-                        )}
-                    </div>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3">
-                    <div className="flex-1">
+            {uiStep === 1 && (
+                <div className="mb-5 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-sm text-zinc-300 mb-3">Choose your training day</p>
+                    <div className="space-y-3">
                         <select
                             value={selectedDay}
                             onChange={(e) => setSelectedDay(e.target.value)}
                             className="w-full bg-zinc-900/70 border border-zinc-700 rounded-xl px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-red-500"
                         >
-                            <option value="" disabled>Selecciona un dia</option>
+                            <option value="" disabled>Select a day</option>
                             {dayOptions.map((opt) => (
                                 <option key={opt.name} value={opt.name}>{formatDayName(opt.name)}</option>
                             ))}
                         </select>
                         {selectedDay && dayOptions.find((o) => o.name === selectedDay)?.focus && (
-                            <p className="text-xs text-zinc-600 mt-2">
+                            <p className="text-xs text-zinc-600">
                                 {dayOptions.find((o) => o.name === selectedDay)?.focus}
                             </p>
                         )}
-                    </div>
-                    <div className="flex flex-col gap-2 sm:w-48">
-                        <button
-                            onClick={handleGenerate}
-                            disabled={!selectedDay || generating}
-                            className="px-5 py-3 bg-gradient-to-r from-red-600 to-red-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-red-500/25 hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
-                        >
-                            {generating ? "⏳ Generando..." : plan ? "Regenerar plan" : "Generar plan"}
-                        </button>
-                        <button
-                            onClick={() => setCreatingTemplate(true)}
-                            className="px-5 py-2.5 bg-zinc-900 text-zinc-300 font-semibold rounded-xl border border-zinc-700 hover:bg-zinc-800/60"
-                        >
-                            ➕ Template
-                        </button>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <button
+                                onClick={handleGenerate}
+                                disabled={!selectedDay || generating}
+                                className="py-3 bg-red-600 text-white font-semibold rounded-xl disabled:opacity-40"
+                            >
+                                {generating ? "Generating..." : plan ? "Regenerate" : "Generate"}
+                            </button>
+                            <button
+                                onClick={() => setUiStep(2)}
+                                disabled={!plan}
+                                className="py-3 border border-zinc-700 text-zinc-200 font-semibold rounded-xl disabled:opacity-40"
+                            >
+                                Continue
+                            </button>
+                            <button
+                                onClick={() => setCreatingTemplate(true)}
+                                className="py-3 border border-zinc-700 text-zinc-300 font-semibold rounded-xl"
+                            >
+                                New Template
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
-            {plan && (
-                <div className="sm:grid sm:grid-cols-[280px_minmax(0,1fr)] sm:gap-4 sm:items-start">
-                    <aside className="mb-4 sm:mb-0 sm:sticky sm:top-24 space-y-4">
+            {uiStep === 2 && (
+                plan ? (
+                    <div className="space-y-3">
                         <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-                            <div className="flex justify-between text-xs text-zinc-500 mb-1.5">
+                            <p className="text-sm text-zinc-300 font-semibold">{formatDayName(plan.day_name)}</p>
+                            <div className="flex items-center justify-between mt-1 text-xs text-zinc-500">
                                 <span>{completedSets}/{totalSets} sets</span>
-                                <span>{totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0}%</span>
+                                <span>{plan.estimated_duration_min} min</span>
                             </div>
-                            <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden mb-3">
+                            <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden mt-3">
                                 <div
                                     className="h-full bg-red-500 rounded-full transition-all duration-500"
                                     style={{ width: `${totalSets > 0 ? (completedSets / totalSets) * 100 : 0}%` }}
                                 />
                             </div>
-                            <p className="text-xs text-zinc-600">
-                                {restoredDraft ? "Borrador restaurado" : "Borrador activo"}
-                                {lastDraftSaveAt ? ` · guardado ${new Date(lastDraftSaveAt).toLocaleTimeString()}` : ""}
+                            <p className="text-xs text-zinc-600 mt-2">
+                                {restoredDraft ? "Draft restored" : "Draft active"}
+                                {lastDraftSaveAt ? ` · ${new Date(lastDraftSaveAt).toLocaleTimeString()}` : ""}
                             </p>
                         </div>
 
-                        <div className="hidden sm:grid gap-2">
+                        <div className="hidden sm:grid sm:grid-cols-3 gap-2">
                             <button
                                 onClick={() => setShowAddExercise(true)}
-                                className="w-full py-3 border border-zinc-700 text-zinc-300 font-semibold rounded-xl"
+                                className="py-3 border border-zinc-700 text-zinc-300 font-semibold rounded-xl"
                             >
-                                ➕ Exercise
+                                Add Exercise
                             </button>
                             <button
                                 onClick={() => save(false)}
                                 disabled={saving || enteredSets === 0}
-                                className="w-full py-3 bg-gradient-to-r from-red-600 to-red-500 text-white font-bold rounded-xl disabled:opacity-40"
+                                className="py-3 bg-red-600 text-white font-bold rounded-xl disabled:opacity-40"
                             >
-                                {saving ? "Saving..." : `💾 Save (${enteredSets})`}
+                                {saving ? "Saving..." : `Save ${enteredSets}`}
                             </button>
                             <button
                                 onClick={() => savedId !== null && setShowComplete(true)}
                                 disabled={savedId === null}
-                                className="w-full py-3 bg-zinc-800 text-zinc-100 font-bold rounded-xl disabled:opacity-40"
+                                className="py-3 bg-zinc-800 text-zinc-100 font-bold rounded-xl disabled:opacity-40"
                             >
-                                ✅ Done
+                                Finish
                             </button>
                         </div>
 
-                        {completedSets > 0 && (
-                            <div className="hidden sm:block p-4 bg-zinc-900 border border-zinc-800 rounded-2xl">
-                                <h3 className="font-semibold text-zinc-300 mb-3">Summary</h3>
-                                <div className="grid grid-cols-1 gap-2 text-sm">
-                                    <p className="text-zinc-400">Sets <span className="text-white font-semibold">{completedSets}</span></p>
-                                    <p className="text-zinc-400">Exercises <span className="text-white font-semibold">{exercises.filter((e) => e.sets.some((s) => s.completed)).length}</span></p>
-                                    <p className="text-zinc-400">Volume <span className="text-white font-semibold">{completedVolume > 0 ? `${Math.round(completedVolume / 1000 * 10) / 10}k lbs` : "-"}</span></p>
-                                </div>
-                                {savedId && <p className="text-xs text-red-400 mt-3">Workout #{savedId}</p>}
-                            </div>
-                        )}
-                    </aside>
-
-                    <section className="space-y-3">
                         {exercises.length === 0 && (
                             <div className="text-center py-16 text-zinc-600 rounded-2xl border border-zinc-800 bg-zinc-950">
                                 <p className="text-lg mb-3">No exercises yet</p>
-                                <button onClick={() => setShowAddExercise(true)} className="px-6 py-3 border border-zinc-700 rounded-xl text-zinc-400 touch-manipulation">➕ Add Exercise</button>
+                                <button onClick={() => setShowAddExercise(true)} className="px-6 py-3 border border-zinc-700 rounded-xl text-zinc-400 touch-manipulation">Add Exercise</button>
                             </div>
                         )}
                         {exercises.map((ex, i) => (
@@ -1517,28 +1498,15 @@ export default function TodayPage() {
                                 onSetComplete={(secs) => startRestTimer(secs)}
                             />
                         ))}
-
-                        {completedSets > 0 && (
-                            <div className="sm:hidden mt-6 p-5 bg-zinc-800/60 border border-zinc-700/50 rounded-2xl">
-                                <h3 className="font-semibold text-zinc-300 mb-4">📊 Summary</h3>
-                                <div className="grid grid-cols-3 gap-3 text-center">
-                                    <div><p className="text-3xl font-bold text-white">{completedSets}</p><p className="text-xs text-zinc-500 mt-1">Sets</p></div>
-                                    <div><p className="text-3xl font-bold text-white">{exercises.filter((e) => e.sets.some((s) => s.completed)).length}</p><p className="text-xs text-zinc-500 mt-1">Exercises</p></div>
-                                    <div>
-                                        <p className="text-3xl font-bold text-white">
-                                            {completedVolume > 0 ? `${Math.round(completedVolume / 1000 * 10) / 10}k` : "—"}
-                                        </p>
-                                        <p className="text-xs text-zinc-500 mt-1">lbs vol</p>
-                                    </div>
-                                </div>
-                                {savedId && <p className="text-center text-xs text-red-400 mt-4">✅ Workout #{savedId}</p>}
-                            </div>
-                        )}
-                    </section>
-                </div>
+                    </div>
+                ) : (
+                    <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6 text-center text-zinc-500 text-sm">
+                        Generate a plan first in step 1.
+                    </div>
+                )
             )}
 
-            {plan && (
+            {plan && uiStep === 2 && (
                 <div className="sm:hidden fixed left-3 right-3 bottom-20 z-40 rounded-2xl border border-zinc-800 bg-zinc-950/95 backdrop-blur-xl p-2">
                     <div className="grid grid-cols-3 gap-2">
                         <button
@@ -1559,7 +1527,7 @@ export default function TodayPage() {
                             disabled={savedId === null}
                             className="py-3 rounded-xl bg-zinc-800 text-zinc-100 text-sm font-bold disabled:opacity-40"
                         >
-                            Done
+                            Finish
                         </button>
                     </div>
                 </div>
