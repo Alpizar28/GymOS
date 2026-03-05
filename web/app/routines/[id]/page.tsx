@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   api,
@@ -71,7 +71,6 @@ export default function RoutineDetailPage() {
   const params = useParams<{ id: string }>();
   const routineId = Number(params.id);
 
-  const [routine, setRoutine] = useState<RoutineDetail | null>(null);
   const [draft, setDraft] = useState<RoutineDetail | null>(null);
   const [library, setLibrary] = useState<ExerciseItem[]>([]);
   const [selectedExerciseName, setSelectedExerciseName] = useState("");
@@ -90,25 +89,24 @@ export default function RoutineDetailPage() {
     window.setTimeout(() => setToast(""), 2400);
   }
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [detail, exercises] = await Promise.all([
         api.getRoutine(routineId),
         api.getExercises(),
       ]);
-      setRoutine(detail);
       setDraft(detail);
       setLibrary(exercises);
     } finally {
       setLoading(false);
     }
-  }
+  }, [routineId]);
 
   useEffect(() => {
     if (!Number.isFinite(routineId)) return;
     void load();
-  }, [routineId]);
+  }, [routineId, load]);
 
   const muscles = useMemo(() => draft?.muscles ?? [], [draft]);
 
@@ -269,7 +267,6 @@ export default function RoutineDetailPage() {
     setProgressionError("");
     try {
       const result = await api.applyRoutineProgression(routineId, 5);
-      setRoutine(result.routine);
       setDraft(result.routine);
       setProgression({
         routine_id: result.routine_id,
@@ -308,7 +305,6 @@ export default function RoutineDetailPage() {
         })),
       };
       const updated = await api.updateRoutine(routineId, payload);
-      setRoutine(updated);
       setDraft(updated);
       setEditMode(false);
       showToast("Rutina guardada");

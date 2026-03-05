@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { api, type CalendarDay } from "@/lib/api";
 import { FlameIcon } from "@/components/icons";
@@ -93,7 +93,7 @@ export default function ProgressPage() {
   const seasonStart = useMemo(() => new Date(today.getFullYear(), 0, 1), [today]);
   const seasonEnd = useMemo(() => new Date(today.getFullYear(), today.getMonth() + 1, 0), [today]);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const calendarDays = await api.getCalendar(formatISO(seasonStart), formatISO(seasonEnd));
@@ -101,11 +101,11 @@ export default function ProgressPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [seasonStart, seasonEnd]);
 
   useEffect(() => {
     void load();
-  }, [seasonStart, seasonEnd]);
+  }, [load]);
 
   const workoutSet = useMemo(() => {
     const set = new Set<string>();

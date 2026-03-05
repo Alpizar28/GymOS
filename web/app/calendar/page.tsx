@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   api,
   type CalendarDay,
@@ -576,7 +576,7 @@ export default function CalendarPage() {
   const weekStart = useMemo(() => startOfWeek(reference), [reference]);
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     const from = formatISO(weekStart);
     const to = formatISO(weekEnd);
@@ -586,11 +586,11 @@ export default function CalendarPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [weekStart, weekEnd]);
 
   useEffect(() => {
-    load();
-  }, [weekStart.toISOString()]);
+    void load();
+  }, [load]);
 
   async function openWorkout(id: number) {
     const detail = await api.getWorkout(id);
@@ -623,7 +623,7 @@ export default function CalendarPage() {
           onClose={() => setSelectedDay(null)}
           onSaved={() => {
             setSelectedDay(null);
-            load();
+            void load();
           }}
         />
       )}
