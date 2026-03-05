@@ -1147,6 +1147,17 @@ async def get_weekly_compare(
     }
 
 
+@router.post("/history/backfill-training-type")
+async def backfill_history_training_type() -> dict:
+    """Backfill workouts.training_type from routines and day name heuristics."""
+    from src.services.history_backfill import backfill_workout_training_types
+
+    async with async_session() as session:
+        result = await backfill_workout_training_types(session)
+        await session.commit()
+        return result
+
+
 @router.post("/workouts/manual")
 async def create_manual_workout(payload: ManualWorkoutRequest) -> dict:
     """Create a workout on a specific date (backfill)."""
