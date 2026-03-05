@@ -18,7 +18,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ActualSet extends SetLogEntry { }
+type ActualSet = SetLogEntry;
 
 interface ExerciseState {
     name: string;
@@ -252,52 +252,90 @@ function TogglePill({
 
 // ─── Rest Timer ───────────────────────────────────────────────────────────────
 
-function RestTimer({ seconds: initial, onDismiss }: { seconds: number; onDismiss: () => void }) {
-    const [left, setLeft] = useState(initial);
-    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-    const pct = (left / initial) * 100;
-
-    useEffect(() => {
-        intervalRef.current = setInterval(() => {
-            setLeft((p) => {
-                if (p <= 1) {
-                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                    onDismiss();
-                    return 0;
-                }
-                return p - 1;
-            });
-        }, 1000);
-        return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-    }, [onDismiss]);
-
-    const mins = Math.floor(left / 60);
-    const secs = left % 60;
+function RestTimerPanel({
+    secondsLeft,
+    running,
+    defaultSeconds,
+    onToggle,
+    onAdd30,
+    onReset,
+    onSkip,
+    onSetDefault,
+}: {
+    secondsLeft: number | null;
+    running: boolean;
+    defaultSeconds: number;
+    onToggle: () => void;
+    onAdd30: () => void;
+    onReset: () => void;
+    onSkip: () => void;
+    onSetDefault: (seconds: number) => void;
+}) {
+    const active = secondsLeft !== null;
+    const effective = active ? secondsLeft : defaultSeconds;
+    const mins = Math.floor(effective / 60);
+    const secs = effective % 60;
 
     return (
-        <div className="fixed bottom-20 left-4 right-4 z-50 sm:left-auto sm:right-6 sm:w-72">
-            <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl p-4 overflow-hidden">
-                {/* Progress bar */}
-                <div className="absolute top-0 left-0 h-1 bg-gradient-to-r from-red-500 to-red-500 transition-all duration-1000"
-                    style={{ width: `${pct}%` }} />
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-xs text-zinc-500 uppercase tracking-wide font-semibold">Rest</p>
-                        <p className="text-4xl font-bold font-mono text-white tabular-nums">
-                            {mins}:{secs.toString().padStart(2, "0")}
-                        </p>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                        <button onClick={() => setLeft((p) => p + 30)}
-                            className="px-3 py-1.5 rounded-lg bg-zinc-700 text-zinc-300 text-sm font-semibold active:bg-zinc-600 touch-manipulation">
-                            +30s
-                        </button>
-                        <button onClick={onDismiss}
-                            className="px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-500 text-sm active:bg-zinc-700 touch-manipulation">
-                            Skip
-                        </button>
-                    </div>
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+            <div className="flex items-center justify-between gap-3">
+                <div>
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide font-semibold">Rest Timer</p>
+                    <p className="text-4xl font-bold font-mono text-white tabular-nums">
+                        {mins}:{secs.toString().padStart(2, "0")}
+                    </p>
+                    <p className="text-xs text-zinc-500 mt-1">
+                        {active ? (running ? "Running" : "Paused") : `Default ${Math.floor(defaultSeconds / 60)}:${(defaultSeconds % 60).toString().padStart(2, "0")}`}
+                    </p>
                 </div>
+
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                    <button
+                        onClick={onToggle}
+                        disabled={!active}
+                        className="px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 disabled:opacity-40"
+                    >
+                        {running ? "Pause" : "Start"}
+                    </button>
+                    <button
+                        onClick={onAdd30}
+                        disabled={!active}
+                        className="px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 disabled:opacity-40"
+                    >
+                        +30s
+                    </button>
+                    <button
+                        onClick={onReset}
+                        className="px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200"
+                    >
+                        Reset
+                    </button>
+                    <button
+                        onClick={onSkip}
+                        disabled={!active}
+                        className="px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-400 disabled:opacity-40"
+                    >
+                        Skip
+                    </button>
+                </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+                {[90, 120, 150].map((seconds) => {
+                    const selected = defaultSeconds === seconds;
+                    return (
+                        <button
+                            key={seconds}
+                            onClick={() => onSetDefault(seconds)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${selected
+                                ? "bg-red-600/25 text-red-200 border-red-500/40"
+                                : "bg-zinc-900 text-zinc-400 border-zinc-700"
+                                }`}
+                        >
+                            {Math.floor(seconds / 60)}:{(seconds % 60).toString().padStart(2, "0")}
+                        </button>
+                    );
+                })}
             </div>
         </div>
     );
@@ -871,13 +909,12 @@ function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet
     onSwap: () => void;
     onMoveUp: () => void;
     onMoveDown: () => void;
-    onSetComplete: (restSecs: number) => void;
+    onSetComplete: () => void;
 }) {
     const { open, sets, plannedSets, lastSession } = state;
     const done = sets.filter((s) => s.completed).length;
     const total = sets.length;
     const allDone = done === total && total > 0;
-    const defaultRestSecs = plannedSets[0]?.rest_seconds ?? 90;
 
     return (
         <div className={`rounded-xl border overflow-hidden ${allDone ? "border-red-600/50 bg-red-950/10" : "border-zinc-700/50 bg-zinc-800/50"}`}>
@@ -918,7 +955,7 @@ function ExerciseAccordion({ state, onToggle, onSetChange, onAddSet, onRemoveSet
                                 onChange={(u) => onSetChange(i, u)}
                                 onRemove={() => onRemoveSet(i)}
                                 onCopyAbove={() => onCopyPreviousSet(i)}
-                                onComplete={() => onSetComplete(defaultRestSecs)}
+                                onComplete={onSetComplete}
                             />
                         ))}
                     </div>
@@ -956,9 +993,9 @@ export default function TodayPage() {
     const [uiStep, setUiStep] = useState<1 | 2>(1);
     const [focusMode, setFocusMode] = useState(false);
     const [focusIndex, setFocusIndex] = useState(0);
-    // Rest timer: null = hidden, number = seconds remaining start value
-    const [restTimer, setRestTimer] = useState<number | null>(null);
-    const restDismissed = useRef(false);
+    const [restTimerLeft, setRestTimerLeft] = useState<number | null>(null);
+    const [restRunning, setRestRunning] = useState(false);
+    const [restDefaultSeconds, setRestDefaultSeconds] = useState(120);
     const draftReadyRef = useRef(false);
     const [lastDraftSaveAt, setLastDraftSaveAt] = useState<number | null>(null);
     const [restoredDraft, setRestoredDraft] = useState(false);
@@ -1092,6 +1129,8 @@ export default function TodayPage() {
         setSavedId(recoveredWorkoutId);
         setCompleted(false);
         setNextDay(null);
+        setRestTimerLeft(null);
+        setRestRunning(false);
 
         writeDraftNow(data.day_name, merged, recoveredWorkoutId);
         draftReadyRef.current = true;
@@ -1316,18 +1355,31 @@ export default function TodayPage() {
         finally { if (!silent) setSaving(false); }
     }, [buildPayload, writeDraftNow, plan, exercises]);
 
-    const startRestTimer = (secs: number) => {
-        restDismissed.current = false;
-        setRestTimer(secs);
+    useEffect(() => {
+        if (!restRunning || restTimerLeft === null) return;
+        const timer = window.setInterval(() => {
+            setRestTimerLeft((prev) => {
+                if (prev === null) return null;
+                if (prev <= 1) {
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                    setRestRunning(false);
+                    return null;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => window.clearInterval(timer);
+    }, [restRunning, restTimerLeft]);
+
+    const startRestTimer = () => {
+        setRestTimerLeft(restDefaultSeconds);
+        setRestRunning(true);
     };
 
     const totalSets = exercises.reduce((n, e) => n + e.sets.length, 0);
     const enteredSets = exercises.reduce((n, e) => n + e.sets.filter((s) => hasSetData(s)).length, 0);
     const completedSets = exercises.reduce((n, e) => n + e.sets.filter((s) => s.completed).length, 0);
-    const completedVolume = exercises.reduce(
-        (n, e) => n + e.sets.filter((s) => s.completed && s.actual_weight && s.actual_reps)
-            .reduce((v, s) => v + s.actual_weight! * s.actual_reps!, 0), 0
-    );
     const visibleExerciseItems = focusMode
         ? exercises[focusIndex]
             ? [{ ex: exercises[focusIndex], index: focusIndex }]
@@ -1386,7 +1438,6 @@ export default function TodayPage() {
                     onClose={() => setShowComplete(false)} />
             )}
             {showAddExercise && <AddExerciseModal onAdd={addExercise} onClose={() => setShowAddExercise(false)} />}
-            {restTimer !== null && <RestTimer seconds={restTimer} onDismiss={() => setRestTimer(null)} />}
             {creatingTemplate && (
                 <CreateTemplateModal
                     onCreate={handleCreateTemplate}
@@ -1443,6 +1494,12 @@ export default function TodayPage() {
             {uiStep === 1 && (
                 <div className="mb-5 rounded-2xl border border-zinc-800 bg-zinc-950 p-4 transition-all duration-200">
                     <p className="text-sm text-zinc-300 mb-3">Choose your training day</p>
+                    {recommendation && (
+                        <p className="text-xs text-zinc-500 mb-3">
+                            Suggested: <span className="text-zinc-300">{formatDayName(recommendation.day_name)}</span>
+                            {recommendation.reason ? ` · ${recommendation.reason}` : ""}
+                        </p>
+                    )}
                     <div className="space-y-3">
                         <select
                             value={selectedDay}
@@ -1548,6 +1605,36 @@ export default function TodayPage() {
                             )}
                         </div>
 
+                        <div className="sticky top-2 z-10">
+                            <RestTimerPanel
+                                secondsLeft={restTimerLeft}
+                                running={restRunning}
+                                defaultSeconds={restDefaultSeconds}
+                                onToggle={() => {
+                                    if (restTimerLeft === null) return;
+                                    setRestRunning((prev) => !prev);
+                                }}
+                                onAdd30={() => {
+                                    if (restTimerLeft === null) return;
+                                    setRestTimerLeft((prev) => (prev ?? 0) + 30);
+                                }}
+                                onReset={() => {
+                                    setRestTimerLeft(restDefaultSeconds);
+                                    setRestRunning(false);
+                                }}
+                                onSkip={() => {
+                                    setRestTimerLeft(null);
+                                    setRestRunning(false);
+                                }}
+                                onSetDefault={(seconds) => {
+                                    setRestDefaultSeconds(seconds);
+                                    if (restTimerLeft === null) return;
+                                    setRestTimerLeft(seconds);
+                                    setRestRunning(false);
+                                }}
+                            />
+                        </div>
+
                         <div className="hidden sm:grid sm:grid-cols-3 gap-2">
                             <button
                                 onClick={() => setShowAddExercise(true)}
@@ -1590,7 +1677,7 @@ export default function TodayPage() {
                                 onSwap={() => setSwapFor(ex.name)}
                                 onMoveUp={() => moveExercise(i, -1)}
                                 onMoveDown={() => moveExercise(i, 1)}
-                                onSetComplete={(secs) => startRestTimer(secs)}
+                                onSetComplete={startRestTimer}
                             />
                         ))}
                     </div>
