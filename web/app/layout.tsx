@@ -1,11 +1,25 @@
 import type { Metadata } from "next";
+import type { Viewport } from "next";
 import Link from "next/link";
+import PwaRegister from "./pwa-register";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "GymOS — Training System",
   description: "Personal gym training dashboard with progression tracking and plan generation",
-  viewport: "width=device-width, initial-scale=1, viewport-fit=cover",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "GymOS",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#09090b",
 };
 
 // Bottom tab bar (mobile) — 5 most-used items
@@ -42,12 +56,12 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
           rel="stylesheet"
         />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         {/* Prevent double-tap zoom on buttons/inputs */}
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className="font-[Inter] antialiased bg-zinc-950 text-zinc-100 min-h-screen">
+        <PwaRegister />
         {/* ── Desktop top nav (hidden on mobile) ── */}
         <nav className="hidden sm:block fixed top-0 left-0 right-0 z-50 bg-zinc-950/85 backdrop-blur-xl border-b border-zinc-800/60">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center h-16 gap-6">
