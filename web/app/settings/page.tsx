@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   api,
   type CalendarDay,
@@ -660,7 +660,7 @@ function CalendarTab() {
   const weekStart = useMemo(() => startOfWeek(reference), [reference]);
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     const from = formatISO(weekStart);
     const to = formatISO(weekEnd);
@@ -670,11 +670,11 @@ function CalendarTab() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [weekStart, weekEnd]);
 
   useEffect(() => {
-    load();
-  }, [weekStart.toISOString()]);
+    void load();
+  }, [load]);
 
   async function openWorkout(id: number) {
     const detail = await api.getWorkout(id);
@@ -707,7 +707,7 @@ function CalendarTab() {
           onClose={() => setSelectedDay(null)}
           onSaved={() => {
             setSelectedDay(null);
-            load();
+            void load();
           }}
         />
       )}
@@ -1668,6 +1668,16 @@ function ProtectionTab() {
 }
 
 export default function SettingsPage() {
+  const [tab, setTab] = useState<"history" | "calendar" | "streak" | "library" | "protection">("history");
+
+  const tabs = [
+    { key: "history", label: "Historial" },
+    { key: "calendar", label: "Semana" },
+    { key: "streak", label: "Racha" },
+    { key: "library", label: "Library" },
+    { key: "protection", label: "Proteccion" },
+  ] as const;
+
   return (
     <div className="max-w-2xl mx-auto overflow-x-hidden">
       <div className="mb-5 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.16),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(239,68,68,0.12)]">
@@ -1676,8 +1686,28 @@ export default function SettingsPage() {
         <p className="text-sm text-zinc-500 mt-1">Calendario, rachas y detalle en una vista</p>
       </div>
 
+      <div className="mb-4 flex flex-wrap gap-2">
+        {tabs.map((item) => (
+          <button
+            key={item.key}
+            onClick={() => setTab(item.key)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
+              tab === item.key
+                ? "bg-red-600/25 text-red-200 border-red-500/40"
+                : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50"
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
       <div className="animate-in fade-in duration-200">
-        <UnifiedHistoryTab />
+        {tab === "history" && <UnifiedHistoryTab />}
+        {tab === "calendar" && <CalendarTab />}
+        {tab === "streak" && <StreakTab />}
+        {tab === "library" && <LibraryTab />}
+        {tab === "protection" && <ProtectionTab />}
       </div>
     </div>
   );
