@@ -41,6 +41,36 @@ function formatDayLabel(name: string) {
   return map[name] ?? name.replace(/_/g, " ");
 }
 
+async function fileToDataUrl(file: File): Promise<string> {
+  const rawDataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("No se pudo leer la imagen"));
+    reader.readAsDataURL(file);
+  });
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("No se pudo procesar la imagen"));
+    img.src = rawDataUrl;
+  });
+
+  const maxSide = 512;
+  const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) return rawDataUrl;
+
+  context.drawImage(image, 0, 0, width, height);
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
+
 const MUSCLE_GROUPS = [
   "chest", "back", "shoulders", "biceps", "triceps",
   "quads", "hamstrings", "glutes", "calves", "core",
@@ -107,6 +137,7 @@ function PersonalSection({ onSaved }: { onSaved?: (profile: PersonalProfile) => 
   const [draft, setDraft] = useState<PersonalProfile | null>(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [toast, setToast] = useState("");
 
   useEffect(() => {
@@ -134,6 +165,33 @@ function PersonalSection({ onSaved }: { onSaved?: (profile: PersonalProfile) => 
       setTimeout(() => setToast(""), 2000);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onPhotoSelected(file: File | null) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setToast("Selecciona una imagen valida");
+      setTimeout(() => setToast(""), 2200);
+      return;
+    }
+    if (file.size > 6 * 1024 * 1024) {
+      setToast("Imagen muy pesada (max 6MB)");
+      setTimeout(() => setToast(""), 2200);
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setDraft((prev) => (prev ? { ...prev, photo_url: dataUrl } : prev));
+      setToast("Foto cargada, guarda para aplicar");
+      setTimeout(() => setToast(""), 2200);
+    } catch {
+      setToast("No se pudo cargar la foto");
+      setTimeout(() => setToast(""), 2200);
+    } finally {
+      setUploadingPhoto(false);
     }
   }
 
@@ -173,14 +231,35 @@ function PersonalSection({ onSaved }: { onSaved?: (profile: PersonalProfile) => 
 
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
-            <label className="text-xs text-zinc-500 block mb-1">Foto de perfil (URL)</label>
+            <label className="text-xs text-zinc-500 block mb-1">Foto de perfil</label>
             {editing ? (
-              <input
-                value={draft.photo_url ?? ""}
-                onChange={(e) => setDraft((prev) => prev ? { ...prev, photo_url: e.target.value || null } : prev)}
-                placeholder="https://..."
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
-              />
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <label className="px-3 py-2 rounded-lg border border-zinc-700 text-zinc-300 text-xs cursor-pointer">
+                    {uploadingPhoto ? "Procesando..." : "Subir foto"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => void onPhotoSelected(e.target.files?.[0] ?? null)}
+                      disabled={uploadingPhoto}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setDraft((prev) => (prev ? { ...prev, photo_url: null } : prev))}
+                    className="px-3 py-2 rounded-lg border border-zinc-700 text-zinc-400 text-xs"
+                  >
+                    Quitar foto
+                  </button>
+                </div>
+                <input
+                  value={draft.photo_url ?? ""}
+                  onChange={(e) => setDraft((prev) => (prev ? { ...prev, photo_url: e.target.value || null } : prev))}
+                  placeholder="Pega URL o usa Subir foto"
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
+                />
+              </div>
             ) : (
               <p className="text-sm text-zinc-300 truncate">{data.photo_url || "Sin foto"}</p>
             )}

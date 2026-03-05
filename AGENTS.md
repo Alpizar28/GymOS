@@ -60,9 +60,9 @@ Notes:
 
 - `/today` — main training flow (step-based, focus mode, draft persistence)
 - `/routines` — routine folders and cards
-- `/routines/[id]` — routine detail/edit/start/share JSON
+- `/routines/[id]` — routine detail/edit/start/share + anchor progression preview/apply
 - `/settings` — unified history (summary/detail calendar + streak + selected-day session drill-down)
-- `/profile` — personal data + stats + templates + library + protections
+- `/profile` — personal data + stats + library + protections
 - `/workouts` — workout records list
 - `/progress` — legacy standalone streak page (not primary nav)
 - `/` — redirects to `/today`
@@ -140,8 +140,19 @@ Avoid introducing new color families unless there is a strong UX reason.
 
 - Single-tenant athlete model (no multi-user auth architecture currently).
 - Progression logic must remain deterministic.
+- Routine progression preview/apply is deterministic and history-based (no LLM call in that flow).
 - LLM proposes plans; DB mutations happen through backend services/routes only.
 - Keep backward-safe behavior in API proxy (`web/app/api/[...path]/route.ts`) for Coolify.
+
+---
+
+## Data Hygiene
+
+- DB startup runs lightweight hygiene (`src/services/db_maintenance.py`):
+  - checks/creates performance indexes,
+  - dedupes cached `plan_days` by `(date, template_day_name)` keeping the newest row,
+  - removes orphan `plans` rows without `plan_days`.
+- Keep idempotent write paths in routes (`/today/log`, `/today/complete`) to avoid duplicate logical records.
 
 ---
 

@@ -25,8 +25,9 @@ GymOS is designed to unify that lifecycle with a clear UX and a robust backend.
 - **Today-first UX**: root route redirects to `/today` for immediate training flow.
 - **Step-based training UI**: choose -> train, with draft persistence and focus mode.
 - **Routines module**: folders, routine cards, detailed set structures (W/A/E), start/share/duplicate.
+- **Routine progression flow**: analyze anchors per saved routine (last 5 sessions) and apply weight/reps/set updates without regenerating plans.
 - **Unified Historial**: calendar + streaks + selected-day drill-down in one view.
-- **Perfil hub**: personal data, templates, exercise library, protections, stats.
+- **Perfil hub**: personal data, exercise library, protections, and expanded stats.
 - **PWA-ready frontend**: installable app shell with offline fallback.
 - **Coolify-friendly proxying**: resilient API proxy with timeout handling.
 
@@ -124,7 +125,7 @@ npm run lint
 
 - `/today` — main training flow
 - `/routines` — routine folders/cards
-- `/routines/[id]` — routine detail and editor
+- `/routines/[id]` — routine detail/editor + progression preview/apply
 - `/settings` — unified history (summary/detail)
 - `/profile` — personal profile and training utilities
 - `/workouts` — workout records
@@ -150,6 +151,15 @@ Includes near-term UX improvements, medium-term body metrics integration
 - Frontend API traffic is proxied through `web/app/api/[...path]/route.ts`.
 - Proxy timeout is configurable via `PROXY_TIMEOUT_MS` (default 60s).
 - Designed for container deployment (Coolify-compatible).
+
+---
+
+## Database Hygiene
+
+- Startup maintenance runs through `src/services/db_maintenance.py`.
+- It creates/ensures key indexes for frequent reads and writes.
+- It removes duplicated cached plan rows (`plan_days`) and clears orphan `plans`.
+- Workout log and session feedback writes are idempotent to reduce repeated records over time.
 
 ---
 
