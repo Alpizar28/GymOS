@@ -10,6 +10,7 @@ import {
   type ManualWorkoutPayload,
   type ProtectionRule,
   type TrainingType,
+  type TrainingTypeStatsResponse,
   type WeeklyCompareResponse,
   type WorkoutDetail,
 } from "@/lib/api";
@@ -1012,6 +1013,14 @@ function UnifiedHistoryTab() {
   const [weeklyCompareLoading, setWeeklyCompareLoading] = useState(true);
   const [backfillLoading, setBackfillLoading] = useState(false);
   const [backfillMessage, setBackfillMessage] = useState("");
+  const [backfillResult, setBackfillResult] = useState<{
+    updated: number;
+    scanned: number;
+    upgradedFromCustom: number;
+    matchedRoutine: number;
+    matchedHeuristic: number;
+  } | null>(null);
+  const [typeStats, setTypeStats] = useState<TrainingTypeStatsResponse | null>(null);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -1044,6 +1053,13 @@ function UnifiedHistoryTab() {
       .catch(() => setWeeklyCompare(null))
       .finally(() => setWeeklyCompareLoading(false));
   }, [trainingType, today]);
+
+  useEffect(() => {
+    api
+      .getTrainingTypeStats()
+      .then(setTypeStats)
+      .catch(() => setTypeStats(null));
+  }, []);
 
   useEffect(() => {
     writeHistoryPrefs({ mode, trainingType, selectedDate });
@@ -1142,16 +1158,23 @@ function UnifiedHistoryTab() {
     setBackfillMessage("");
     try {
       const result = await api.backfillHistoryTrainingType();
-      setBackfillMessage(
-        `Backfill listo: ${result.updated}/${result.workouts_scanned} sesiones actualizadas`
-      );
+      setBackfillResult({
+        updated: result.updated,
+        scanned: result.workouts_scanned,
+        upgradedFromCustom: result.upgraded_from_custom,
+        matchedRoutine: result.matched_routine,
+        matchedHeuristic: result.matched_heuristic,
+      });
+      setBackfillMessage(`Backfill listo: ${result.updated}/${result.workouts_scanned} sesiones actualizadas`);
 
-      const [calendarData, weeklyData] = await Promise.all([
+      const [calendarData, weeklyData, statsData] = await Promise.all([
         api.getCalendar(calendarDateKey(seasonStart), calendarDateKey(seasonEnd), trainingType),
         api.getWeeklyCompare(calendarDateKey(today), trainingType),
+        api.getTrainingTypeStats(),
       ]);
       setDays(calendarData);
       setWeeklyCompare(weeklyData);
+      setTypeStats(statsData);
     } catch {
       setBackfillMessage("No se pudo ejecutar backfill");
     } finally {
@@ -1265,6 +1288,27 @@ function UnifiedHistoryTab() {
       </div>
 
       {backfillMessage ? <p className="text-xs text-zinc-400">{backfillMessage}</p> : null}
+
+      {backfillResult && (
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-3 text-xs text-zinc-400 grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <p>Updated: <span className="text-zinc-200 font-semibold">{backfillResult.updated}</span></p>
+          <p>Scanned: <span className="text-zinc-200 font-semibold">{backfillResult.scanned}</span></p>
+          <p>From custom: <span className="text-zinc-200 font-semibold">{backfillResult.upgradedFromCustom}</span></p>
+          <p>By routine: <span className="text-zinc-200 font-semibold">{backfillResult.matchedRoutine}</span></p>
+          <p>By name: <span className="text-zinc-200 font-semibold">{backfillResult.matchedHeuristic}</span></p>
+        </div>
+      )}
+
+      {typeStats && (
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-3 text-xs text-zinc-400 grid grid-cols-2 sm:grid-cols-6 gap-2">
+          <p>Total: <span className="text-zinc-200 font-semibold">{typeStats.total}</span></p>
+          <p>Push: <span className="text-zinc-200 font-semibold">{typeStats.push}</span></p>
+          <p>Pull: <span className="text-zinc-200 font-semibold">{typeStats.pull}</span></p>
+          <p>Legs: <span className="text-zinc-200 font-semibold">{typeStats.legs}</span></p>
+          <p>Custom: <span className="text-zinc-200 font-semibold">{typeStats.custom}</span></p>
+          <p>Non-custom: <span className="text-zinc-200 font-semibold">{typeStats.non_custom}</span></p>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
         {loading ? (

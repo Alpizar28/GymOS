@@ -1158,6 +1158,39 @@ async def backfill_history_training_type() -> dict:
         return result
 
 
+@router.get("/history/training-type-stats")
+async def history_training_type_stats() -> dict:
+    """Return all-time workout counts grouped by effective training_type."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(Workout.template_day_name, Workout.training_type)
+        )
+
+    counts = {"push": 0, "pull": 0, "legs": 0, "custom": 0}
+    inferred = 0
+    total = 0
+
+    for row in result.all():
+        total += 1
+        stored_type = (row.training_type or "").strip().lower()
+        if stored_type in ROUTINE_TRAINING_TYPE_VALUES:
+            effective = stored_type
+        else:
+            effective = _classify_training_type(row.template_day_name)
+            inferred += 1
+        counts[effective] += 1
+
+    return {
+        "total": total,
+        "push": counts["push"],
+        "pull": counts["pull"],
+        "legs": counts["legs"],
+        "custom": counts["custom"],
+        "non_custom": counts["push"] + counts["pull"] + counts["legs"],
+        "inferred": inferred,
+    }
+
+
 @router.post("/workouts/manual")
 async def create_manual_workout(payload: ManualWorkoutRequest) -> dict:
     """Create a workout on a specific date (backfill)."""
