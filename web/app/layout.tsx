@@ -25,6 +25,7 @@ export const viewport: Viewport = {
 // Bottom tab bar (mobile) — 5 most-used items
 const bottomTabs = [
   { href: "/today",    label: "Today",    icon: "🏋️" },
+  { href: "/routines", label: "Rutinas",  icon: "📚" },
   { href: "/",         label: "Home",     icon: "📊" },
   { href: "/progress", label: "Progress", icon: "📈" },
   { href: "/settings", label: "Historial", icon: "📅" },
@@ -98,10 +99,10 @@ export default function RootLayout({
               <Link
                 key={tab.href}
                 href={tab.href}
-                className="flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-zinc-500 active:text-red-400 touch-manipulation"
+                className="flex-1 min-w-0 flex flex-col items-center justify-center py-2 gap-1 text-zinc-500 active:text-red-400 touch-manipulation"
               >
-                <span className="text-2xl leading-none">{tab.icon}</span>
-                <span className="text-[10px] font-semibold tracking-wide">{tab.label}</span>
+                <span className="text-xl leading-none">{tab.icon}</span>
+                <span className="text-[9px] font-semibold tracking-wide truncate max-w-full px-0.5">{tab.label}</span>
               </Link>
             ))}
           </div>

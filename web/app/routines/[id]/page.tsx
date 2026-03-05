@@ -218,7 +218,7 @@ export default function RoutineDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-5">
         <button
           onClick={() => void startRoutine()}
           disabled={starting}
@@ -289,7 +289,7 @@ export default function RoutineDetailPage() {
             </div>
 
             <div className="rounded-xl border border-zinc-800 overflow-hidden">
-              <div className="grid grid-cols-4 gap-2 px-3 py-2 bg-zinc-950 text-[11px] text-zinc-500 uppercase tracking-wide font-semibold">
+              <div className="grid grid-cols-4 gap-2 px-3 py-2 bg-zinc-950 text-[10px] text-zinc-500 uppercase tracking-wide font-semibold">
                 <span>Set</span>
                 <span>Prev</span>
                 <span>LBS</span>
