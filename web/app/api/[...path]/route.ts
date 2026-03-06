@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 
 const DEFAULT_BACKEND = "http://backend:8000";
-const DEFAULT_PROXY_TIMEOUT_MS = 60000;
+const DEFAULT_PROXY_TIMEOUT_MS = 15000;
 const BACKEND_DISCOVERY_TTL_MS = 60_000;
 
 let cachedBackendBase: string | null = null;
@@ -18,8 +18,13 @@ function backendBaseUrl() {
 }
 
 function backendCandidates() {
+  if (process.env.BACKEND_URL) {
+    const primary = process.env.BACKEND_URL.replace(/\/$/, "");
+    if (primary === DEFAULT_BACKEND) return [primary];
+    return [primary, DEFAULT_BACKEND];
+  }
+
   const values = [
-    process.env.BACKEND_URL,
     process.env.SERVICE_URL_BACKEND,
     process.env.COOLIFY_URL_BACKEND,
     process.env.NEXT_PUBLIC_BACKEND_URL,
@@ -37,6 +42,17 @@ async function resolveBackendBaseUrl() {
   const now = Date.now();
   if (cachedBackendBase && now - cachedBackendAt < BACKEND_DISCOVERY_TTL_MS) {
     return cachedBackendBase;
+  }
+
+  const configuredBase = backendBaseUrl();
+
+  // In containerized environments (Coolify/Docker), BACKEND_URL is the stable
+  // internal service target and probing external candidates can cause slow
+  // startup windows right after deployment.
+  if (process.env.BACKEND_URL) {
+    cachedBackendBase = configuredBase;
+    cachedBackendAt = now;
+    return configuredBase;
   }
 
   const candidates = backendCandidates();
@@ -61,7 +77,7 @@ async function resolveBackendBaseUrl() {
     }
   }
 
-  cachedBackendBase = backendBaseUrl();
+  cachedBackendBase = configuredBase;
   cachedBackendAt = now;
   return cachedBackendBase;
 }
