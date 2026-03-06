@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
@@ -90,7 +89,7 @@ export default function LoginPage() {
   return (
     <div className="max-w-md mx-auto mt-8">
       <div className="mb-4 flex items-center justify-center">
-        <Image src="/logo-wordmark.svg" alt="GymOS" width={180} height={32} className="h-8 w-auto" priority />
+        <img src="/logo-wordmark.svg" alt="GymOS" className="h-8 w-auto" />
       </div>
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 space-y-4">
         <h1 className="text-xl font-bold">GymOS Login</h1>

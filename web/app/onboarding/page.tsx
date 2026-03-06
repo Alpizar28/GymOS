@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 import { api, type PersonalProfile } from "@/lib/api";
@@ -146,7 +145,7 @@ export default function OnboardingPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
-        <Image src="/logo-wordmark.svg" alt="GymOS" width={180} height={32} className="mb-3 h-8 w-auto" priority />
+        <img src="/logo-wordmark.svg" alt="GymOS" className="mb-3 h-8 w-auto" />
         <h1 className="text-xl font-bold">Completa tu perfil</h1>
         <p className="text-sm text-zinc-400 mt-1">
           Esto mejora recomendaciones, progresion y personalizacion de rutinas.

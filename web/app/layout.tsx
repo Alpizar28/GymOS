@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import type { Viewport } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import {
   BrandIcon,
@@ -87,7 +86,7 @@ export default function RootLayout({
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center h-16 gap-6">
             <span className="inline-flex items-center gap-3" aria-label="GymOS">
               <BrandIcon className="h-6 w-6" />
-              <Image src="/logo-wordmark.svg" alt="GymOS" width={135} height={24} className="h-6 w-auto" />
+              <img src="/logo-wordmark.svg" alt="GymOS" className="h-6 w-auto" />
             </span>
             <ul className="flex gap-1">
               {topNavLinks.map((link) => (

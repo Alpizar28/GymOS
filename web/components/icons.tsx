@@ -1,8 +1,7 @@
-import Image, { type ImageProps } from "next/image";
-import type { SVGProps } from "react";
+import type { ImgHTMLAttributes, SVGProps } from "react";
 
 type IconProps = SVGProps<SVGSVGElement>;
-type BrandIconProps = Omit<ImageProps, "src" | "alt" | "width" | "height">;
+type BrandIconProps = ImgHTMLAttributes<HTMLImageElement>;
 
 function baseProps(props: IconProps) {
   return {
@@ -19,12 +18,10 @@ function baseProps(props: IconProps) {
 
 export function BrandIcon(props: BrandIconProps) {
   return (
-    <Image
+    <img
       src="/logo-mark.svg"
       alt=""
       aria-hidden
-      width={24}
-      height={24}
       {...props}
     />
   );
