@@ -30,8 +30,19 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     void check();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (PUBLIC_PATHS.has(pathname)) return;
+      if (event === "SIGNED_OUT" || !session) {
+        router.replace("/login");
+      }
+    });
+
     return () => {
       mounted = false;
+      subscription.unsubscribe();
     };
   }, [pathname, router]);
 

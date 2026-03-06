@@ -1,5 +1,21 @@
 const API_BASE = "/api";
 
+async function getAccessToken(): Promise<string | null> {
+    if (typeof window === "undefined") return null;
+
+    const { supabase } = await import("@/lib/supabase");
+
+    const sessionResult = await supabase.auth.getSession();
+    let token = sessionResult.data.session?.access_token ?? null;
+
+    if (!token) {
+        const refreshed = await supabase.auth.refreshSession();
+        token = refreshed.data.session?.access_token ?? null;
+    }
+
+    return token;
+}
+
 export interface AthleteState {
     next_day_index: number;
     next_day_name: string;
@@ -376,16 +392,15 @@ export interface AnchorProgress {
 
 async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
     const headers = new Headers(init?.headers ?? {});
-    if (typeof window !== "undefined") {
-        const { supabase } = await import("@/lib/supabase");
-        const { data } = await supabase.auth.getSession();
-        const token = data.session?.access_token;
-        if (token) {
-            headers.set("Authorization", `Bearer ${token}`);
-        }
+    const token = await getAccessToken();
+    if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
     }
 
     const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+    if (res.status === 401 && typeof window !== "undefined") {
+        window.location.href = "/login";
+    }
     if (!res.ok) throw new Error(`API ${path}: ${res.status}`);
     return res.json();
 }
