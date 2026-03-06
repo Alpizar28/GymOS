@@ -932,7 +932,7 @@ function CompleteModal({ summary, onConfirm, onClose }: {
 
 // ─── Set Card ────────────────────────────────────────────────────────────────
 
-function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, onRemove, onCopyAbove, onComplete: onDone, onOpenWeightCalculator }: {
+function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, onRemove, onCopyAbove, onComplete: onDone, onOpenWeightCalculator, isWeightActive }: {
     exerciseIndex: number;
     index: number;
     planned: TodaySet | null;
@@ -943,6 +943,7 @@ function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, on
     onCopyAbove: () => void;
     onComplete: (setIndex: number) => void; // triggers rest timer + next focus
     onOpenWeightCalculator: () => void;
+    isWeightActive: boolean;
 }) {
     const upd = (f: Partial<ActualSet>) => onChange({ ...actual, ...f });
     const visual = setTypeVisual(planned, actual);
@@ -988,7 +989,10 @@ function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, on
                         }}
                         onChange={(e) => upd({ actual_weight: e.target.value ? parseFloat(e.target.value) : null })}
                         placeholder={planned?.weight_lbs ? String(planned.weight_lbs) : "lb"}
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" />
+                        className={`w-full bg-zinc-800 border rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${isWeightActive
+                                ? "border-red-500 ring-1 ring-red-500"
+                                : "border-zinc-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                            }`} />
                 </div>
                 <div>
                     <label className="block text-xs text-zinc-600 mb-1">reps</label>
@@ -1031,7 +1035,7 @@ function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, on
 
 // ─── Exercise Accordion ──────────────────────────────────────────────────────
 
-function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddSet, onRemoveSet, onCopyPreviousSet, onRemoveExercise, onSwap, onMoveUp, onMoveDown, onSetComplete, onOpenWeightCalculator }: {
+function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddSet, onRemoveSet, onCopyPreviousSet, onRemoveExercise, onSwap, onMoveUp, onMoveDown, onSetComplete, onOpenWeightCalculator, activeWeightSetIndex }: {
     exerciseIndex: number;
     state: ExerciseState;
     onToggle: () => void;
@@ -1045,6 +1049,7 @@ function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddS
     onMoveDown: () => void;
     onSetComplete: (setIndex: number) => void;
     onOpenWeightCalculator: (setIndex: number) => void;
+    activeWeightSetIndex: number | null;
 }) {
     const { open, sets, plannedSets, lastSession } = state;
     const done = sets.filter((s) => s.completed).length;
@@ -1093,6 +1098,7 @@ function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddS
                                 onCopyAbove={() => onCopyPreviousSet(i)}
                                 onComplete={onSetComplete}
                                 onOpenWeightCalculator={() => onOpenWeightCalculator(i)}
+                                isWeightActive={activeWeightSetIndex === i}
                             />
                         ))}
                     </div>
@@ -1968,6 +1974,7 @@ export default function TodayPage() {
                                 onMoveDown={() => moveExercise(i, 1)}
                                 onSetComplete={() => startRestTimer()}
                                 onOpenWeightCalculator={(si) => setKeypadTarget({ exerciseIdx: i, setIdx: si })}
+                                activeWeightSetIndex={keypadTarget?.exerciseIdx === i ? keypadTarget.setIdx : null}
                             />
                         ))}
                     </div>

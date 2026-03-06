@@ -80,9 +80,9 @@ export function WeightKeypadSheet({
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
   return (
-    <div className="fixed inset-0 z-[55] bg-black/60 backdrop-blur-sm flex items-end" onClick={onClose}>
+    <div className="fixed inset-0 z-[55] bg-black/25 flex items-end" onClick={onClose}>
       <div
-        className="w-full rounded-t-3xl border-t border-zinc-700 bg-[#12121a] p-3 pb-[calc(12px+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-6 fade-in duration-200"
+        className="w-full rounded-t-3xl border-t border-zinc-700 bg-[#12121a]/96 p-3 pb-[calc(12px+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-6 fade-in duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3 px-1">
@@ -98,10 +98,7 @@ export function WeightKeypadSheet({
           </button>
         </div>
 
-        <div className="mb-3 rounded-xl border border-zinc-700 bg-zinc-900/70 px-4 py-3 text-center">
-          <p className="text-3xl font-bold tabular-nums text-white">{raw || "0"}</p>
-          <p className="text-xs text-zinc-500 mt-1">lbs</p>
-        </div>
+        <p className="text-[11px] text-zinc-500 mb-2 px-1">Editing weight directly on active input</p>
 
         <div className="grid grid-cols-[1fr_112px] gap-2">
           <div className="grid grid-cols-3 gap-2">
@@ -110,7 +107,7 @@ export function WeightKeypadSheet({
                 key={key}
                 type="button"
                 onClick={() => appendToken(key)}
-                className="h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-white text-2xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-[#4da3ff]/20 active:border-[#4da3ff]"
+                className="h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-white text-2xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-red-500/20 active:border-red-400"
               >
                 {key}
               </button>
@@ -118,24 +115,24 @@ export function WeightKeypadSheet({
             <button
               type="button"
               onClick={() => appendToken(".")}
-              className="h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-white text-2xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-[#4da3ff]/20 active:border-[#4da3ff]"
+              className="h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-white text-2xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-red-500/20 active:border-red-400"
             >
               .
             </button>
             <button
               type="button"
               onClick={() => appendToken("0")}
-              className="h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-white text-2xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-[#4da3ff]/20 active:border-[#4da3ff]"
+              className="h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-white text-2xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-red-500/20 active:border-red-400"
             >
               0
             </button>
             <button
               type="button"
               onClick={backspace}
-              className="h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-200 text-xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-[#4da3ff]/20 active:border-[#4da3ff]"
+              className="h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-200 text-xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-red-500/20 active:border-red-400"
             >
               <span className="flex items-center justify-center">
-                <span className="h-9 w-9 rounded-full border border-zinc-600 bg-zinc-800/70 flex items-center justify-center">
+                <span className="h-9 w-9 rounded-full border border-zinc-600 bg-zinc-800/70 flex items-center justify-center text-red-200">
                   <BackspaceIcon className="h-5 w-5" />
                 </span>
               </span>
@@ -146,7 +143,7 @@ export function WeightKeypadSheet({
             <button
               type="button"
               onClick={() => step(2.5)}
-              className="rounded-xl border border-[#4da3ff]/80 bg-[#4da3ff]/20 text-[#9ecbff] text-lg font-bold transition-transform duration-100 active:scale-[0.98]"
+              className="rounded-xl border border-red-500/80 bg-red-500/20 text-red-200 text-lg font-bold transition-transform duration-100 active:scale-[0.98]"
             >
               +2.5
             </button>
@@ -163,18 +160,18 @@ export function WeightKeypadSheet({
                 haptic();
                 onOpenPlateCalculator();
               }}
-              className="rounded-2xl border border-[#4da3ff]/70 bg-[#4da3ff]/16 text-left px-3 py-2 transition-transform duration-100 active:scale-[0.99]"
+              className="rounded-2xl border border-red-500/70 bg-red-500/14 text-left px-3 py-2 transition-transform duration-100 active:scale-[0.99]"
             >
               <div className="flex items-center gap-2">
-                <span className="h-8 w-8 rounded-full border border-[#4da3ff]/60 bg-[#4da3ff]/18 flex items-center justify-center">
-                  <BarbellIcon className="h-[18px] w-[18px] text-[#9ecbff]" />
+                <span className="h-8 w-8 rounded-full border border-red-500/60 bg-red-500/18 flex items-center justify-center">
+                  <BarbellIcon className="h-[18px] w-[18px] text-red-200" />
                 </span>
                 <span className="text-zinc-500 text-xs">+</span>
-                <span className="h-8 w-8 rounded-full border border-[#4da3ff]/60 bg-[#4da3ff]/18 flex items-center justify-center">
-                  <CalculatorIcon className="h-[18px] w-[18px] text-[#9ecbff]" />
+                <span className="h-8 w-8 rounded-full border border-red-500/60 bg-red-500/18 flex items-center justify-center">
+                  <CalculatorIcon className="h-[18px] w-[18px] text-red-200" />
                 </span>
               </div>
-              <p className="text-[11px] text-[#9ecbff] font-semibold mt-1">Plate Calculator</p>
+              <p className="text-[11px] text-red-200 font-semibold mt-1">Plate Calculator</p>
               <p className="text-[10px] text-zinc-300 mt-0.5">Open calculator</p>
             </button>
           </div>

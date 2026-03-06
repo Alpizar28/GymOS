@@ -28,8 +28,8 @@ function plateHeight(plate: number): number {
 function plateColor(plate: number): string {
   if (plate >= 45) return "bg-zinc-200";
   if (plate >= 35) return "bg-zinc-300";
-  if (plate >= 25) return "bg-blue-300";
-  if (plate >= 22) return "bg-blue-400";
+  if (plate >= 25) return "bg-red-300";
+  if (plate >= 22) return "bg-red-400";
   if (plate >= 10) return "bg-zinc-400";
   return "bg-zinc-500";
 }
@@ -136,75 +136,77 @@ export function PlateCalculatorModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-end sm:items-center justify-center p-3">
-      <div className="w-full max-w-lg rounded-2xl border border-zinc-700 bg-[#1c1c24] shadow-2xl p-4 sm:p-5 animate-in slide-in-from-bottom-4 fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center justify-center p-2 sm:p-3">
+      <div className="w-full max-w-lg rounded-2xl border border-zinc-700 bg-[#1c1c24]/98 shadow-2xl p-3 sm:p-4 animate-in slide-in-from-bottom-4 fade-in duration-200 max-h-[88vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-3">
           <button onClick={clear} className="text-sm font-semibold text-red-400">
             Clear
           </button>
           <div className="text-center">
-            <p className="text-base font-semibold text-white">Plate Calculator</p>
+            <p className="text-sm sm:text-base font-semibold text-white">Plate Calculator</p>
             <p className="text-xs text-zinc-400 mt-0.5">Initial Weight: {formatWeight(initialWeight)} lbs</p>
           </div>
-          <button onClick={() => onSave(total)} className="text-sm font-semibold text-blue-400">
+          <button onClick={() => onSave(total)} className="text-sm font-semibold text-red-300">
             Save
           </button>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-zinc-700 bg-[#17171f] p-4">
-          <p className="text-center text-4xl font-bold text-white tabular-nums">{formatWeight(total)} lbs</p>
+        <div className="mt-3 rounded-2xl border border-zinc-700 bg-[#17171f] p-3">
+          <p className="text-center text-3xl sm:text-4xl font-bold text-white tabular-nums">{formatWeight(total)} lbs</p>
           <p className="text-center text-xs text-zinc-400 mt-1">
             Bar {formatWeight(barWeight)} + Plates {formatWeight(platesTotal)} + Initial {formatWeight(initialWeight)}
           </p>
 
-          <div className="mt-4 flex items-center justify-center gap-1">
+          <div className="mt-3 flex items-center justify-center gap-1">
             <PlateStack plates={visualPerSide} side="left" />
-            <div className="h-2 w-16 sm:w-20 rounded-full bg-zinc-400" />
-            <div className="h-5 w-3 rounded bg-zinc-200" />
-            <div className="h-2 w-16 sm:w-20 rounded-full bg-zinc-400" />
+            <div className="h-2 w-14 sm:w-20 rounded-full bg-zinc-400" />
+            <div className="h-4 w-2.5 rounded bg-zinc-200" />
+            <div className="h-2 w-14 sm:w-20 rounded-full bg-zinc-400" />
             <PlateStack plates={visualPerSide} side="right" />
           </div>
         </div>
 
-        <div className="mt-5">
+        <div className="mt-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">Add Plates (+lbs per side)</p>
-          <div className="space-y-2">
+          <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory">
             {plateSizes.map((plate) => {
               const count = plateCounts[plate] ?? 0;
               return (
                 <div
                   key={plate}
-                  className="grid grid-cols-[44px_1fr_44px] items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900/70 px-2 py-2"
+                  className="snap-start shrink-0 w-[132px] rounded-xl border border-zinc-700 bg-zinc-900/70 px-2 py-2"
                 >
-                  <button
-                    type="button"
-                    onClick={() => changePlateCount(plate, -1)}
-                    className="h-11 w-11 rounded-xl border border-zinc-600 bg-zinc-800 text-lg font-bold text-zinc-200 active:scale-[0.98]"
-                  >
-                    -
-                  </button>
-                  <div className="text-center">
+                  <div className="text-center mb-2">
                     <p className="text-sm font-semibold text-white">{formatWeight(plate)} lb</p>
                     <p className="text-xs text-zinc-400">{count} por lado</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => changePlateCount(plate, 1)}
-                    className="h-11 w-11 rounded-xl border border-[#4da3ff]/70 bg-[#4da3ff]/20 text-lg font-bold text-[#9acaff] active:scale-[0.98]"
-                  >
-                    +
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => changePlateCount(plate, -1)}
+                      className="h-10 rounded-lg border border-zinc-600 bg-zinc-800 text-lg font-bold text-zinc-200 active:scale-[0.98]"
+                    >
+                      -
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => changePlateCount(plate, 1)}
+                      className="h-10 rounded-lg border border-red-500/70 bg-red-500/20 text-lg font-bold text-red-200 active:scale-[0.98]"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
               );
             })}
-            <button
-              type="button"
-              onClick={() => setShowCustomInput((prev) => !prev)}
-              className="h-11 w-full rounded-xl border border-dashed border-zinc-600 text-zinc-400 text-sm font-semibold"
-            >
-              Add custom plate (+)
-            </button>
           </div>
+          <button
+            type="button"
+            onClick={() => setShowCustomInput((prev) => !prev)}
+            className="mt-2 h-10 w-full rounded-xl border border-dashed border-zinc-600 text-zinc-400 text-sm font-semibold"
+          >
+            Add custom plate (+)
+          </button>
           {showCustomInput && (
             <div className="mt-2 flex items-center gap-2">
               <input
@@ -227,7 +229,7 @@ export function PlateCalculatorModal({
           )}
         </div>
 
-        <div className="mt-5">
+        <div className="mt-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">Bar Type (lbs)</p>
           <div className="grid grid-cols-2 gap-2">
             {[
@@ -243,7 +245,7 @@ export function PlateCalculatorModal({
                   type="button"
                   onClick={() => setBarType(option.type)}
                   className={`rounded-full px-3 py-2 text-xs font-semibold border ${active
-                    ? "bg-[#4da3ff] border-[#4da3ff] text-white"
+                    ? "bg-red-600/80 border-red-500 text-white"
                     : "bg-zinc-800 border-zinc-700 text-zinc-300"
                     }`}
                 >

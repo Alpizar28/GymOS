@@ -592,7 +592,10 @@ export default function RoutineDetailPage() {
                           target_weight_lbs: e.target.value ? Number(e.target.value) : null,
                         })
                       }
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm"
+                      className={`w-full bg-zinc-950 border rounded px-2 py-1 text-sm ${keypadTarget?.exIdx === exIdx && keypadTarget?.setIdx === setIdx
+                        ? "border-red-500 ring-1 ring-red-500"
+                        : "border-zinc-800"
+                        }`}
                     />
                   ) : (
                     <span>{set.target_weight_lbs ?? "-"}</span>
