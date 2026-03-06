@@ -273,13 +273,22 @@ async def import_program_constraints(session: AsyncSession, path: Path) -> int:
 
 
 async def seed_week_template(session: AsyncSession) -> int:
-    """Insert training templates. Returns number of days inserted."""
+    """Insert training templates idempotently. Returns number of days inserted."""
+    result = await session.execute(select(WeekTemplate.day_index))
+    existing_day_indexes = {day_index for (day_index,) in result.all()}
+
+    inserted = 0
     for day in WEEK_TEMPLATE:
+        if day["day_index"] in existing_day_indexes:
+            continue
         template = WeekTemplate(**day)
         session.add(template)
-    await session.flush()
-    logger.info("Seeded %d week template days", len(WEEK_TEMPLATE))
-    return len(WEEK_TEMPLATE)
+        inserted += 1
+
+    if inserted:
+        await session.flush()
+    logger.info("Seeded %d week template days", inserted)
+    return inserted
 
 
 async def ensure_week_template(session: AsyncSession) -> int:
