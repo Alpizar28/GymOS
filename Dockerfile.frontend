@@ -13,7 +13,7 @@ RUN npm install
 
 # Copy source and build with BACKEND_URL baked in
 COPY web/ ./
-RUN npm run build
+RUN npm run build -- --webpack
 
 FROM node:20-slim AS runner
 
