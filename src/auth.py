@@ -25,6 +25,7 @@ class AuthUser:
 
 _jwk_client: PyJWKClient | None = None
 _jwk_client_expiry = 0.0
+_JWKS_TIMEOUT_SECONDS = 3
 
 
 def _jwks_url() -> str:
@@ -46,7 +47,10 @@ def _get_jwk_client() -> PyJWKClient:
     if not jwks_url:
         raise HTTPException(status_code=500, detail="SUPABASE_URL is not configured")
 
-    _jwk_client = PyJWKClient(jwks_url)
+    try:
+        _jwk_client = PyJWKClient(jwks_url, timeout=_JWKS_TIMEOUT_SECONDS)
+    except TypeError:
+        _jwk_client = PyJWKClient(jwks_url)
     _jwk_client_expiry = now + 300
     return _jwk_client
 
