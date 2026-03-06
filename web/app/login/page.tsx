@@ -17,9 +17,16 @@ export default function LoginPage() {
   useEffect(() => {
     let mounted = true;
 
+    async function resolveSession() {
+      const first = await supabase.auth.getSession();
+      if (first.data.session) return first.data.session;
+      const refreshed = await supabase.auth.refreshSession();
+      return refreshed.data.session ?? null;
+    }
+
     async function recoverSession() {
-      const { data, error } = await supabase.auth.getUser();
-      if (!error && data.user && mounted) {
+      const session = await resolveSession();
+      if (session && mounted) {
         router.replace("/today");
       }
     }

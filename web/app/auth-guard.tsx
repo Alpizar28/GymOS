@@ -15,14 +15,21 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
+    async function resolveSession() {
+      const first = await supabase.auth.getSession();
+      if (first.data.session) return first.data.session;
+      const refreshed = await supabase.auth.refreshSession();
+      return refreshed.data.session ?? null;
+    }
+
     async function check() {
       if (PUBLIC_PATHS.has(pathname)) {
         if (mounted) setReady(true);
         return;
       }
 
-      const { data, error } = await supabase.auth.getUser();
-      if (error || !data.user) {
+      const session = await resolveSession();
+      if (!session) {
         router.replace("/login");
         return;
       }

@@ -408,12 +408,6 @@ async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
         }
     }
 
-    if (res.status === 401 && typeof window !== "undefined") {
-        const { supabase } = await import("@/lib/supabase");
-        await supabase.auth.signOut();
-        window.location.href = "/login";
-    }
-
     if (!res.ok) throw new Error(`API ${path}: ${res.status}`);
     return res.json();
 }
