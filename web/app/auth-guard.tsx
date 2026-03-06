@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
+import { api } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
 const PUBLIC_PATHS = new Set(["/login", "/offline"]);
+const ONBOARDING_PATH = "/onboarding";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -33,6 +35,20 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         router.replace("/login");
         return;
       }
+
+      const status = await api.getOnboardingStatus().catch(() => ({ completed: true }));
+      const isOnboarding = pathname === ONBOARDING_PATH;
+
+      if (!status.completed && !isOnboarding) {
+        router.replace(ONBOARDING_PATH);
+        return;
+      }
+
+      if (status.completed && isOnboarding) {
+        router.replace("/today");
+        return;
+      }
+
       if (mounted) setReady(true);
     }
 

@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.exercises import Exercise, ExerciseStats
 from src.models.progression import AnchorTarget
-from src.models.settings import AthleteState, Setting
-
-DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000001"
+from src.models.settings import AthleteState
 
 
 async def ensure_user_bootstrap(session: AsyncSession, user_id: str) -> None:
@@ -21,18 +19,6 @@ async def ensure_user_bootstrap(session: AsyncSession, user_id: str) -> None:
         return
 
     session.add(AthleteState(user_id=user_id, next_day_index=1, fatigue_score=0.0))
-
-    defaults_result = await session.execute(
-        select(Setting).where(
-            Setting.user_id == DEFAULT_USER_ID,
-            or_(
-                func.lower(Setting.key).startswith("athlete_"),
-                func.lower(Setting.key).startswith("constraint_"),
-            ),
-        )
-    )
-    for row in defaults_result.scalars().all():
-        session.add(Setting(user_id=user_id, key=row.key, value=row.value))
 
     anchors_result = await session.execute(
         select(Exercise, ExerciseStats)

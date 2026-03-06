@@ -294,8 +294,27 @@ class PersonalProfileResponse(BaseModel):
     full_name: str
     photo_url: str | None = None
     age: int | None = None
+    sex: str | None = None
     height_cm: float | None = None
     weight_lbs: float | None = None
+    body_fat_pct: float | None = None
+    primary_goal: str | None = None
+    goal_detail: str | None = None
+    target_weight_lbs: float | None = None
+    timeline_weeks: int | None = None
+    training_years: float | None = None
+    days_per_week: int | None = None
+    session_duration_min: int | None = None
+    preferred_split: str | None = None
+    equipment_access: list[str] = Field(default_factory=list)
+    injuries: list[dict] = Field(default_factory=list)
+    limitations: str | None = None
+    exercise_likes: list[str] = Field(default_factory=list)
+    exercise_dislikes: list[str] = Field(default_factory=list)
+    sleep_hours: float | None = None
+    stress_level: str | None = None
+    activity_level: str | None = None
+    nutrition_notes: str | None = None
     goal: str | None = None
     notes: str | None = None
 
@@ -304,10 +323,41 @@ class PersonalProfileUpdateRequest(StrictRequestModel):
     full_name: str | None = Field(default=None, min_length=1, max_length=80)
     photo_url: str | None = Field(default=None, max_length=2048)
     age: int | None = Field(default=None, ge=10, le=110)
+    sex: str | None = Field(default=None, pattern=r"^(male|female|other|prefer_not_to_say)$")
     height_cm: float | None = Field(default=None, ge=90, le=260)
     weight_lbs: float | None = Field(default=None, ge=50, le=900)
+    body_fat_pct: float | None = Field(default=None, ge=2, le=80)
+    primary_goal: str | None = Field(
+        default=None,
+        pattern=r"^(fat_loss|muscle_gain|recomp|strength|performance|health)$",
+    )
+    goal_detail: str | None = Field(default=None, max_length=300)
+    target_weight_lbs: float | None = Field(default=None, ge=50, le=900)
+    timeline_weeks: int | None = Field(default=None, ge=1, le=260)
+    training_years: float | None = Field(default=None, ge=0, le=60)
+    days_per_week: int | None = Field(default=None, ge=1, le=7)
+    session_duration_min: int | None = Field(default=None, ge=20, le=240)
+    preferred_split: str | None = Field(default=None, max_length=80)
+    equipment_access: list[str] | None = Field(default=None, max_length=20)
+    injuries: list[dict] | None = Field(default=None, max_length=30)
+    limitations: str | None = Field(default=None, max_length=1000)
+    exercise_likes: list[str] | None = Field(default=None, max_length=100)
+    exercise_dislikes: list[str] | None = Field(default=None, max_length=100)
+    sleep_hours: float | None = Field(default=None, ge=0, le=24)
+    stress_level: str | None = Field(default=None, pattern=r"^(low|medium|high)$")
+    activity_level: str | None = Field(
+        default=None,
+        pattern=r"^(sedentary|light|moderate|high|athlete)$",
+    )
+    nutrition_notes: str | None = Field(default=None, max_length=1000)
     goal: str | None = Field(default=None, max_length=200)
     notes: str | None = Field(default=None, max_length=2000)
+
+
+class OnboardingStatusResponse(BaseModel):
+    completed: bool
+    completed_at: str | None = None
+    version: int = 1
 
 
 class BodyMetricImportRequest(StrictRequestModel):
@@ -997,6 +1047,37 @@ async def create_day_option(payload: DayOptionCreate) -> DayOptionResponse:
 async def get_personal_profile() -> PersonalProfileResponse:
     """Get editable personal profile fields for Profile page."""
     user_id = get_current_user_id()
+
+    def _default_profile(weight_lbs: float | None = None) -> dict:
+        return {
+            "full_name": "Athlete",
+            "photo_url": None,
+            "age": None,
+            "sex": None,
+            "height_cm": None,
+            "weight_lbs": weight_lbs,
+            "body_fat_pct": None,
+            "primary_goal": None,
+            "goal_detail": None,
+            "target_weight_lbs": None,
+            "timeline_weeks": None,
+            "training_years": None,
+            "days_per_week": None,
+            "session_duration_min": None,
+            "preferred_split": None,
+            "equipment_access": [],
+            "injuries": [],
+            "limitations": None,
+            "exercise_likes": [],
+            "exercise_dislikes": [],
+            "sleep_hours": None,
+            "stress_level": None,
+            "activity_level": None,
+            "nutrition_notes": None,
+            "goal": None,
+            "notes": None,
+        }
+
     async with async_session() as session:
         personal_result = await session.execute(
             select(Setting).where(
@@ -1008,15 +1089,9 @@ async def get_personal_profile() -> PersonalProfileResponse:
 
         if personal:
             data = json.loads(personal.value)
-            return PersonalProfileResponse(
-                full_name=data.get("full_name", "Athlete"),
-                photo_url=data.get("photo_url"),
-                age=data.get("age"),
-                height_cm=data.get("height_cm"),
-                weight_lbs=data.get("weight_lbs"),
-                goal=data.get("goal"),
-                notes=data.get("notes"),
-            )
+            fallback = _default_profile(weight_lbs=data.get("weight_lbs"))
+            fallback.update(data)
+            return PersonalProfileResponse(**fallback)
 
         metrics_result = await session.execute(
             select(Setting).where(
@@ -1030,15 +1105,64 @@ async def get_personal_profile() -> PersonalProfileResponse:
             parsed = json.loads(metrics.value)
             default_weight = parsed.get("bodyweight_end_lbs")
 
-        return PersonalProfileResponse(
-            full_name="Athlete",
-            photo_url=None,
-            age=None,
-            height_cm=None,
-            weight_lbs=default_weight,
-            goal=None,
-            notes=None,
+        return PersonalProfileResponse(**_default_profile(weight_lbs=default_weight))
+
+
+@router.get("/profile/onboarding-status")
+async def get_onboarding_status() -> OnboardingStatusResponse:
+    """Get onboarding completion status for current user."""
+    user_id = get_current_user_id()
+    async with async_session() as session:
+        result = await session.execute(
+            select(Setting).where(
+                Setting.user_id == user_id,
+                Setting.key == "athlete_onboarding_status",
+            )
         )
+        row = result.scalar_one_or_none()
+        if row is None:
+            return OnboardingStatusResponse(completed=False, completed_at=None, version=1)
+
+        parsed = json.loads(row.value)
+        return OnboardingStatusResponse(
+            completed=bool(parsed.get("completed", False)),
+            completed_at=parsed.get("completed_at"),
+            version=int(parsed.get("version", 1)),
+        )
+
+
+@router.put("/profile/onboarding")
+async def complete_onboarding(payload: PersonalProfileUpdateRequest) -> PersonalProfileResponse:
+    """Persist onboarding profile and mark onboarding as completed."""
+    profile = await update_personal_profile(payload)
+    user_id = get_current_user_id()
+
+    async with async_session() as session:
+        status_result = await session.execute(
+            select(Setting).where(
+                Setting.user_id == user_id,
+                Setting.key == "athlete_onboarding_status",
+            )
+        )
+        status_row = status_result.scalar_one_or_none()
+        status_payload = {
+            "completed": True,
+            "completed_at": date.today().isoformat(),
+            "version": 1,
+        }
+        if status_row is None:
+            status_row = Setting(
+                user_id=user_id,
+                key="athlete_onboarding_status",
+                value=json.dumps(status_payload),
+            )
+            session.add(status_row)
+        else:
+            status_row.value = json.dumps(status_payload)
+
+        await session.commit()
+
+    return profile
 
 
 @router.patch("/profile/personal")
@@ -1058,8 +1182,27 @@ async def update_personal_profile(payload: PersonalProfileUpdateRequest) -> Pers
             "full_name": "Athlete",
             "photo_url": None,
             "age": None,
+            "sex": None,
             "height_cm": None,
             "weight_lbs": None,
+            "body_fat_pct": None,
+            "primary_goal": None,
+            "goal_detail": None,
+            "target_weight_lbs": None,
+            "timeline_weeks": None,
+            "training_years": None,
+            "days_per_week": None,
+            "session_duration_min": None,
+            "preferred_split": None,
+            "equipment_access": [],
+            "injuries": [],
+            "limitations": None,
+            "exercise_likes": [],
+            "exercise_dislikes": [],
+            "sleep_hours": None,
+            "stress_level": None,
+            "activity_level": None,
+            "nutrition_notes": None,
             "goal": None,
             "notes": None,
         }
@@ -1083,8 +1226,27 @@ async def update_personal_profile(payload: PersonalProfileUpdateRequest) -> Pers
             full_name=data.get("full_name", "Athlete"),
             photo_url=data.get("photo_url"),
             age=data.get("age"),
+            sex=data.get("sex"),
             height_cm=data.get("height_cm"),
             weight_lbs=data.get("weight_lbs"),
+            body_fat_pct=data.get("body_fat_pct"),
+            primary_goal=data.get("primary_goal"),
+            goal_detail=data.get("goal_detail"),
+            target_weight_lbs=data.get("target_weight_lbs"),
+            timeline_weeks=data.get("timeline_weeks"),
+            training_years=data.get("training_years"),
+            days_per_week=data.get("days_per_week"),
+            session_duration_min=data.get("session_duration_min"),
+            preferred_split=data.get("preferred_split"),
+            equipment_access=data.get("equipment_access") or [],
+            injuries=data.get("injuries") or [],
+            limitations=data.get("limitations"),
+            exercise_likes=data.get("exercise_likes") or [],
+            exercise_dislikes=data.get("exercise_dislikes") or [],
+            sleep_hours=data.get("sleep_hours"),
+            stress_level=data.get("stress_level"),
+            activity_level=data.get("activity_level"),
+            nutrition_notes=data.get("nutrition_notes"),
             goal=data.get("goal"),
             notes=data.get("notes"),
         )
