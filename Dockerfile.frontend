@@ -6,6 +6,7 @@ WORKDIR /app
 # Accept BACKEND_URL at build time so next.config.ts rewrites are evaluated correctly
 ARG BACKEND_URL=http://backend:8000
 ENV BACKEND_URL=${BACKEND_URL}
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Install dependencies
 COPY web/package*.json ./
@@ -13,7 +14,7 @@ RUN npm install --include=optional
 
 # Copy source and build with BACKEND_URL baked in
 COPY web/ ./
-RUN npm run build -- --webpack
+RUN npm run build -- --webpack > /tmp/next-build.log 2>&1 || (cat /tmp/next-build.log && exit 1)
 
 FROM node:20-slim AS runner
 
