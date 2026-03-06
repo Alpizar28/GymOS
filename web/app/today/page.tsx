@@ -57,6 +57,14 @@ interface WorkoutFinishSummary {
     exercises: WorkoutExerciseSummary[];
 }
 
+type KeypadField = "weight" | "reps" | "rir";
+
+interface KeypadTarget {
+    exerciseIdx: number;
+    setIdx: number;
+    field: KeypadField;
+}
+
 interface UndoAction {
     label: string;
     previousExercises: ExerciseState[];
@@ -932,7 +940,7 @@ function CompleteModal({ summary, onConfirm, onClose }: {
 
 // ─── Set Card ────────────────────────────────────────────────────────────────
 
-function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, onRemove, onCopyAbove, onComplete: onDone, onOpenWeightCalculator, isWeightActive }: {
+function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, onRemove, onCopyAbove, onComplete: onDone, onOpenFieldKeypad, activeField }: {
     exerciseIndex: number;
     index: number;
     planned: TodaySet | null;
@@ -942,8 +950,8 @@ function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, on
     onRemove: () => void;
     onCopyAbove: () => void;
     onComplete: (setIndex: number) => void; // triggers rest timer + next focus
-    onOpenWeightCalculator: () => void;
-    isWeightActive: boolean;
+    onOpenFieldKeypad: (field: KeypadField) => void;
+    activeField: KeypadField | null;
 }) {
     const upd = (f: Partial<ActualSet>) => onChange({ ...actual, ...f });
     const visual = setTypeVisual(planned, actual);
@@ -985,11 +993,11 @@ function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, on
                         value={actual.actual_weight ?? ""}
                         onFocus={(e) => {
                             e.currentTarget.blur();
-                            onOpenWeightCalculator();
+                            onOpenFieldKeypad("weight");
                         }}
                         onChange={(e) => upd({ actual_weight: e.target.value ? parseFloat(e.target.value) : null })}
                         placeholder={planned?.weight_lbs ? String(planned.weight_lbs) : "lb"}
-                        className={`w-full bg-zinc-800 border rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${isWeightActive
+                        className={`w-full bg-zinc-800 border rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${activeField === "weight"
                                 ? "border-red-500 ring-1 ring-red-500"
                                 : "border-zinc-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
                             }`} />
@@ -999,18 +1007,32 @@ function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, on
                     <input type="number" inputMode="numeric"
                         id={`set-${exerciseIndex}-${index}-reps`}
                         value={actual.actual_reps ?? ""}
+                        onFocus={(e) => {
+                            e.currentTarget.blur();
+                            onOpenFieldKeypad("reps");
+                        }}
                         onChange={(e) => upd({ actual_reps: e.target.value ? parseInt(e.target.value) : null })}
                         placeholder={planned?.target_reps ? String(planned.target_reps) : "reps"}
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" />
+                        className={`w-full bg-zinc-800 border rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${activeField === "reps"
+                                ? "border-red-500 ring-1 ring-red-500"
+                                : "border-zinc-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                            }`} />
                 </div>
                 <div>
                     <label className="block text-xs text-zinc-600 mb-1">RIR</label>
                     <input type="number" inputMode="numeric" min="0" max="5"
                         id={`set-${exerciseIndex}-${index}-rir`}
                         value={actual.actual_rir ?? ""}
+                        onFocus={(e) => {
+                            e.currentTarget.blur();
+                            onOpenFieldKeypad("rir");
+                        }}
                         onChange={(e) => upd({ actual_rir: e.target.value ? parseInt(e.target.value) : null })}
                         placeholder={planned?.rir_target != null ? String(planned.rir_target) : "RIR"}
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" />
+                        className={`w-full bg-zinc-800 border rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${activeField === "rir"
+                                ? "border-red-500 ring-1 ring-red-500"
+                                : "border-zinc-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                            }`} />
                 </div>
                 {/* Done button */}
                 <div>
@@ -1035,7 +1057,7 @@ function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, on
 
 // ─── Exercise Accordion ──────────────────────────────────────────────────────
 
-function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddSet, onRemoveSet, onCopyPreviousSet, onRemoveExercise, onSwap, onMoveUp, onMoveDown, onSetComplete, onOpenWeightCalculator, activeWeightSetIndex }: {
+function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddSet, onRemoveSet, onCopyPreviousSet, onRemoveExercise, onSwap, onMoveUp, onMoveDown, onSetComplete, onOpenFieldKeypad, activeSetKeypadField }: {
     exerciseIndex: number;
     state: ExerciseState;
     onToggle: () => void;
@@ -1048,8 +1070,8 @@ function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddS
     onMoveUp: () => void;
     onMoveDown: () => void;
     onSetComplete: (setIndex: number) => void;
-    onOpenWeightCalculator: (setIndex: number) => void;
-    activeWeightSetIndex: number | null;
+    onOpenFieldKeypad: (setIndex: number, field: KeypadField) => void;
+    activeSetKeypadField: { setIdx: number; field: KeypadField } | null;
 }) {
     const { open, sets, plannedSets, lastSession } = state;
     const done = sets.filter((s) => s.completed).length;
@@ -1097,8 +1119,8 @@ function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddS
                                 onRemove={() => onRemoveSet(i)}
                                 onCopyAbove={() => onCopyPreviousSet(i)}
                                 onComplete={onSetComplete}
-                                onOpenWeightCalculator={() => onOpenWeightCalculator(i)}
-                                isWeightActive={activeWeightSetIndex === i}
+                                onOpenFieldKeypad={(field) => onOpenFieldKeypad(i, field)}
+                                activeField={activeSetKeypadField?.setIdx === i ? activeSetKeypadField.field : null}
                             />
                         ))}
                     </div>
@@ -1142,7 +1164,7 @@ export default function TodayPage() {
     const [restRunning, setRestRunning] = useState(false);
     const [restDefaultSeconds, setRestDefaultSeconds] = useState(120);
     const [shortBarWeight, setShortBarWeight] = useState(35);
-    const [keypadTarget, setKeypadTarget] = useState<{ exerciseIdx: number; setIdx: number } | null>(null);
+    const [keypadTarget, setKeypadTarget] = useState<KeypadTarget | null>(null);
     const [plateTarget, setPlateTarget] = useState<{ exerciseIdx: number; setIdx: number } | null>(null);
     const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
     const undoTimeoutRef = useRef<number | null>(null);
@@ -1608,16 +1630,33 @@ export default function TodayPage() {
 
     const closeWeightKeypad = () => setKeypadTarget(null);
 
-    const updateWeightFromKeypad = (value: number | null) => {
+    const updateFieldFromKeypad = (value: number | null) => {
         if (!keypadTarget) return;
         const targetSet = exercises[keypadTarget.exerciseIdx]?.sets[keypadTarget.setIdx];
         if (!targetSet) return;
-        updateSet(keypadTarget.exerciseIdx, keypadTarget.setIdx, { ...targetSet, actual_weight: value });
+        if (keypadTarget.field === "weight") {
+            updateSet(keypadTarget.exerciseIdx, keypadTarget.setIdx, { ...targetSet, actual_weight: value });
+            return;
+        }
+
+        if (keypadTarget.field === "reps") {
+            updateSet(keypadTarget.exerciseIdx, keypadTarget.setIdx, {
+                ...targetSet,
+                actual_reps: value === null ? null : Math.max(0, Math.floor(value)),
+            });
+            return;
+        }
+
+        updateSet(keypadTarget.exerciseIdx, keypadTarget.setIdx, {
+            ...targetSet,
+            actual_rir: value === null ? null : Math.min(5, Math.max(0, Math.floor(value))),
+        });
     };
 
     const openPlateCalculatorFromKeypad = () => {
         if (!keypadTarget) return;
-        setPlateTarget(keypadTarget);
+        if (keypadTarget.field !== "weight") return;
+        setPlateTarget({ exerciseIdx: keypadTarget.exerciseIdx, setIdx: keypadTarget.setIdx });
         setKeypadTarget(null);
     };
 
@@ -1714,8 +1753,15 @@ export default function TodayPage() {
             )}
             {keypadTarget && (
                 <WeightKeypadSheet
-                    initialValue={exercises[keypadTarget.exerciseIdx]?.sets[keypadTarget.setIdx]?.actual_weight ?? null}
-                    onChange={updateWeightFromKeypad}
+                    initialValue={
+                        keypadTarget.field === "weight"
+                            ? exercises[keypadTarget.exerciseIdx]?.sets[keypadTarget.setIdx]?.actual_weight ?? null
+                            : keypadTarget.field === "reps"
+                                ? exercises[keypadTarget.exerciseIdx]?.sets[keypadTarget.setIdx]?.actual_reps ?? null
+                                : exercises[keypadTarget.exerciseIdx]?.sets[keypadTarget.setIdx]?.actual_rir ?? null
+                    }
+                    mode={keypadTarget.field === "weight" ? "weight" : "count"}
+                    onChange={updateFieldFromKeypad}
                     onClose={closeWeightKeypad}
                     onOpenPlateCalculator={openPlateCalculatorFromKeypad}
                 />
@@ -1973,8 +2019,8 @@ export default function TodayPage() {
                                 onMoveUp={() => moveExercise(i, -1)}
                                 onMoveDown={() => moveExercise(i, 1)}
                                 onSetComplete={() => startRestTimer()}
-                                onOpenWeightCalculator={(si) => setKeypadTarget({ exerciseIdx: i, setIdx: si })}
-                                activeWeightSetIndex={keypadTarget?.exerciseIdx === i ? keypadTarget.setIdx : null}
+                                onOpenFieldKeypad={(si, field) => setKeypadTarget({ exerciseIdx: i, setIdx: si, field })}
+                                activeSetKeypadField={keypadTarget?.exerciseIdx === i ? { setIdx: keypadTarget.setIdx, field: keypadTarget.field } : null}
                             />
                         ))}
                     </div>

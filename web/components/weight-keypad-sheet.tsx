@@ -16,14 +16,16 @@ function clampNonNegative(value: number): number {
 
 export function WeightKeypadSheet({
   initialValue,
+  mode,
   onChange,
   onClose,
   onOpenPlateCalculator,
 }: {
   initialValue: number | null;
+  mode: "weight" | "count";
   onChange: (value: number | null) => void;
   onClose: () => void;
-  onOpenPlateCalculator: () => void;
+  onOpenPlateCalculator?: () => void;
 }) {
   const [raw, setRaw] = useState(initialValue === null ? "" : formatWeight(initialValue));
 
@@ -42,11 +44,13 @@ export function WeightKeypadSheet({
     }
     const parsed = Number(trimmed);
     if (!Number.isFinite(parsed)) return;
-    onChange(clampNonNegative(parsed));
+    const next = clampNonNegative(parsed);
+    onChange(mode === "count" ? Math.floor(next) : next);
   }
 
   function appendToken(token: string) {
     haptic();
+    if (mode === "count" && token === ".") return;
     if (token === ".") {
       if (raw.includes(".")) return;
       if (raw === "") {
@@ -98,7 +102,7 @@ export function WeightKeypadSheet({
           </button>
         </div>
 
-        <p className="text-[11px] text-zinc-500 mb-2 px-1">Editing weight directly on active input</p>
+        <p className="text-[11px] text-zinc-500 mb-2 px-1">Editing value directly on active input</p>
 
         <div className="grid grid-cols-[1fr_112px] gap-2">
           <div className="grid grid-cols-3 gap-2">
@@ -115,7 +119,8 @@ export function WeightKeypadSheet({
             <button
               type="button"
               onClick={() => appendToken(".")}
-              className="h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-white text-2xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-red-500/20 active:border-red-400"
+              disabled={mode === "count"}
+              className="h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-white text-2xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-red-500/20 active:border-red-400 disabled:opacity-30 disabled:active:scale-100 disabled:active:bg-zinc-900 disabled:active:border-zinc-700"
             >
               .
             </button>
@@ -142,38 +147,40 @@ export function WeightKeypadSheet({
           <div className="grid grid-rows-[56px_56px_1fr] gap-2">
             <button
               type="button"
-              onClick={() => step(2.5)}
+              onClick={() => step(mode === "count" ? 1 : 2.5)}
               className="rounded-xl border border-red-500/80 bg-red-500/20 text-red-200 text-lg font-bold transition-transform duration-100 active:scale-[0.98]"
             >
-              +2.5
+              {mode === "count" ? "+1" : "+2.5"}
             </button>
             <button
               type="button"
-              onClick={() => step(-2.5)}
+              onClick={() => step(mode === "count" ? -1 : -2.5)}
               className="rounded-xl border border-zinc-600 bg-zinc-900 text-zinc-200 text-lg font-bold transition-transform duration-100 active:scale-[0.98]"
             >
-              -2.5
+              {mode === "count" ? "-1" : "-2.5"}
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                haptic();
-                onOpenPlateCalculator();
-              }}
-              className="rounded-2xl border border-red-500/70 bg-red-500/14 text-left px-3 py-2 transition-transform duration-100 active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-2">
-                <span className="h-8 w-8 rounded-full border border-red-500/60 bg-red-500/18 flex items-center justify-center">
-                  <BarbellIcon className="h-[18px] w-[18px] text-red-200" />
-                </span>
-                <span className="text-zinc-500 text-xs">+</span>
-                <span className="h-8 w-8 rounded-full border border-red-500/60 bg-red-500/18 flex items-center justify-center">
-                  <CalculatorIcon className="h-[18px] w-[18px] text-red-200" />
-                </span>
-              </div>
-              <p className="text-[11px] text-red-200 font-semibold mt-1">Plate Calculator</p>
-              <p className="text-[10px] text-zinc-300 mt-0.5">Open calculator</p>
-            </button>
+            {mode === "weight" && onOpenPlateCalculator && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptic();
+                  onOpenPlateCalculator();
+                }}
+                className="rounded-2xl border border-red-500/70 bg-red-500/14 text-left px-3 py-2 transition-transform duration-100 active:scale-[0.99]"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="h-8 w-8 rounded-full border border-red-500/60 bg-red-500/18 flex items-center justify-center">
+                    <BarbellIcon className="h-[18px] w-[18px] text-red-200" />
+                  </span>
+                  <span className="text-zinc-500 text-xs">+</span>
+                  <span className="h-8 w-8 rounded-full border border-red-500/60 bg-red-500/18 flex items-center justify-center">
+                    <CalculatorIcon className="h-[18px] w-[18px] text-red-200" />
+                  </span>
+                </div>
+                <p className="text-[11px] text-red-200 font-semibold mt-1">Plate Calculator</p>
+                <p className="text-[10px] text-zinc-300 mt-0.5">Open calculator</p>
+              </button>
+            )}
           </div>
         </div>
       </div>

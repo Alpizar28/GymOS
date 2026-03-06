@@ -16,6 +16,8 @@ import { PlateCalculatorModal } from "@/components/plate-calculator-modal";
 import { WeightKeypadSheet } from "@/components/weight-keypad-sheet";
 import { TrashIcon } from "@/components/icons";
 
+type KeypadField = "weight" | "reps" | "rir";
+
 const SET_TYPE_OPTIONS = [
   { value: "warmup", label: "W" },
   { value: "approach", label: "A" },
@@ -86,7 +88,7 @@ export default function RoutineDetailPage() {
   const [applyingProgression, setApplyingProgression] = useState(false);
   const [progressionError, setProgressionError] = useState("");
   const [shortBarWeight, setShortBarWeight] = useState(35);
-  const [keypadTarget, setKeypadTarget] = useState<{ exIdx: number; setIdx: number } | null>(null);
+  const [keypadTarget, setKeypadTarget] = useState<{ exIdx: number; setIdx: number; field: KeypadField } | null>(null);
   const [plateTarget, setPlateTarget] = useState<{ exIdx: number; setIdx: number } | null>(null);
 
   function showToast(message: string) {
@@ -324,22 +326,37 @@ export default function RoutineDetailPage() {
     }
   }
 
-  function openWeightKeypad(exIdx: number, setIdx: number) {
-    setKeypadTarget({ exIdx, setIdx });
+  function openWeightKeypad(exIdx: number, setIdx: number, field: KeypadField) {
+    setKeypadTarget({ exIdx, setIdx, field });
   }
 
   function closeWeightKeypad() {
     setKeypadTarget(null);
   }
 
-  function updateWeightFromKeypad(value: number | null) {
+  function updateFromKeypad(value: number | null) {
     if (!keypadTarget) return;
-    updateSet(keypadTarget.exIdx, keypadTarget.setIdx, { target_weight_lbs: value });
+    if (keypadTarget.field === "weight") {
+      updateSet(keypadTarget.exIdx, keypadTarget.setIdx, { target_weight_lbs: value });
+      return;
+    }
+
+    if (keypadTarget.field === "reps") {
+      updateSet(keypadTarget.exIdx, keypadTarget.setIdx, {
+        target_reps: value === null ? null : Math.max(0, Math.floor(value)),
+      });
+      return;
+    }
+
+    updateSet(keypadTarget.exIdx, keypadTarget.setIdx, {
+      rir_target: value === null ? null : Math.min(5, Math.max(0, Math.floor(value))),
+    });
   }
 
   function openPlateCalculatorFromKeypad() {
     if (!keypadTarget) return;
-    setPlateTarget(keypadTarget);
+    if (keypadTarget.field !== "weight") return;
+    setPlateTarget({ exIdx: keypadTarget.exIdx, setIdx: keypadTarget.setIdx });
     setKeypadTarget(null);
   }
 
@@ -361,8 +378,15 @@ export default function RoutineDetailPage() {
     <div className="max-w-3xl mx-auto overflow-x-hidden">
       {keypadTarget && (
         <WeightKeypadSheet
-          initialValue={draft.exercises[keypadTarget.exIdx]?.sets[keypadTarget.setIdx]?.target_weight_lbs ?? null}
-          onChange={updateWeightFromKeypad}
+          initialValue={
+            keypadTarget.field === "weight"
+              ? draft.exercises[keypadTarget.exIdx]?.sets[keypadTarget.setIdx]?.target_weight_lbs ?? null
+              : keypadTarget.field === "reps"
+                ? draft.exercises[keypadTarget.exIdx]?.sets[keypadTarget.setIdx]?.target_reps ?? null
+                : draft.exercises[keypadTarget.exIdx]?.sets[keypadTarget.setIdx]?.rir_target ?? null
+          }
+          mode={keypadTarget.field === "weight" ? "weight" : "count"}
+          onChange={updateFromKeypad}
           onClose={closeWeightKeypad}
           onOpenPlateCalculator={openPlateCalculatorFromKeypad}
         />
@@ -585,14 +609,14 @@ export default function RoutineDetailPage() {
                       value={set.target_weight_lbs ?? ""}
                       onFocus={(e) => {
                         e.currentTarget.blur();
-                        openWeightKeypad(exIdx, setIdx);
+                        openWeightKeypad(exIdx, setIdx, "weight");
                       }}
                       onChange={(e) =>
                         updateSet(exIdx, setIdx, {
                           target_weight_lbs: e.target.value ? Number(e.target.value) : null,
                         })
                       }
-                      className={`w-full bg-zinc-950 border rounded px-2 py-1 text-sm ${keypadTarget?.exIdx === exIdx && keypadTarget?.setIdx === setIdx
+                      className={`w-full bg-zinc-950 border rounded px-2 py-1 text-sm ${keypadTarget?.exIdx === exIdx && keypadTarget?.setIdx === setIdx && keypadTarget.field === "weight"
                         ? "border-red-500 ring-1 ring-red-500"
                         : "border-zinc-800"
                         }`}
@@ -604,12 +628,19 @@ export default function RoutineDetailPage() {
                     <input
                       type="number"
                       value={set.target_reps ?? ""}
+                      onFocus={(e) => {
+                        e.currentTarget.blur();
+                        openWeightKeypad(exIdx, setIdx, "reps");
+                      }}
                       onChange={(e) =>
                         updateSet(exIdx, setIdx, {
                           target_reps: e.target.value ? Number(e.target.value) : null,
                         })
                       }
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm"
+                      className={`w-full bg-zinc-950 border rounded px-2 py-1 text-sm ${keypadTarget?.exIdx === exIdx && keypadTarget?.setIdx === setIdx && keypadTarget.field === "reps"
+                        ? "border-red-500 ring-1 ring-red-500"
+                        : "border-zinc-800"
+                        }`}
                     />
                   ) : (
                     <span>{set.target_reps ?? "-"}</span>
@@ -618,12 +649,19 @@ export default function RoutineDetailPage() {
                     <input
                       type="number"
                       value={set.rir_target ?? ""}
+                      onFocus={(e) => {
+                        e.currentTarget.blur();
+                        openWeightKeypad(exIdx, setIdx, "rir");
+                      }}
                       onChange={(e) =>
                         updateSet(exIdx, setIdx, {
                           rir_target: e.target.value ? Number(e.target.value) : null,
                         })
                       }
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm"
+                      className={`w-full bg-zinc-950 border rounded px-2 py-1 text-sm ${keypadTarget?.exIdx === exIdx && keypadTarget?.setIdx === setIdx && keypadTarget.field === "rir"
+                        ? "border-red-500 ring-1 ring-red-500"
+                        : "border-zinc-800"
+                        }`}
                     />
                   ) : (
                     <span>{set.rir_target ?? "-"}</span>
