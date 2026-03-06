@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { Viewport } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import {
   BrandIcon,
@@ -17,6 +18,14 @@ export const metadata: Metadata = {
   title: "GymOS — Training System",
   description: "Personal gym training dashboard with progression tracking and plan generation",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: [{ url: "/icon-192.png" }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -64,6 +73,7 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
           rel="stylesheet"
         />
+        <link rel="icon" href="/icon-192.png" sizes="192x192" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         {/* Prevent double-tap zoom on buttons/inputs */}
         <meta name="mobile-web-app-capable" content="yes" />
@@ -73,11 +83,9 @@ export default function RootLayout({
         {/* ── Desktop top nav (hidden on mobile) ── */}
         <nav className="hidden sm:block fixed top-0 left-0 right-0 z-50 bg-zinc-950/85 backdrop-blur-xl border-b border-zinc-800/60">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center h-16 gap-6">
-            <span className="text-xl font-bold bg-gradient-to-r from-red-500 to-red-400 bg-clip-text text-transparent">
-              <span className="inline-flex items-center gap-2">
-                <BrandIcon className="h-5 w-5" />
-                GymOS
-              </span>
+            <span className="inline-flex items-center gap-3" aria-label="GymOS">
+              <BrandIcon className="h-6 w-6" />
+              <Image src="/logo-wordmark.svg" alt="GymOS" width={135} height={24} className="h-6 w-auto" />
             </span>
             <ul className="flex gap-1">
               {topNavLinks.map((link) => (

@@ -1,6 +1,8 @@
+import Image, { type ImageProps } from "next/image";
 import type { SVGProps } from "react";
 
 type IconProps = SVGProps<SVGSVGElement>;
+type BrandIconProps = Omit<ImageProps, "src" | "alt" | "width" | "height">;
 
 function baseProps(props: IconProps) {
   return {
@@ -15,20 +17,16 @@ function baseProps(props: IconProps) {
   };
 }
 
-export function BrandIcon(props: IconProps) {
+export function BrandIcon(props: BrandIconProps) {
   return (
-    <svg {...baseProps(props)}>
-      <path d="M3 9h3" />
-      <path d="M18 9h3" />
-      <path d="M6 7v4" />
-      <path d="M18 7v4" />
-      <path d="M9 9h6" />
-      <path d="M3 15h3" />
-      <path d="M18 15h3" />
-      <path d="M6 13v4" />
-      <path d="M18 13v4" />
-      <path d="M9 15h6" />
-    </svg>
+    <Image
+      src="/logo-mark.svg"
+      alt=""
+      aria-hidden
+      width={24}
+      height={24}
+      {...props}
+    />
   );
 }
 
