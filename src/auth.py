@@ -95,7 +95,7 @@ def authenticate_request(request: Request) -> AuthUser:
         payload = jwt.decode(
             token,
             signing_key.key,
-            algorithms=["RS256"],
+            algorithms=["RS256", "ES256"],
             audience=settings.supabase_jwt_audience,
             options={"verify_signature": True, "verify_exp": True},
         )
