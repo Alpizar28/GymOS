@@ -41,6 +41,22 @@ interface TodayDraft {
     exercises: ExerciseState[];
 }
 
+interface WorkoutExerciseSummary {
+    name: string;
+    completedSets: number;
+    loggedSets: number;
+    volume: number;
+    topSet: string | null;
+}
+
+interface WorkoutFinishSummary {
+    exerciseCount: number;
+    completedSets: number;
+    loggedSets: number;
+    totalVolume: number;
+    exercises: WorkoutExerciseSummary[];
+}
+
 interface UndoAction {
     label: string;
     previousExercises: ExerciseState[];
@@ -77,6 +93,53 @@ function cloneExercises(state: ExerciseState[]) {
         sets: ex.sets.map((set) => ({ ...set })),
         lastSession: ex.lastSession ? ex.lastSession.map((set) => ({ ...set })) : ex.lastSession,
     }));
+}
+
+function formatWeightCompact(value: number): string {
+    return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function buildFinishSummary(exercises: ExerciseState[]): WorkoutFinishSummary {
+    const rows: WorkoutExerciseSummary[] = exercises
+        .map((exercise) => {
+            const completedSets = exercise.sets.filter((set) => set.completed).length;
+            const loggedSets = exercise.sets.filter((set) => set.completed || hasSetData(set)).length;
+            const setsWithWeight = exercise.sets.filter((set) => (set.completed || hasSetData(set)) && (set.actual_weight ?? 0) > 0);
+            const volume = setsWithWeight.reduce((sum, set) => sum + (set.actual_weight ?? 0) * (set.actual_reps ?? 0), 0);
+
+            let topSet: string | null = null;
+            const top = setsWithWeight.reduce<ActualSet | null>((best, current) => {
+                if (!best) return current;
+                const bestWeight = best.actual_weight ?? 0;
+                const currentWeight = current.actual_weight ?? 0;
+                if (currentWeight > bestWeight) return current;
+                if (currentWeight === bestWeight && (current.actual_reps ?? 0) > (best.actual_reps ?? 0)) {
+                    return current;
+                }
+                return best;
+            }, null);
+
+            if (top && top.actual_weight !== null && top.actual_reps !== null) {
+                topSet = `${formatWeightCompact(top.actual_weight)} x ${top.actual_reps}`;
+            }
+
+            return {
+                name: exercise.name,
+                completedSets,
+                loggedSets,
+                volume,
+                topSet,
+            };
+        })
+        .filter((row) => row.loggedSets > 0);
+
+    return {
+        exerciseCount: rows.length,
+        completedSets: rows.reduce((sum, row) => sum + row.completedSets, 0),
+        loggedSets: rows.reduce((sum, row) => sum + row.loggedSets, 0),
+        totalVolume: rows.reduce((sum, row) => sum + row.volume, 0),
+        exercises: rows,
+    };
 }
 
 function mergeExercises(base: ExerciseState[], incoming: ExerciseState[]) {
@@ -781,25 +844,69 @@ function SwapModal({ exerciseName, onClose, onSwap }: {
 
 // ─── Complete Modal ───────────────────────────────────────────────────────────
 
-function CompleteModal({ workoutId, onComplete, onClose }: {
-    workoutId: number; onComplete: (nd: number) => void; onClose: () => void;
+function CompleteModal({ summary, onConfirm, onClose }: {
+    summary: WorkoutFinishSummary;
+    onConfirm: (fatigue: number) => Promise<void>;
+    onClose: () => void;
 }) {
     const [fatigue, setFatigue] = useState(5);
     const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
     const label = fatigue <= 3 ? "Easy" : fatigue <= 6 ? "Moderate" : fatigue <= 8 ? "Hard" : "Exhausted";
+
     async function go() {
+        setError("");
         setSaving(true);
-        try { const r = await api.completeSession(workoutId, fatigue); onComplete(r.next_day_index); }
+        try {
+            await onConfirm(fatigue);
+        } catch {
+            setError("No se pudo completar la sesion. Intenta de nuevo.");
+        }
         finally { setSaving(false); }
     }
+
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm shadow-2xl">
+            <div className="bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
                 <div className="px-6 py-5 border-b border-zinc-800">
-                    <h3 className="font-bold text-white text-xl">Complete Session</h3>
-                    <p className="text-sm text-zinc-500 mt-1">Rate fatigue to advance the day</p>
+                    <h3 className="font-bold text-white text-xl">Finish Workout</h3>
+                    <p className="text-sm text-zinc-500 mt-1">Review your session and confirm completion</p>
                 </div>
-                <div className="p-6 space-y-6 pb-10">
+                <div className="p-6 space-y-5 pb-10">
+                    <div className="grid grid-cols-3 gap-2">
+                        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-center">
+                            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Exercises</p>
+                            <p className="text-xl font-bold text-white mt-1">{summary.exerciseCount}</p>
+                        </div>
+                        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-center">
+                            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Sets</p>
+                            <p className="text-xl font-bold text-white mt-1">{summary.completedSets}/{summary.loggedSets}</p>
+                        </div>
+                        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-center">
+                            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Volume</p>
+                            <p className="text-xl font-bold text-white mt-1">{Math.round(summary.totalVolume)}</p>
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 max-h-56 overflow-y-auto space-y-2">
+                        {summary.exercises.length === 0 ? (
+                            <p className="text-xs text-zinc-500">No sets logged yet.</p>
+                        ) : (
+                            summary.exercises.map((exercise) => (
+                                <div key={exercise.name} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-2.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="text-sm font-semibold text-white truncate">{exercise.name}</p>
+                                        <p className="text-xs text-zinc-400">{exercise.completedSets}/{exercise.loggedSets} sets</p>
+                                    </div>
+                                    <p className="text-xs text-zinc-500 mt-1">
+                                        {exercise.topSet ? `Top set ${exercise.topSet}` : "No top set"}
+                                        {` · Vol ${Math.round(exercise.volume)}`}
+                                    </p>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
                     <div>
                         <div className="flex justify-between text-base mb-3">
                             <span className="text-zinc-400">Fatigue</span>
@@ -809,11 +916,12 @@ function CompleteModal({ workoutId, onComplete, onClose }: {
                             onChange={(e) => setFatigue(parseInt(e.target.value))}
                             className="w-full h-8 accent-red-500 touch-manipulation" />
                     </div>
+                    {error && <p className="text-xs text-red-400">{error}</p>}
                     <div className="grid grid-cols-2 gap-3">
-                        <button onClick={onClose} className="py-4 rounded-xl bg-zinc-800 text-zinc-400 font-semibold active:bg-zinc-700 touch-manipulation">Cancel</button>
+                        <button onClick={onClose} disabled={saving} className="py-4 rounded-xl bg-zinc-800 text-zinc-400 font-semibold active:bg-zinc-700 touch-manipulation disabled:opacity-40">Cancel</button>
                         <button onClick={go} disabled={saving}
                             className="py-4 rounded-xl bg-gradient-to-r from-red-600 to-red-500 text-white font-bold active:opacity-80 disabled:opacity-50 touch-manipulation">
-                            {saving ? "Saving..." : "Done! →"}
+                            {saving ? "Finalizing..." : "Confirm & Complete"}
                         </button>
                     </div>
                 </div>
@@ -1017,6 +1125,8 @@ export default function TodayPage() {
     const [showComplete, setShowComplete] = useState(false);
     const [completed, setCompleted] = useState(false);
     const [nextDay, setNextDay] = useState<number | null>(null);
+    const [streakDays, setStreakDays] = useState<number>(0);
+    const [finishSummary, setFinishSummary] = useState<WorkoutFinishSummary | null>(null);
     const [swapFor, setSwapFor] = useState<string | null>(null);
     const [showAddExercise, setShowAddExercise] = useState(false);
     const [uiStep, setUiStep] = useState<1 | 2>(1);
@@ -1187,6 +1297,8 @@ export default function TodayPage() {
         setSavedId(recoveredWorkoutId);
         setCompleted(false);
         setNextDay(null);
+        setStreakDays(0);
+        setFinishSummary(null);
         setRestTimerLeft(null);
         setRestRunning(false);
         clearUndoTimeout();
@@ -1417,10 +1529,10 @@ export default function TodayPage() {
         return { day_name: plan.day_name, training_type: plan.training_type, exercises: exEntries };
     }, [plan, exercises]);
 
-    const save = useCallback(async (silent = false) => {
+    const save = useCallback(async (silent = false): Promise<number | null> => {
         const payload = buildPayload();
-        if (!payload) { if (!silent) showToast("Genera un plan primero."); return; }
-        if (payload.exercises.length === 0) { if (!silent) showToast("Ingresa al menos un set para guardar."); return; }
+        if (!payload) { if (!silent) showToast("Genera un plan primero."); return null; }
+        if (payload.exercises.length === 0) { if (!silent) showToast("Ingresa al menos un set para guardar."); return null; }
         if (!silent) setSaving(true);
         try {
             const res = await api.logToday(payload);
@@ -1431,9 +1543,38 @@ export default function TodayPage() {
             if (!silent) {
                 showToast(`Saved as Workout #${res.workout_id}`);
             }
+            return res.workout_id;
         } catch { if (!silent) showToast("Save failed."); }
         finally { if (!silent) setSaving(false); }
+        return null;
     }, [buildPayload, writeDraftNow, plan, exercises]);
+
+    const openFinishModal = useCallback(() => {
+        const summary = buildFinishSummary(exercises);
+        if (summary.loggedSets === 0) {
+            showToast("Ingresa al menos un set antes de finalizar.");
+            return;
+        }
+        setFinishSummary(summary);
+        setShowComplete(true);
+    }, [exercises]);
+
+    const confirmFinish = useCallback(async (fatigue: number) => {
+        let workoutId = savedId;
+        if (workoutId === null) {
+            workoutId = await save(true);
+        }
+        if (workoutId === null) {
+            throw new Error("Workout save failed");
+        }
+
+        const response = await api.completeSession(workoutId, fatigue);
+        clearDraft();
+        setStreakDays(response.streak_days ?? 0);
+        setNextDay(response.next_day_index);
+        setCompleted(true);
+        setShowComplete(false);
+    }, [savedId, save, clearDraft]);
 
     useEffect(() => {
         if (!restRunning || restTimerLeft === null) return;
@@ -1523,10 +1664,35 @@ export default function TodayPage() {
     );
 
     if (completed) return (
-        <div className="flex flex-col items-center justify-center min-h-[70vh] text-center gap-5 px-6">
-            <h2 className="text-3xl font-bold text-white">Done!</h2>
-            <p className="text-zinc-400 text-lg">Day advanced → Day {nextDay}</p>
-            <a href="/today" className="mt-2 px-8 py-4 bg-red-600 text-white rounded-xl font-bold text-lg">Today</a>
+        <div className="max-w-lg mx-auto min-h-[70vh] flex flex-col justify-center px-5 py-10 text-center">
+            <div className="rounded-3xl border border-red-500/30 bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.24),_transparent_60%)] bg-zinc-950 p-6">
+                <p className="text-5xl">✅</p>
+                <h2 className="text-3xl font-bold text-white mt-2">Workout Completed</h2>
+                <p className="text-zinc-400 text-sm mt-1">Great work. Session closed and day advanced.</p>
+
+                <div className="grid grid-cols-2 gap-3 mt-5 text-left">
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3">
+                        <p className="text-[11px] uppercase tracking-wide text-zinc-500">Next Day</p>
+                        <p className="text-xl font-bold text-white">{nextDay ?? "-"}</p>
+                    </div>
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3">
+                        <p className="text-[11px] uppercase tracking-wide text-zinc-500">Streak</p>
+                        <p className="text-xl font-bold text-red-300">{streakDays} days</p>
+                    </div>
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3">
+                        <p className="text-[11px] uppercase tracking-wide text-zinc-500">Exercises</p>
+                        <p className="text-xl font-bold text-white">{finishSummary?.exerciseCount ?? 0}</p>
+                    </div>
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3">
+                        <p className="text-[11px] uppercase tracking-wide text-zinc-500">Volume</p>
+                        <p className="text-xl font-bold text-white">{Math.round(finishSummary?.totalVolume ?? 0)}</p>
+                    </div>
+                </div>
+
+                <a href="/today" className="mt-6 inline-flex items-center justify-center w-full py-3 bg-red-600 text-white rounded-xl font-bold text-base">
+                    Back to Today
+                </a>
+            </div>
         </div>
     );
 
@@ -1552,15 +1718,12 @@ export default function TodayPage() {
             {swapFor !== null && swapIndex >= 0 && (
                 <SwapModal exerciseName={swapFor} onClose={() => setSwapFor(null)} onSwap={(alt) => swapExercise(swapIndex, alt)} />
             )}
-            {showComplete && savedId !== null && (
-                <CompleteModal workoutId={savedId}
-                    onComplete={(nd) => {
-                        clearDraft();
-                        setCompleted(true);
-                        setNextDay(nd);
-                        setShowComplete(false);
-                    }}
-                    onClose={() => setShowComplete(false)} />
+            {showComplete && finishSummary && (
+                <CompleteModal
+                    summary={finishSummary}
+                    onConfirm={confirmFinish}
+                    onClose={() => setShowComplete(false)}
+                />
             )}
             {showAddExercise && <AddExerciseModal onAdd={addExercise} onClose={() => setShowAddExercise(false)} />}
             {creatingTemplate && (
@@ -1775,8 +1938,8 @@ export default function TodayPage() {
                                 {saving ? "Saving..." : `Save ${enteredSets}`}
                             </button>
                             <button
-                                onClick={() => savedId !== null && setShowComplete(true)}
-                                disabled={savedId === null}
+                                onClick={openFinishModal}
+                                disabled={enteredSets === 0}
                                 className="py-3 bg-zinc-800 text-zinc-100 font-bold rounded-xl disabled:opacity-40"
                             >
                                 Finish
@@ -1832,8 +1995,8 @@ export default function TodayPage() {
                             {saving ? "Saving" : `Save ${enteredSets}`}
                         </button>
                         <button
-                            onClick={() => savedId !== null && setShowComplete(true)}
-                            disabled={savedId === null}
+                            onClick={openFinishModal}
+                            disabled={enteredSets === 0}
                             className="py-3 rounded-xl bg-zinc-800 text-zinc-100 text-sm font-bold disabled:opacity-40"
                         >
                             Finish

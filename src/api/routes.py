@@ -2209,10 +2209,32 @@ async def complete_today_session(payload: CompleteSessionRequest) -> dict:
             session.add(state)
 
         await session.commit()
+
+        streak_result = await session.execute(
+            select(Workout.date)
+            .where(Workout.user_id == user_id)
+            .distinct()
+            .order_by(desc(Workout.date))
+            .limit(400)
+        )
+        streak_dates = [row[0] for row in streak_result.all()]
+
+        streak_days = 0
+        if streak_dates:
+            streak_days = 1
+            cursor = streak_dates[0]
+            for d in streak_dates[1:]:
+                if d == cursor - timedelta(days=1):
+                    streak_days += 1
+                    cursor = d
+                    continue
+                break
+
         return {
             "workout_id": payload.workout_id,
             "next_day_index": state.next_day_index if state else 1,
             "fatigue_saved": payload.fatigue,
+            "streak_days": streak_days,
         }
 
 

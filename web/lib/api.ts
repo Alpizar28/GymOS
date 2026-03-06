@@ -577,7 +577,7 @@ export const api = {
             body: JSON.stringify(payload),
         }),
     completeSession: (workout_id: number, fatigue: number) =>
-        fetchApi<{ workout_id: number; next_day_index: number }>("/today/complete", {
+        fetchApi<{ workout_id: number; next_day_index: number; fatigue_saved: number; streak_days: number }>("/today/complete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ workout_id, fatigue }),
