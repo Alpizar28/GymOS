@@ -91,10 +91,35 @@ export interface PersonalProfile {
     full_name: string;
     photo_url: string | null;
     age: number | null;
+    sex: "male" | "female" | "other" | "prefer_not_to_say" | null;
     height_cm: number | null;
     weight_lbs: number | null;
+    body_fat_pct: number | null;
+    primary_goal: "fat_loss" | "muscle_gain" | "recomp" | "strength" | "performance" | "health" | null;
+    goal_detail: string | null;
+    target_weight_lbs: number | null;
+    timeline_weeks: number | null;
+    training_years: number | null;
+    days_per_week: number | null;
+    session_duration_min: number | null;
+    preferred_split: string | null;
+    equipment_access: string[];
+    injuries: Array<{ area: string; severity: "low" | "medium" | "high"; notes?: string | null }>;
+    limitations: string | null;
+    exercise_likes: string[];
+    exercise_dislikes: string[];
+    sleep_hours: number | null;
+    stress_level: "low" | "medium" | "high" | null;
+    activity_level: "sedentary" | "light" | "moderate" | "high" | "athlete" | null;
+    nutrition_notes: string | null;
     goal: string | null;
     notes: string | null;
+}
+
+export interface OnboardingStatus {
+    completed: boolean;
+    completed_at: string | null;
+    version: number;
 }
 
 export interface RoutineFolder {
@@ -435,6 +460,13 @@ export const api = {
     updatePersonalProfile: (payload: Partial<PersonalProfile>) =>
         fetchApi<PersonalProfile>("/profile/personal", {
             method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        }),
+    getOnboardingStatus: () => fetchApi<OnboardingStatus>("/profile/onboarding-status"),
+    completeOnboarding: (payload: Partial<PersonalProfile>) =>
+        fetchApi<PersonalProfile>("/profile/onboarding", {
+            method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         }),
