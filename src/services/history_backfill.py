@@ -56,10 +56,13 @@ def _classify_training_type(name: str | None) -> str:
     return "legs"
 
 
-async def backfill_workout_training_types(session: AsyncSession) -> dict:
+async def backfill_workout_training_types(session: AsyncSession, user_id: str) -> dict:
     """Populate workouts.training_type from routine names and name heuristics."""
     routines_result = await session.execute(
-        select(Routine.name, Routine.training_type).where(Routine.is_deleted.is_(False))
+        select(Routine.name, Routine.training_type).where(
+            Routine.user_id == user_id,
+            Routine.is_deleted.is_(False),
+        )
     )
 
     routine_lookup: dict[str, str] = {}
@@ -69,7 +72,9 @@ async def backfill_workout_training_types(session: AsyncSession) -> dict:
         if normalized_name and normalized_type in VALID_TRAINING_TYPES:
             routine_lookup[normalized_name] = normalized_type
 
-    workouts_result = await session.execute(select(Workout).order_by(Workout.id))
+    workouts_result = await session.execute(
+        select(Workout).where(Workout.user_id == user_id).order_by(Workout.id)
+    )
     workouts = workouts_result.scalars().all()
 
     updated = 0

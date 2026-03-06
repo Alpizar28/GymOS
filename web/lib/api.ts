@@ -375,7 +375,17 @@ export interface AnchorProgress {
 // --- API Functions ---
 
 async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
-    const res = await fetch(`${API_BASE}${path}`, init);
+    const headers = new Headers(init?.headers ?? {});
+    if (typeof window !== "undefined") {
+        const { supabase } = await import("@/lib/supabase");
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (token) {
+            headers.set("Authorization", `Bearer ${token}`);
+        }
+    }
+
+    const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
     if (!res.ok) throw new Error(`API ${path}: ${res.status}`);
     return res.json();
 }

@@ -14,6 +14,7 @@ class Workout(Base):
     __tablename__ = "workouts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     date: Mapped[date] = mapped_column(Date, nullable=False)
     duration_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
     bodyweight: Mapped[float | None] = mapped_column(Float, nullable=True)

@@ -19,14 +19,11 @@ COPY data/ATHLETE_PROFILE.json data/EXERCISE_LIBRARY.json data/PROGRAM_CONSTRAIN
 
 # Install dependencies
 RUN pip install --no-cache-dir .
-
-# Create data directory for SQLite
-RUN mkdir -p /app/data
-
 # Environment variables (Defaults)
-ENV DATABASE_URL=sqlite+aiosqlite:////app/data/gym.db
+ENV DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/postgres
 ENV LOG_LEVEL=INFO
 ENV PORT=8000
+ENV AUTH_ENABLED=true
 
 EXPOSE 8000
 

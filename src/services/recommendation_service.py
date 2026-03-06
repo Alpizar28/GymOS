@@ -7,6 +7,7 @@ from datetime import date
 
 from sqlalchemy import desc, select
 
+from src.auth import get_current_user_id
 from src.models.settings import WeekTemplate
 from src.models.workouts import Workout
 
@@ -68,11 +69,15 @@ def _template_categories(template: WeekTemplate) -> list[str]:
 
 async def suggest_day(session) -> dict:
     """Return a recommended day_name with a brief reason."""
+    user_id = get_current_user_id()
     templates_result = await session.execute(select(WeekTemplate).order_by(WeekTemplate.day_index))
     templates = templates_result.scalars().all()
 
     workouts_result = await session.execute(
-        select(Workout).order_by(desc(Workout.date)).limit(30)
+        select(Workout)
+        .where(Workout.user_id == user_id)
+        .order_by(desc(Workout.date))
+        .limit(30)
     )
     workouts = workouts_result.scalars().all()
 

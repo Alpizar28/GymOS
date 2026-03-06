@@ -10,6 +10,7 @@ import {
   type CalendarDay,
   type WorkoutDetail,
 } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { LibraryIcon, ProfileIcon, ShieldIcon, StatsIcon } from "@/components/icons";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -69,6 +70,17 @@ async function fileToDataUrl(file: File): Promise<string> {
 
   context.drawImage(image, 0, 0, width, height);
   return canvas.toDataURL("image/jpeg", 0.85);
+}
+
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [meta, b64] = dataUrl.split(",");
+  const mime = /data:(.*?);base64/.exec(meta)?.[1] || "image/jpeg";
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: mime });
 }
 
 const MUSCLE_GROUPS = [
@@ -184,8 +196,20 @@ function PersonalSection({ onSaved }: { onSaved?: (profile: PersonalProfile) => 
     setUploadingPhoto(true);
     try {
       const dataUrl = await fileToDataUrl(file);
-      setDraft((prev) => (prev ? { ...prev, photo_url: dataUrl } : prev));
-      setToast("Foto cargada, guarda para aplicar");
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) throw new Error("Sesion no valida");
+
+      const blob = dataUrlToBlob(dataUrl);
+      const objectPath = `profiles/${userId}/avatar.jpg`;
+      const uploaded = await supabase.storage
+        .from("profile-photos")
+        .upload(objectPath, blob, { upsert: true, contentType: "image/jpeg" });
+      if (uploaded.error) throw uploaded.error;
+
+      const publicUrl = supabase.storage.from("profile-photos").getPublicUrl(objectPath).data.publicUrl;
+      setDraft((prev) => (prev ? { ...prev, photo_url: publicUrl } : prev));
+      setToast("Foto subida, guarda para aplicar");
       setTimeout(() => setToast(""), 2200);
     } catch {
       setToast("No se pudo cargar la foto");

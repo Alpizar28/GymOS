@@ -39,7 +39,7 @@ GymOS is designed to unify that lifecycle with a clear UX and a robust backend.
 - Python 3.11+
 - FastAPI
 - SQLAlchemy async
-- SQLite (`aiosqlite`)
+- PostgreSQL (Supabase-ready, `asyncpg`)
 
 ### Frontend
 - Next.js 16 (App Router)
@@ -151,6 +151,13 @@ Includes near-term UX improvements, medium-term body metrics integration
 - Frontend API traffic is proxied through `web/app/api/[...path]/route.ts`.
 - Proxy timeout is configurable via `PROXY_TIMEOUT_MS` (default 60s).
 - Designed for container deployment (Coolify-compatible).
+
+## Supabase Migration Notes
+
+- Auth is now Supabase JWT-based (backend expects `Authorization: Bearer <token>` when `AUTH_ENABLED=true`).
+- Profile photo upload now targets Supabase Storage bucket `profile-photos`.
+- SQL policy templates are included in `supabase/rls.sql` and `supabase/storage.sql`.
+- SQLite -> Postgres copy script is available at `scripts/migrate_sqlite_to_postgres.py`.
 
 ---
 

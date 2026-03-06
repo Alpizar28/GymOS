@@ -7,6 +7,7 @@ from datetime import date
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.auth import get_current_user_id
 from src.llm.client import call_llm_json
 from src.llm.prompts import (
     GENERATE_DAY_PLAN_SYSTEM,
@@ -75,6 +76,7 @@ async def get_anchor_targets_for_day(
     day_rules: dict,
 ) -> list[dict]:
     """Get anchor targets for the day's anchor exercises."""
+    user_id = get_current_user_id()
     anchor_names = day_rules.get("anchors", [])
     if not anchor_names:
         return []
@@ -82,6 +84,7 @@ async def get_anchor_targets_for_day(
     result = await session.execute(
         select(AnchorTarget, Exercise.name_canonical)
         .join(Exercise, AnchorTarget.exercise_id == Exercise.id)
+        .where(AnchorTarget.user_id == user_id)
         .where(Exercise.name_canonical.in_(anchor_names))
     )
 
@@ -101,9 +104,13 @@ async def get_anchor_targets_for_day(
 
 async def get_constraints(session: AsyncSession) -> dict:
     """Load program constraints from settings."""
+    user_id = get_current_user_id()
     constraints = {}
     result = await session.execute(
-        select(Setting).where(Setting.key.startswith("constraint_"))
+        select(Setting).where(
+            Setting.user_id == user_id,
+            Setting.key.startswith("constraint_"),
+        )
     )
     for setting in result.scalars().all():
         key = setting.key.replace("constraint_", "")
@@ -127,13 +134,16 @@ async def generate_day_plan(
     6. Store in plan_days
     """
     # Get current state if no explicit day
+    user_id = get_current_user_id()
     if day_index is None and day_name is None:
         suggestion = await suggest_day(session)
         if suggestion.get("day_name"):
             day_name = suggestion["day_name"]
             fatigue = 0.0
         else:
-            state_result = await session.execute(select(AthleteState).where(AthleteState.id == 1))
+            state_result = await session.execute(
+                select(AthleteState).where(AthleteState.user_id == user_id)
+            )
             state = state_result.scalar_one_or_none()
             day_index = state.next_day_index if state else 1
             fatigue = state.fatigue_score if state else 0.0
@@ -209,6 +219,7 @@ async def generate_day_plan(
 
     # Store
     plan = Plan(
+        user_id=user_id,
         start_date=date.today(),
         end_date=date.today(),
         goal=f"{template.name} session",

@@ -1,83 +1,102 @@
-"""Migrate data from SQLite to Postgres using async SQLAlchemy."""
+"""Copy GymOS data from SQLite into PostgreSQL/Supabase.
+
+Usage:
+    SQLITE_PATH=./gym.db \
+    DATABASE_URL=postgresql+asyncpg://... \
+    python scripts/migrate_sqlite_to_postgres.py
+"""
 
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
-from collections.abc import Sequence
+import sqlite3
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy import text
 
-from src.config import settings
-from src.database import Base
-import src.models  # noqa: F401
+from src.database import async_session
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
-logger = logging.getLogger(__name__)
+TABLE_ORDER = [
+    "exercises",
+    "exercise_stats",
+    "week_template",
+    "settings",
+    "athlete_state",
+    "routine_folders",
+    "routines",
+    "routine_exercises",
+    "routine_sets",
+    "anchor_targets",
+    "plans",
+    "plan_days",
+    "workouts",
+    "workout_exercises",
+    "sets",
+    "session_feedback",
+]
 
-CHUNK_SIZE = 1000
-
-
-def _get_source_url() -> str:
-    return os.getenv("SQLITE_DATABASE_URL", settings.database_url)
-
-
-def _get_target_url() -> str:
-    target = os.getenv("POSTGRES_DATABASE_URL")
-    if not target:
-        raise ValueError("POSTGRES_DATABASE_URL is required")
-    return target
-
-
-async def _copy_table(
-    *,
-    table,
-    source_engine: AsyncEngine,
-    target_engine: AsyncEngine,
-) -> int:
-    inserted = 0
-    async with source_engine.connect() as source_conn:
-        result = await source_conn.execute(select(table))
-        while True:
-            rows: Sequence = result.fetchmany(CHUNK_SIZE)
-            if not rows:
-                break
-            payload = [dict(row._mapping) for row in rows]
-            async with target_engine.begin() as target_conn:
-                await target_conn.execute(table.insert(), payload)
-            inserted += len(payload)
-    return inserted
+USER_SCOPED_TABLES = {
+    "settings",
+    "athlete_state",
+    "workouts",
+    "plans",
+    "routine_folders",
+    "routines",
+    "anchor_targets",
+}
 
 
-async def migrate() -> None:
-    source_url = _get_source_url()
-    target_url = _get_target_url()
+def _fetch_rows(conn: sqlite3.Connection, table: str) -> tuple[list[str], list[tuple]]:
+    cursor = conn.execute(f"SELECT * FROM {table}")
+    cols = [item[0] for item in cursor.description]
+    rows = cursor.fetchall()
+    return cols, rows
 
-    source_engine = create_async_engine(source_url)
-    target_engine = create_async_engine(target_url)
 
+async def _copy_table(table: str, cols: list[str], rows: list[tuple]) -> int:
+    if not rows:
+        return 0
+
+    target_cols = cols.copy()
+    if table in USER_SCOPED_TABLES and "user_id" not in target_cols:
+        target_cols.append("user_id")
+
+    placeholders = ", ".join([f":{c}" for c in target_cols])
+    columns = ", ".join(target_cols)
+    statement = text(f"INSERT INTO {table} ({columns}) VALUES ({placeholders})")
+
+    migration_user_id = os.getenv("MIGRATION_USER_ID", "00000000-0000-0000-0000-000000000001")
+    payload = []
+    for row in rows:
+        record = dict(zip(cols, row, strict=False))
+        if table in USER_SCOPED_TABLES and "user_id" not in record:
+            record["user_id"] = migration_user_id
+        payload.append(record)
+
+    async with async_session() as session:
+        await session.execute(statement, payload)
+        await session.commit()
+    return len(payload)
+
+
+async def main() -> None:
+    sqlite_path = os.getenv("SQLITE_PATH", "./gym.db")
+    if not os.path.exists(sqlite_path):
+        raise FileNotFoundError(f"SQLite file not found: {sqlite_path}")
+
+    conn = sqlite3.connect(sqlite_path)
+    conn.row_factory = sqlite3.Row
     try:
-        for table in Base.metadata.sorted_tables:
-            logger.info("Migrating table: %s", table.name)
-            count = await _copy_table(
-                table=table,
-                source_engine=source_engine,
-                target_engine=target_engine,
-            )
-            logger.info("Inserted %d rows into %s", count, table.name)
+        total = 0
+        for table in TABLE_ORDER:
+            cols, rows = _fetch_rows(conn, table)
+            copied = await _copy_table(table, cols, rows)
+            total += copied
+            print(f"{table}: {copied} rows")
+        print(f"Done. Total rows copied: {total}")
     finally:
-        await source_engine.dispose()
-        await target_engine.dispose()
-
-
-def main() -> None:
-    asyncio.run(migrate())
+        conn.close()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

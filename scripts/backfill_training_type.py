@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -22,7 +23,8 @@ async def run_backfill() -> None:
     logger.info("Database initialized")
 
     async with async_session() as session:
-        result = await backfill_workout_training_types(session)
+        user_id = os.getenv("BACKFILL_USER_ID", "00000000-0000-0000-0000-000000000001")
+        result = await backfill_workout_training_types(session, user_id=user_id)
         await session.commit()
 
     logger.info("Backfill completed: %s", result)

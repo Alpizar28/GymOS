@@ -2,9 +2,10 @@
 
 import logging
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.auth import get_current_user_id
 from src.models.settings import Setting
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ async def activate_protection(
     Returns the protection config.
     """
     key = f"protection_{muscle_group.lower().strip()}"
+    user_id = get_current_user_id()
     factor = max(0.2, 1.0 - (severity / 10) * 0.8)  # severity 10 → 0.2x, severity 1 → 0.92x
 
     protection = {
@@ -38,13 +40,21 @@ async def activate_protection(
     }
 
     # Upsert
-    result = await session.execute(select(Setting).where(Setting.key == key))
+    result = await session.execute(
+        select(Setting).where(Setting.user_id == user_id, Setting.key == key)
+    )
     existing = result.scalar_one_or_none()
 
     if existing:
         existing.value = str(protection).replace("'", '"').replace("True", "true")
     else:
-        session.add(Setting(key=key, value=str(protection).replace("'", '"').replace("True", "true")))
+        session.add(
+            Setting(
+                user_id=user_id,
+                key=key,
+                value=str(protection).replace("'", '"').replace("True", "true"),
+            )
+        )
 
     await session.flush()
     logger.info("Protection activated: %s (severity %d, factor %.2f)", muscle_group, severity, factor)
@@ -54,7 +64,10 @@ async def activate_protection(
 async def deactivate_protection(session: AsyncSession, muscle_group: str) -> bool:
     """Deactivate protection mode for a muscle group."""
     key = f"protection_{muscle_group.lower().strip()}"
-    result = await session.execute(select(Setting).where(Setting.key == key))
+    user_id = get_current_user_id()
+    result = await session.execute(
+        select(Setting).where(Setting.user_id == user_id, Setting.key == key)
+    )
     existing = result.scalar_one_or_none()
 
     if existing:
@@ -70,7 +83,10 @@ async def get_active_protections(session: AsyncSession) -> list[dict]:
     import json
 
     result = await session.execute(
-        select(Setting).where(Setting.key.like("protection_%"))
+        select(Setting).where(
+            Setting.user_id == get_current_user_id(),
+            Setting.key.like("protection_%"),
+        )
     )
     protections = []
     for setting in result.scalars().all():

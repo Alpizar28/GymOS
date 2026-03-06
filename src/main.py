@@ -5,9 +5,14 @@ import sys
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from src.auth import authenticate_request, clear_current_user_id
 from src.config import settings
+from src.database import async_session
+from src.services.user_bootstrap import ensure_user_bootstrap
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
@@ -52,9 +57,23 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=allowed_origins,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def auth_context_middleware(request, call_next):
+        try:
+            user = authenticate_request(request)
+            if user.user_id != "system":
+                async with async_session() as session:
+                    await ensure_user_bootstrap(session, user.user_id)
+            response = await call_next(request)
+            return response
+        except HTTPException as exc:
+            return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+        finally:
+            clear_current_user_id()
 
     app.include_router(router)
     return app

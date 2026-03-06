@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.auth import get_current_user_id
 from src.models.progression import AnchorTarget
 from src.models.routines import Routine, RoutineExercise, RoutineSet
 from src.models.workouts import Workout, WorkoutExercise, WorkoutSet
@@ -108,6 +109,7 @@ async def _load_recent_history(
     exercise_id: int,
     lookback: int,
 ) -> list[dict]:
+    user_id = get_current_user_id()
     result = await session.execute(
         select(
             Workout.id.label("workout_id"),
@@ -119,6 +121,7 @@ async def _load_recent_history(
         .join(WorkoutExercise, WorkoutExercise.workout_id == Workout.id)
         .join(WorkoutSet, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
         .where(WorkoutExercise.exercise_id == exercise_id)
+        .where(Workout.user_id == user_id)
         .where(WorkoutSet.set_type == "normal")
         .order_by(
             desc(Workout.date),
@@ -242,7 +245,10 @@ async def build_routine_progression_preview(
 
     exercise_ids = [ex.exercise_id for ex in anchors if ex.exercise_id is not None]
     target_result = await session.execute(
-        select(AnchorTarget).where(AnchorTarget.exercise_id.in_(exercise_ids))
+        select(AnchorTarget).where(
+            AnchorTarget.user_id == get_current_user_id(),
+            AnchorTarget.exercise_id.in_(exercise_ids),
+        )
     )
     targets = {target.exercise_id: target for target in target_result.scalars().all()}
 

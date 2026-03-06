@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
@@ -12,9 +12,13 @@ class RoutineFolder(Base):
     """Folder used to organize reusable routines."""
 
     __tablename__ = "routine_folders"
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_routine_folders_user_name"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
@@ -38,6 +42,7 @@ class Routine(Base):
     __tablename__ = "routines"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     folder_id: Mapped[int] = mapped_column(Integer, ForeignKey("routine_folders.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     subtitle: Mapped[str | None] = mapped_column(String(220), nullable=True)

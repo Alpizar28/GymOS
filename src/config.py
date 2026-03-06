@@ -7,10 +7,16 @@ class Settings(BaseSettings):
     """Type-safe settings from .env file."""
 
     openai_api_key: str = ""
-    database_url: str = "sqlite+aiosqlite:///data/gym.db"
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres"
     log_level: str = "INFO"
     web_url: str = "http://localhost:3000"
     port: int = 8000
+
+    # Auth (Supabase)
+    auth_enabled: bool = False
+    supabase_url: str = ""
+    supabase_jwt_audience: str = "authenticated"
+    dev_fallback_user_id: str = "00000000-0000-0000-0000-000000000001"
 
     # LLM config
     llm_model: str = "gpt-4o"

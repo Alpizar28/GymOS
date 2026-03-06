@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
@@ -12,10 +12,13 @@ class AnchorTarget(Base):
     """Progression target for an anchor exercise. Rules are deterministic, NOT LLM-driven."""
 
     __tablename__ = "anchor_targets"
-
-    exercise_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("exercises.id"), primary_key=True
+    __table_args__ = (
+        UniqueConstraint("user_id", "exercise_id", name="uq_anchor_targets_user_exercise"),
     )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    exercise_id: Mapped[int] = mapped_column(Integer, ForeignKey("exercises.id"), nullable=False)
     target_weight: Mapped[float] = mapped_column(Float, nullable=False)
     target_reps_min: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
     target_reps_max: Mapped[int] = mapped_column(Integer, nullable=False, default=8)

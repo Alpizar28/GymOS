@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.auth import get_current_user_id
 from src.models.exercises import Exercise
 from src.models.progression import AnchorTarget
 from src.models.settings import AthleteState
@@ -19,6 +20,7 @@ async def get_weekly_summary(
     reference_date: date | None = None,
 ) -> dict:
     """Generate a weekly stats summary."""
+    user_id = get_current_user_id()
     ref = reference_date or date.today()
     week_start = ref - timedelta(days=ref.weekday())
     week_end = week_start + timedelta(days=6)
@@ -28,6 +30,7 @@ async def get_weekly_summary(
         select(func.count(Workout.id)).where(
             Workout.date >= week_start,
             Workout.date <= week_end,
+            Workout.user_id == user_id,
         )
     )
     workout_count = count_result.scalar() or 0
@@ -38,6 +41,7 @@ async def get_weekly_summary(
         .join(WorkoutExercise, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
         .join(Workout, WorkoutExercise.workout_id == Workout.id)
         .where(Workout.date >= week_start, Workout.date <= week_end)
+        .where(Workout.user_id == user_id)
         .where(WorkoutSet.set_type == "normal")
     )
     total_sets = sets_result.scalar() or 0
@@ -48,6 +52,7 @@ async def get_weekly_summary(
         .join(WorkoutExercise, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
         .join(Workout, WorkoutExercise.workout_id == Workout.id)
         .where(Workout.date >= week_start, Workout.date <= week_end)
+        .where(Workout.user_id == user_id)
         .where(WorkoutSet.set_type == "normal")
         .where(WorkoutSet.weight.is_not(None), WorkoutSet.reps.is_not(None))
     )
@@ -57,7 +62,7 @@ async def get_weekly_summary(
     anchor_progress = await get_anchor_progress(session)
 
     # Athlete state
-    state_result = await session.execute(select(AthleteState).where(AthleteState.id == 1))
+    state_result = await session.execute(select(AthleteState).where(AthleteState.user_id == user_id))
     state = state_result.scalar_one_or_none()
 
     return {
@@ -73,9 +78,11 @@ async def get_weekly_summary(
 
 async def get_anchor_progress(session: AsyncSession) -> list[dict]:
     """Get current state of all anchor targets."""
+    user_id = get_current_user_id()
     result = await session.execute(
         select(AnchorTarget, Exercise.name_canonical)
         .join(Exercise, AnchorTarget.exercise_id == Exercise.id)
+        .where(AnchorTarget.user_id == user_id)
         .order_by(desc(AnchorTarget.target_weight))
     )
 

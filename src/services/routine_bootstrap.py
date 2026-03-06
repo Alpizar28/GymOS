@@ -18,6 +18,8 @@ HIDDEN_SYSTEM_TEMPLATE_NAMES = {
     "Posterior_Heavy",
 }
 
+DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000001"
+
 
 def _display_name(template_name: str) -> str:
     return template_name.replace("_", " ").strip()
@@ -37,12 +39,15 @@ def _infer_training_type(name: str, focus: str | None) -> str:
 async def ensure_default_routines(session: AsyncSession) -> int:
     """Create initial routines from non-system templates once."""
     count_result = await session.execute(
-        select(func.count()).select_from(Routine).where(Routine.is_deleted.is_(False))
+        select(func.count()).select_from(Routine).where(
+            Routine.is_deleted.is_(False),
+            Routine.user_id == DEFAULT_USER_ID,
+        )
     )
     if count_result.scalar_one() > 0:
         return 0
 
-    folder = RoutineFolder(name="Rutinas", sort_order=0, is_deleted=False)
+    folder = RoutineFolder(user_id=DEFAULT_USER_ID, name="Rutinas", sort_order=0, is_deleted=False)
     session.add(folder)
     await session.flush()
 
@@ -58,6 +63,7 @@ async def ensure_default_routines(session: AsyncSession) -> int:
         anchor_names = [a for a in rules.get("anchors", []) if isinstance(a, str) and a.strip()]
 
         routine = Routine(
+            user_id=DEFAULT_USER_ID,
             folder_id=folder.id,
             name=_display_name(template.name),
             subtitle=template.focus,

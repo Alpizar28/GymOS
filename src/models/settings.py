@@ -1,19 +1,24 @@
-"""Config & state models: Settings, WeekTemplate, AthleteState."""
+"""Config & state models: user settings, templates, athlete state."""
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, Integer, String, Text, func
+from sqlalchemy import DateTime, Float, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.database import Base
 
 
 class Setting(Base):
-    """Key-value store for app config (athlete profile, constraints, etc.)."""
+    """Per-user key-value store for app config and profile JSON blobs."""
 
     __tablename__ = "settings"
+    __table_args__ = (
+        UniqueConstraint("user_id", "key", name="uq_settings_user_key"),
+    )
 
-    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    key: Mapped[str] = mapped_column(String(100), nullable=False)
     value: Mapped[str] = mapped_column(Text, nullable=False)  # JSON string
 
 
@@ -29,11 +34,12 @@ class WeekTemplate(Base):
 
 
 class AthleteState(Base):
-    """Singleton row tracking current athlete state."""
+    """Per-user row tracking current athlete state."""
 
     __tablename__ = "athlete_state"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(36), nullable=False, unique=True, index=True)
     next_day_index: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     fatigue_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     updated_at: Mapped[datetime] = mapped_column(

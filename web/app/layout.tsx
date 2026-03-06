@@ -10,6 +10,7 @@ import {
   WorkoutsIcon,
 } from "@/components/icons";
 import PwaRegister from "./pwa-register";
+import AuthGuard from "./auth-guard";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -97,7 +98,7 @@ export default function RootLayout({
         {/* ── Main content ── */}
         {/* mobile: pt-4 pb-24 (space for bottom nav); desktop: pt-24 pb-12 */}
         <main className="max-w-2xl sm:max-w-7xl mx-auto px-4 sm:px-6 pt-4 sm:pt-24 pb-28 sm:pb-12">
-          {children}
+          <AuthGuard>{children}</AuthGuard>
         </main>
 
         {/* ── Mobile bottom tab bar (hidden on desktop) ── */}

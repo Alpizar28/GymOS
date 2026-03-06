@@ -8,6 +8,7 @@ from datetime import date
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.auth import get_current_user_id
 from src.models.exercises import Exercise
 from src.models.feedback import SessionFeedback
 from src.models.settings import AthleteState
@@ -128,6 +129,7 @@ async def log_workout(
         return None
 
     workout = Workout(
+        user_id=get_current_user_id(),
         date=workout_date or date.today(),
         template_day_name=template_day_name,
         notes=notes,
@@ -194,6 +196,7 @@ async def log_manual_workout(
 ) -> Workout | None:
     """Create a workout from free text or structured exercise data."""
     workout = Workout(
+        user_id=get_current_user_id(),
         date=workout_date,
         template_day_name=template_day_name,
         notes=notes,
@@ -292,10 +295,17 @@ async def complete_workout(
 
     # Advance athlete state
     result = await session.execute(
-        select(AthleteState).where(AthleteState.id == 1)
+        select(AthleteState).where(AthleteState.user_id == get_current_user_id())
     )
     state = result.scalar_one_or_none()
-    if state:
+    if state is None:
+        state = AthleteState(
+            user_id=get_current_user_id(),
+            next_day_index=2,
+            fatigue_score=round(fatigue, 1),
+        )
+        session.add(state)
+    else:
         state.next_day_index = (state.next_day_index % 6) + 1
         # Simple fatigue update: decayed average
         state.fatigue_score = round(state.fatigue_score * 0.7 + fatigue * 0.3, 1)

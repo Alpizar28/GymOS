@@ -8,6 +8,7 @@ from enum import Enum
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.auth import get_current_user_id
 from src.models.exercises import Exercise
 from src.models.progression import AnchorTarget
 from src.models.workouts import Workout, WorkoutExercise, WorkoutSet
@@ -142,11 +143,13 @@ async def get_recent_sets_for_exercise(
     limit: int = 5,
 ) -> list[dict]:
     """Get the most recent workout sets for an exercise, across sessions."""
+    user_id = get_current_user_id()
     result = await session.execute(
         select(WorkoutSet, Workout.date)
         .join(WorkoutExercise, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
         .join(Workout, WorkoutExercise.workout_id == Workout.id)
         .where(WorkoutExercise.exercise_id == exercise_id)
+        .where(Workout.user_id == user_id)
         .where(WorkoutSet.set_type == "normal")
         .order_by(desc(Workout.date), desc(WorkoutSet.id))
         .limit(limit * 5)  # get enough sets across sessions
@@ -180,6 +183,12 @@ async def update_anchor_after_workout(
     that were performed and update their targets.
     """
     # Get all exercises in this workout
+    user_id = get_current_user_id()
+    workout_result = await session.execute(select(Workout).where(Workout.id == workout_id))
+    workout = workout_result.scalar_one_or_none()
+    if workout is None or workout.user_id != user_id:
+        return []
+
     result = await session.execute(
         select(WorkoutExercise)
         .where(WorkoutExercise.workout_id == workout_id)
@@ -191,7 +200,10 @@ async def update_anchor_after_workout(
     for we in workout_exercises:
         # Check if this exercise has an anchor target
         target_result = await session.execute(
-            select(AnchorTarget).where(AnchorTarget.exercise_id == we.exercise_id)
+            select(AnchorTarget).where(
+                AnchorTarget.user_id == user_id,
+                AnchorTarget.exercise_id == we.exercise_id,
+            )
         )
         target = target_result.scalar_one_or_none()
         if target is None:

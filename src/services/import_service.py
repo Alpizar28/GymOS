@@ -203,7 +203,11 @@ async def import_athlete_profile(session: AsyncSession, path: Path) -> int:
     data = json.loads(path.read_text())
     count = 0
     for key, value in data.items():
-        setting = Setting(key=f"athlete_{key}", value=json.dumps(value))
+        setting = Setting(
+            user_id="00000000-0000-0000-0000-000000000001",
+            key=f"athlete_{key}",
+            value=json.dumps(value),
+        )
         session.add(setting)
         count += 1
     await session.flush()
@@ -256,7 +260,11 @@ async def import_program_constraints(session: AsyncSession, path: Path) -> int:
     data = json.loads(path.read_text())
     count = 0
     for key, value in data.items():
-        setting = Setting(key=f"constraint_{key}", value=json.dumps(value))
+        setting = Setting(
+            user_id="00000000-0000-0000-0000-000000000001",
+            key=f"constraint_{key}",
+            value=json.dumps(value),
+        )
         session.add(setting)
         count += 1
     await session.flush()
@@ -294,7 +302,11 @@ async def ensure_week_template(session: AsyncSession) -> int:
 
 async def seed_athlete_state(session: AsyncSession) -> None:
     """Create the singleton athlete_state row."""
-    state = AthleteState(id=1, next_day_index=1, fatigue_score=0.0)
+    state = AthleteState(
+        user_id="00000000-0000-0000-0000-000000000001",
+        next_day_index=1,
+        fatigue_score=0.0,
+    )
     session.add(state)
     await session.flush()
     logger.info("Seeded athlete state")
@@ -327,6 +339,7 @@ async def seed_anchor_targets(session: AsyncSession) -> int:
         target_weight = stats.avg_weight if stats else 100.0
 
         target = AnchorTarget(
+            user_id="00000000-0000-0000-0000-000000000001",
             exercise_id=exercise.id,
             target_weight=target_weight,
             target_reps_min=reps_min,

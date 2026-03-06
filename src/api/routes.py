@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import selectinload
 
+from src.auth import get_current_user_id
 from src.database import async_session
 from src.models.body_metrics import BodyMetric
 from src.models.exercises import Exercise, ExerciseStats
@@ -87,6 +88,7 @@ async def _aggregate_week_window(
     end: date,
     training_type: str,
 ) -> dict:
+    user_id = get_current_user_id()
     result = await session.execute(
         select(
             Workout.id,
@@ -100,6 +102,7 @@ async def _aggregate_week_window(
         )
         .join(WorkoutExercise, WorkoutExercise.workout_id == Workout.id)
         .join(WorkoutSet, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
+        .where(Workout.user_id == user_id)
         .where(Workout.date >= start, Workout.date <= end)
         .where(WorkoutSet.set_type == "normal")
         .group_by(Workout.id)
@@ -361,9 +364,12 @@ class AnchorProgressResponse(BaseModel):
 @router.get("/dashboard")
 async def get_dashboard() -> DashboardResponse:
     """Main dashboard: athlete state + last plan + weekly stats."""
+    user_id = get_current_user_id()
     async with async_session() as session:
         # Athlete state
-        state_result = await session.execute(select(AthleteState).where(AthleteState.id == 1))
+        state_result = await session.execute(
+            select(AthleteState).where(AthleteState.user_id == user_id)
+        )
         state = state_result.scalar_one_or_none()
 
         # Get day name
@@ -377,7 +383,11 @@ async def get_dashboard() -> DashboardResponse:
 
         # Last plan
         plan_result = await session.execute(
-            select(PlanDay).order_by(desc(PlanDay.id)).limit(1)
+            select(PlanDay)
+            .join(Plan, PlanDay.plan_id == Plan.id)
+            .where(Plan.user_id == user_id)
+            .order_by(desc(PlanDay.id))
+            .limit(1)
         )
         last_plan_day = plan_result.scalar_one_or_none()
         last_plan = json.loads(last_plan_day.content_json) if last_plan_day else None
@@ -429,9 +439,13 @@ async def api_generate_day(payload: GenerateDayRequest) -> dict:
 @router.get("/workouts")
 async def list_workouts(limit: int = Query(default=30, ge=1, le=200)) -> list[WorkoutSummary]:
     """List recent workouts."""
+    user_id = get_current_user_id()
     async with async_session() as session:
         result = await session.execute(
-            select(Workout).order_by(desc(Workout.date)).limit(limit)
+            select(Workout)
+            .where(Workout.user_id == user_id)
+            .order_by(desc(Workout.date))
+            .limit(limit)
         )
         workouts = result.scalars().all()
 
@@ -463,8 +477,11 @@ async def list_workouts(limit: int = Query(default=30, ge=1, le=200)) -> list[Wo
 @router.get("/workouts/{workout_id}")
 async def get_workout(workout_id: int) -> WorkoutDetail:
     """Get detailed workout with all exercises and sets."""
+    user_id = get_current_user_id()
     async with async_session() as session:
-        result = await session.execute(select(Workout).where(Workout.id == workout_id))
+        result = await session.execute(
+            select(Workout).where(Workout.id == workout_id, Workout.user_id == user_id)
+        )
         workout = result.scalar_one_or_none()
         if not workout:
             raise HTTPException(status_code=404, detail="Workout not found")
@@ -530,9 +547,14 @@ class TodayLogRequest(StrictRequestModel):
 @router.get("/today")
 async def get_today_plan() -> dict:
     """Return today's latest generated plan for the interactive logger UI."""
+    user_id = get_current_user_id()
     async with async_session() as session:
         plan_result = await session.execute(
-            select(PlanDay).order_by(desc(PlanDay.id)).limit(1)
+            select(PlanDay)
+            .join(Plan, PlanDay.plan_id == Plan.id)
+            .where(Plan.user_id == user_id)
+            .order_by(desc(PlanDay.id))
+            .limit(1)
         )
         plan_day = plan_result.scalar_one_or_none()
         if not plan_day:
@@ -577,9 +599,11 @@ async def log_today_workout(payload: TodayLogRequest) -> dict:
     Creates a new Workout for today or updates the existing one.
     """
     today = date.today()
+    user_id = get_current_user_id()
     async with async_session() as session:
         existing = await session.execute(
             select(Workout)
+            .where(Workout.user_id == user_id)
             .where(Workout.date == today)
             .where(Workout.template_day_name == payload.day_name)
             .order_by(desc(Workout.id))
@@ -590,6 +614,7 @@ async def log_today_workout(payload: TodayLogRequest) -> dict:
 
         if created:
             workout = Workout(
+                user_id=user_id,
                 date=today,
                 template_day_name=payload.day_name,
                 training_type=payload.training_type,
@@ -699,6 +724,7 @@ async def log_today_workout(payload: TodayLogRequest) -> dict:
 @router.get("/exercises/{exercise_name}/last-session")
 async def get_last_exercise_session(exercise_name: str) -> list[dict]:
     """Return the sets from the most recent workout session that included this exercise."""
+    user_id = get_current_user_id()
     async with async_session() as session:
         ex_result = await session.execute(
             select(Exercise).where(Exercise.name_canonical.ilike(exercise_name)).limit(1)
@@ -712,6 +738,7 @@ async def get_last_exercise_session(exercise_name: str) -> list[dict]:
             select(WorkoutExercise)
             .join(Workout, WorkoutExercise.workout_id == Workout.id)
             .where(WorkoutExercise.exercise_id == exercise.id)
+            .where(Workout.user_id == user_id)
             .order_by(desc(Workout.date), desc(WorkoutExercise.id))
             .limit(1)
         )
@@ -823,10 +850,12 @@ async def create_exercise(payload: ExerciseCreateRequest) -> ExerciseResponse:
 @router.get("/progress")
 async def get_progress() -> list[AnchorProgressResponse]:
     """Get anchor exercise progression with history."""
+    user_id = get_current_user_id()
     async with async_session() as session:
         result = await session.execute(
             select(AnchorTarget, Exercise.name_canonical)
             .join(Exercise, AnchorTarget.exercise_id == Exercise.id)
+            .where(AnchorTarget.user_id == user_id)
             .order_by(desc(AnchorTarget.target_weight))
         )
 
@@ -838,6 +867,7 @@ async def get_progress() -> list[AnchorProgressResponse]:
                 .join(WorkoutExercise, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
                 .join(Workout, WorkoutExercise.workout_id == Workout.id)
                 .where(WorkoutExercise.exercise_id == target.exercise_id)
+                .where(Workout.user_id == user_id)
                 .where(WorkoutSet.set_type == "normal")
                 .order_by(Workout.date)
             )
@@ -966,9 +996,13 @@ async def create_day_option(payload: DayOptionCreate) -> DayOptionResponse:
 @router.get("/profile/personal")
 async def get_personal_profile() -> PersonalProfileResponse:
     """Get editable personal profile fields for Profile page."""
+    user_id = get_current_user_id()
     async with async_session() as session:
         personal_result = await session.execute(
-            select(Setting).where(Setting.key == "athlete_personal_profile")
+            select(Setting).where(
+                Setting.user_id == user_id,
+                Setting.key == "athlete_personal_profile",
+            )
         )
         personal = personal_result.scalar_one_or_none()
 
@@ -985,7 +1019,10 @@ async def get_personal_profile() -> PersonalProfileResponse:
             )
 
         metrics_result = await session.execute(
-            select(Setting).where(Setting.key == "athlete_global_metrics")
+            select(Setting).where(
+                Setting.user_id == user_id,
+                Setting.key == "athlete_global_metrics",
+            )
         )
         metrics = metrics_result.scalar_one_or_none()
         default_weight = None
@@ -1007,9 +1044,13 @@ async def get_personal_profile() -> PersonalProfileResponse:
 @router.patch("/profile/personal")
 async def update_personal_profile(payload: PersonalProfileUpdateRequest) -> PersonalProfileResponse:
     """Update editable personal profile fields."""
+    user_id = get_current_user_id()
     async with async_session() as session:
         result = await session.execute(
-            select(Setting).where(Setting.key == "athlete_personal_profile")
+            select(Setting).where(
+                Setting.user_id == user_id,
+                Setting.key == "athlete_personal_profile",
+            )
         )
         row = result.scalar_one_or_none()
 
@@ -1031,7 +1072,7 @@ async def update_personal_profile(payload: PersonalProfileUpdateRequest) -> Pers
         data["full_name"] = full_name
 
         if row is None:
-            row = Setting(key="athlete_personal_profile", value=json.dumps(data))
+            row = Setting(user_id=user_id, key="athlete_personal_profile", value=json.dumps(data))
             session.add(row)
         else:
             row.value = json.dumps(data)
@@ -1166,6 +1207,7 @@ async def get_calendar(
     if normalized_training_type not in TRAINING_TYPE_VALUES:
         raise HTTPException(status_code=400, detail="Invalid training_type")
 
+    user_id = get_current_user_id()
     async with async_session() as session:
         result = await session.execute(
             select(
@@ -1183,6 +1225,7 @@ async def get_calendar(
             .join(WorkoutExercise, WorkoutExercise.workout_id == Workout.id)
             .join(WorkoutSet, WorkoutSet.workout_exercise_id == WorkoutExercise.id)
             .where(Workout.date >= start, Workout.date <= end)
+            .where(Workout.user_id == user_id)
             .where(WorkoutSet.set_type == "normal")
             .group_by(Workout.id)
             .order_by(Workout.date.desc())
@@ -1289,8 +1332,9 @@ async def backfill_history_training_type() -> dict:
     """Backfill workouts.training_type from routines and day name heuristics."""
     from src.services.history_backfill import backfill_workout_training_types
 
+    user_id = get_current_user_id()
     async with async_session() as session:
-        result = await backfill_workout_training_types(session)
+        result = await backfill_workout_training_types(session, user_id=user_id)
         await session.commit()
         return result
 
@@ -1298,9 +1342,11 @@ async def backfill_history_training_type() -> dict:
 @router.get("/history/training-type-stats")
 async def history_training_type_stats() -> dict:
     """Return all-time workout counts grouped by effective training_type."""
+    user_id = get_current_user_id()
     async with async_session() as session:
         result = await session.execute(
             select(Workout.template_day_name, Workout.training_type)
+            .where(Workout.user_id == user_id)
         )
 
     counts = {"push": 0, "pull": 0, "legs": 0, "custom": 0}
@@ -1417,13 +1463,18 @@ def _routine_to_detail_payload(routine: Routine) -> dict:
 
 
 async def _fetch_routine_or_404(session, routine_id: int) -> Routine:
+    user_id = get_current_user_id()
     result = await session.execute(
         select(Routine)
         .options(
             selectinload(Routine.exercises).selectinload(RoutineExercise.sets),
             selectinload(Routine.exercises).selectinload(RoutineExercise.exercise),
         )
-        .where(Routine.id == routine_id, Routine.is_deleted.is_(False))
+        .where(
+            Routine.id == routine_id,
+            Routine.user_id == user_id,
+            Routine.is_deleted.is_(False),
+        )
     )
     routine = result.scalar_one_or_none()
     if not routine:
@@ -1479,10 +1530,11 @@ async def _upsert_routine_exercises(session, routine: Routine, exercises: list[R
 @router.get("/routines/folders")
 async def list_routine_folders() -> list[dict]:
     """List non-deleted routine folders with active routine counts."""
+    user_id = get_current_user_id()
     async with async_session() as session:
         folders_result = await session.execute(
             select(RoutineFolder)
-            .where(RoutineFolder.is_deleted.is_(False))
+            .where(RoutineFolder.user_id == user_id, RoutineFolder.is_deleted.is_(False))
             .order_by(RoutineFolder.sort_order, RoutineFolder.id)
         )
 
@@ -1491,7 +1543,11 @@ async def list_routine_folders() -> list[dict]:
             count_result = await session.execute(
                 select(func.count())
                 .select_from(Routine)
-                .where(Routine.folder_id == folder.id, Routine.is_deleted.is_(False))
+                .where(
+                    Routine.user_id == user_id,
+                    Routine.folder_id == folder.id,
+                    Routine.is_deleted.is_(False),
+                )
             )
             folders.append(
                 {
@@ -1511,9 +1567,11 @@ async def create_routine_folder(payload: RoutineFolderCreateRequest) -> dict:
     if not name:
         raise HTTPException(status_code=400, detail="Folder name is required")
 
+    user_id = get_current_user_id()
     async with async_session() as session:
         existing = await session.execute(
             select(RoutineFolder).where(
+                RoutineFolder.user_id == user_id,
                 func.lower(RoutineFolder.name) == name.lower(),
                 RoutineFolder.is_deleted.is_(False),
             )
@@ -1524,7 +1582,7 @@ async def create_routine_folder(payload: RoutineFolderCreateRequest) -> dict:
         max_sort_result = await session.execute(select(func.max(RoutineFolder.sort_order)))
         sort_order = int(max_sort_result.scalar_one() or 0) + 1
 
-        folder = RoutineFolder(name=name, sort_order=sort_order, is_deleted=False)
+        folder = RoutineFolder(user_id=user_id, name=name, sort_order=sort_order, is_deleted=False)
         session.add(folder)
         await session.commit()
         await session.refresh(folder)
@@ -1534,9 +1592,10 @@ async def create_routine_folder(payload: RoutineFolderCreateRequest) -> dict:
 @router.patch("/routines/folders/{folder_id}")
 async def update_routine_folder(folder_id: int, payload: RoutineFolderUpdateRequest) -> dict:
     """Update routine folder metadata."""
+    user_id = get_current_user_id()
     async with async_session() as session:
         folder = await session.get(RoutineFolder, folder_id)
-        if not folder or folder.is_deleted:
+        if not folder or folder.user_id != user_id or folder.is_deleted:
             raise HTTPException(status_code=404, detail="Folder not found")
 
         if payload.name is not None:
@@ -1552,7 +1611,11 @@ async def update_routine_folder(folder_id: int, payload: RoutineFolderUpdateRequ
         count_result = await session.execute(
             select(func.count())
             .select_from(Routine)
-            .where(Routine.folder_id == folder.id, Routine.is_deleted.is_(False))
+            .where(
+                Routine.user_id == user_id,
+                Routine.folder_id == folder.id,
+                Routine.is_deleted.is_(False),
+            )
         )
         return {
             "id": folder.id,
@@ -1565,13 +1628,16 @@ async def update_routine_folder(folder_id: int, payload: RoutineFolderUpdateRequ
 @router.delete("/routines/folders/{folder_id}")
 async def delete_routine_folder(folder_id: int) -> dict:
     """Soft-delete a folder and all routines inside it."""
+    user_id = get_current_user_id()
     async with async_session() as session:
         folder = await session.get(RoutineFolder, folder_id)
-        if not folder or folder.is_deleted:
+        if not folder or folder.user_id != user_id or folder.is_deleted:
             raise HTTPException(status_code=404, detail="Folder not found")
 
         folder.is_deleted = True
-        routines_result = await session.execute(select(Routine).where(Routine.folder_id == folder_id))
+        routines_result = await session.execute(
+            select(Routine).where(Routine.user_id == user_id, Routine.folder_id == folder_id)
+        )
         for routine in routines_result.scalars().all():
             routine.is_deleted = True
 
@@ -1582,8 +1648,9 @@ async def delete_routine_folder(folder_id: int) -> dict:
 @router.get("/routines")
 async def list_routines(folder_id: int | None = None) -> list[dict]:
     """List non-deleted routines with card preview data."""
+    user_id = get_current_user_id()
     async with async_session() as session:
-        query = select(Routine).where(Routine.is_deleted.is_(False))
+        query = select(Routine).where(Routine.user_id == user_id, Routine.is_deleted.is_(False))
         if folder_id is not None:
             query = query.where(Routine.folder_id == folder_id)
 
@@ -1637,9 +1704,10 @@ async def create_routine(payload: RoutineCreateRequest) -> dict:
     if not name:
         raise HTTPException(status_code=400, detail="Routine name is required")
 
+    user_id = get_current_user_id()
     async with async_session() as session:
         folder = await session.get(RoutineFolder, payload.folder_id)
-        if not folder or folder.is_deleted:
+        if not folder or folder.user_id != user_id or folder.is_deleted:
             raise HTTPException(status_code=404, detail="Folder not found")
 
         if payload.sort_order is not None:
@@ -1651,6 +1719,7 @@ async def create_routine(payload: RoutineCreateRequest) -> dict:
             sort_order = int(max_sort_result.scalar_one() or 0) + 1
 
         routine = Routine(
+            user_id=user_id,
             folder_id=payload.folder_id,
             name=name,
             subtitle=payload.subtitle,
@@ -1680,12 +1749,13 @@ async def get_routine(routine_id: int) -> dict:
 @router.patch("/routines/{routine_id}")
 async def update_routine(routine_id: int, payload: RoutineUpdateRequest) -> dict:
     """Update routine metadata and optionally replace exercise structure."""
+    user_id = get_current_user_id()
     async with async_session() as session:
         routine = await _fetch_routine_or_404(session, routine_id)
 
         if payload.folder_id is not None:
             folder = await session.get(RoutineFolder, payload.folder_id)
-            if not folder or folder.is_deleted:
+            if not folder or folder.user_id != user_id or folder.is_deleted:
                 raise HTTPException(status_code=404, detail="Folder not found")
             routine.folder_id = payload.folder_id
         if payload.name is not None:
@@ -1713,9 +1783,10 @@ async def update_routine(routine_id: int, payload: RoutineUpdateRequest) -> dict
 @router.delete("/routines/{routine_id}")
 async def delete_routine(routine_id: int) -> dict:
     """Soft-delete a routine."""
+    user_id = get_current_user_id()
     async with async_session() as session:
         routine = await session.get(Routine, routine_id)
-        if not routine or routine.is_deleted:
+        if not routine or routine.user_id != user_id or routine.is_deleted:
             raise HTTPException(status_code=404, detail="Routine not found")
 
         routine.is_deleted = True
@@ -1726,15 +1797,20 @@ async def delete_routine(routine_id: int) -> dict:
 @router.post("/routines/{routine_id}/duplicate")
 async def duplicate_routine(routine_id: int) -> dict:
     """Duplicate an existing routine in the same folder."""
+    user_id = get_current_user_id()
     async with async_session() as session:
         source = await _fetch_routine_or_404(session, routine_id)
 
         max_sort_result = await session.execute(
-            select(func.max(Routine.sort_order)).where(Routine.folder_id == source.folder_id)
+            select(func.max(Routine.sort_order)).where(
+                Routine.user_id == user_id,
+                Routine.folder_id == source.folder_id,
+            )
         )
         sort_order = int(max_sort_result.scalar_one() or 0) + 1
 
         clone = Routine(
+            user_id=user_id,
             folder_id=source.folder_id,
             name=f"{source.name} Copy",
             subtitle=source.subtitle,
@@ -1802,6 +1878,7 @@ async def start_routine(routine_id: int) -> dict:
             return "drop"
         return "normal"
 
+    user_id = get_current_user_id()
     async with async_session() as session:
         routine = await _fetch_routine_or_404(session, routine_id)
         if not routine.exercises:
@@ -1851,6 +1928,7 @@ async def start_routine(routine_id: int) -> dict:
         }
 
         plan = Plan(
+            user_id=user_id,
             start_date=date.today(),
             end_date=date.today(),
             goal=f"Routine start: {routine.name}",
@@ -1928,10 +2006,11 @@ async def complete_today_session(payload: CompleteSessionRequest) -> dict:
     """
     from src.models.feedback import SessionFeedback
 
+    user_id = get_current_user_id()
     async with async_session() as session:
         # Verify workout exists
         workout = await session.get(Workout, payload.workout_id)
-        if not workout:
+        if not workout or workout.user_id != user_id:
             raise HTTPException(status_code=404, detail="Workout not found")
 
         # Save fatigue feedback
@@ -1946,9 +2025,18 @@ async def complete_today_session(payload: CompleteSessionRequest) -> dict:
         session.add(feedback)
 
         # Advance athlete state
-        state_result = await session.execute(select(AthleteState).where(AthleteState.id == 1))
+        state_result = await session.execute(
+            select(AthleteState).where(AthleteState.user_id == user_id)
+        )
         state = state_result.scalar_one_or_none()
-        if state:
+        if state is None:
+            state = AthleteState(
+                user_id=user_id,
+                next_day_index=2,
+                fatigue_score=round(payload.fatigue, 1),
+            )
+            session.add(state)
+        else:
             state.next_day_index = (state.next_day_index % 6) + 1
             state.fatigue_score = round(state.fatigue_score * 0.7 + payload.fatigue * 0.3, 1)
             session.add(state)
@@ -1970,6 +2058,7 @@ async def get_week_plan() -> list[dict]:
     Return a 6-day plan. Each day is served from PlanDay cache if available,
     otherwise returns the week template metadata for that day.
     """
+    user_id = get_current_user_id()
     async with async_session() as session:
         templates_result = await session.execute(
             select(WeekTemplate)
@@ -1980,7 +2069,10 @@ async def get_week_plan() -> list[dict]:
 
         # Get the last generated plan per day_name from PlanDay cache
         plans_result = await session.execute(
-            select(PlanDay).order_by(desc(PlanDay.id))
+            select(PlanDay)
+            .join(Plan, PlanDay.plan_id == Plan.id)
+            .where(Plan.user_id == user_id)
+            .order_by(desc(PlanDay.id))
         )
         plans_by_day: dict[str, dict] = {}
         for p in plans_result.scalars().all():
