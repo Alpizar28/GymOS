@@ -42,6 +42,8 @@ export const viewport: Viewport = {
   themeColor: "#09090b",
 };
 
+export const dynamic = "force-dynamic";
+
 // Bottom tab bar (mobile) — 5 most-used items
 const bottomTabs = [
   { href: "/today",    label: "Today", icon: TodayIcon },
