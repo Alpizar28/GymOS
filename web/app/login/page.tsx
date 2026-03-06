@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
@@ -11,7 +11,24 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function recoverSession() {
+      const { data } = await supabase.auth.getSession();
+      if (data.session && mounted) {
+        router.replace("/today");
+      }
+    }
+
+    void recoverSession();
+    return () => {
+      mounted = false;
+    };
+  }, [router]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,6 +49,23 @@ export default function LoginPage() {
       setMessage(text);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function signInWithGoogle() {
+    setGoogleLoading(true);
+    setMessage("");
+    try {
+      const redirectTo = `${window.location.origin}/login`;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo },
+      });
+      if (error) throw error;
+    } catch (error: unknown) {
+      const text = error instanceof Error ? error.message : "No se pudo iniciar con Google";
+      setMessage(text);
+      setGoogleLoading(false);
     }
   }
 
@@ -67,6 +101,15 @@ export default function LoginPage() {
             {loading ? "Procesando..." : mode === "login" ? "Entrar" : "Crear cuenta"}
           </button>
         </form>
+
+        <button
+          type="button"
+          onClick={signInWithGoogle}
+          disabled={googleLoading || loading}
+          className="w-full py-2.5 rounded-lg border border-zinc-700 bg-zinc-950 text-zinc-100 font-semibold disabled:opacity-40"
+        >
+          {googleLoading ? "Redirigiendo a Google..." : "Continuar con Google"}
+        </button>
 
         <button
           type="button"

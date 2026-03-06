@@ -1,0 +1,35 @@
+name: Coolify Autodeploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coolify-deploy-main
+  cancel-in-progress: true
+
+jobs:
+  trigger-coolify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Coolify webhook
+        env:
+          COOLIFY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+          COOLIFY_WEBHOOK_FALLBACK: https://panel.n8njokem.space/webhooks/source/github/events/manual
+        run: |
+          URL="${COOLIFY_WEBHOOK_URL:-$COOLIFY_WEBHOOK_FALLBACK}"
+
+          if [ -z "$URL" ]; then
+            echo "Coolify webhook URL is missing"
+            exit 1
+          fi
+
+          echo "Triggering Coolify deploy webhook..."
+          curl --fail-with-body --location --request POST "$URL" \
+            --header "Content-Type: application/json" \
+            --data "{\"source\":\"github-actions\",\"repository\":\"${GITHUB_REPOSITORY}\",\"ref\":\"${GITHUB_REF}\",\"sha\":\"${GITHUB_SHA}\",\"actor\":\"${GITHUB_ACTOR}\"}"
