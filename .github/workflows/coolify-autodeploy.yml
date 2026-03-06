@@ -17,19 +17,43 @@ jobs:
   trigger-coolify:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Coolify webhook
+      - name: Trigger Coolify deploy API webhook
         env:
-          COOLIFY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
-          COOLIFY_WEBHOOK_FALLBACK: https://panel.n8njokem.space/webhooks/source/github/events/manual
+          COOLIFY_DEPLOY_WEBHOOK_URL: ${{ secrets.COOLIFY_DEPLOY_WEBHOOK_URL }}
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
         run: |
-          URL="${COOLIFY_WEBHOOK_URL:-$COOLIFY_WEBHOOK_FALLBACK}"
+          URL="${COOLIFY_DEPLOY_WEBHOOK_URL}"
 
           if [ -z "$URL" ]; then
-            echo "Coolify webhook URL is missing"
+            echo "Missing secret: COOLIFY_DEPLOY_WEBHOOK_URL"
+            exit 1
+          fi
+
+          if [ -z "$COOLIFY_API_TOKEN" ]; then
+            echo "Missing secret: COOLIFY_API_TOKEN"
+            echo "The deploy webhook shown by Coolify is auth-required."
             exit 1
           fi
 
           echo "Triggering Coolify deploy webhook..."
-          curl --fail-with-body --location --request POST "$URL" \
+          HTTP_CODE=$(curl \
+            --silent \
+            --show-error \
+            --location \
+            --request POST "$URL" \
+            --header "Authorization: Bearer $COOLIFY_API_TOKEN" \
             --header "Content-Type: application/json" \
-            --data "{\"source\":\"github-actions\",\"repository\":\"${GITHUB_REPOSITORY}\",\"ref\":\"${GITHUB_REF}\",\"sha\":\"${GITHUB_SHA}\",\"actor\":\"${GITHUB_ACTOR}\"}"
+            --data "{\"source\":\"github-actions\",\"repository\":\"${GITHUB_REPOSITORY}\",\"ref\":\"${GITHUB_REF_NAME}\",\"sha\":\"${GITHUB_SHA}\",\"actor\":\"${GITHUB_ACTOR}\"}" \
+            --output /tmp/coolify-response.txt \
+            --write-out "%{http_code}")
+
+          case "$HTTP_CODE" in
+            2*)
+              echo "Coolify webhook triggered successfully (status $HTTP_CODE)."
+              ;;
+            *)
+              echo "Coolify webhook failed (status $HTTP_CODE)"
+              cat /tmp/coolify-response.txt || true
+              exit 1
+              ;;
+          esac
