@@ -102,6 +102,14 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
     headers.delete("host");
     headers.delete("content-length");
 
+    // Some edge/proxy hops may strip Authorization from browser requests.
+    // Accept a mirrored token header from the client and restore it.
+    const mirroredToken = headers.get("x-supabase-access-token");
+    if (!headers.get("authorization") && mirroredToken) {
+      headers.set("authorization", `Bearer ${mirroredToken}`);
+    }
+    headers.delete("x-supabase-access-token");
+
     const response = await fetch(target, {
       method,
       headers,

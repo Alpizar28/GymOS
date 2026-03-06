@@ -395,6 +395,7 @@ async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
     const firstToken = await getAccessToken();
     if (firstToken) {
         firstHeaders.set("Authorization", `Bearer ${firstToken}`);
+        firstHeaders.set("X-Supabase-Access-Token", firstToken);
     }
 
     let res = await fetch(`${API_BASE}${path}`, { ...init, headers: firstHeaders });
@@ -404,6 +405,7 @@ async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
         if (refreshedToken && refreshedToken !== firstToken) {
             const retryHeaders = new Headers(init?.headers ?? {});
             retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);
+            retryHeaders.set("X-Supabase-Access-Token", refreshedToken);
             res = await fetch(`${API_BASE}${path}`, { ...init, headers: retryHeaders });
         }
     }
