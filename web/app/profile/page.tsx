@@ -346,6 +346,22 @@ function PersonalSection({ onSaved }: { onSaved?: (profile: PersonalProfile) => 
           </div>
 
           <div>
+            <label className="text-xs text-zinc-500 block mb-1">Short Bar (lb)</label>
+            {editing ? (
+              <input
+                type="number"
+                step="0.5"
+                min={0}
+                value={draft.preferred_short_bar_lbs ?? ""}
+                onChange={(e) => setDraft((prev) => prev ? { ...prev, preferred_short_bar_lbs: e.target.value ? Number(e.target.value) : null } : prev)}
+                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
+              />
+            ) : (
+              <p className="text-sm text-zinc-200">{data.preferred_short_bar_lbs ?? 35}</p>
+            )}
+          </div>
+
+          <div>
             <label className="text-xs text-zinc-500 block mb-1">Objetivo</label>
             {editing ? (
               <input

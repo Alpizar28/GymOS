@@ -15,6 +15,7 @@ import {
     type DayOptionCreate,
     type ExerciseItem,
 } from "@/lib/api";
+import { PlateCalculatorModal } from "@/components/plate-calculator-modal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -822,7 +823,7 @@ function CompleteModal({ workoutId, onComplete, onClose }: {
 
 // ─── Set Card ────────────────────────────────────────────────────────────────
 
-function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, onRemove, onCopyAbove, onComplete: onDone }: {
+function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, onRemove, onCopyAbove, onComplete: onDone, onOpenWeightCalculator }: {
     exerciseIndex: number;
     index: number;
     planned: TodaySet | null;
@@ -832,6 +833,7 @@ function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, on
     onRemove: () => void;
     onCopyAbove: () => void;
     onComplete: (setIndex: number) => void; // triggers rest timer + next focus
+    onOpenWeightCalculator: () => void;
 }) {
     const upd = (f: Partial<ActualSet>) => onChange({ ...actual, ...f });
     const visual = setTypeVisual(planned, actual);
@@ -871,6 +873,10 @@ function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, on
                     <input type="number" step="2.5" inputMode="decimal"
                         id={`set-${exerciseIndex}-${index}-weight`}
                         value={actual.actual_weight ?? ""}
+                        onFocus={(e) => {
+                            e.currentTarget.blur();
+                            onOpenWeightCalculator();
+                        }}
                         onChange={(e) => upd({ actual_weight: e.target.value ? parseFloat(e.target.value) : null })}
                         placeholder={planned?.weight_lbs ? String(planned.weight_lbs) : "lb"}
                         className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500" />
@@ -916,7 +922,7 @@ function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, on
 
 // ─── Exercise Accordion ──────────────────────────────────────────────────────
 
-function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddSet, onRemoveSet, onCopyPreviousSet, onRemoveExercise, onSwap, onMoveUp, onMoveDown, onSetComplete }: {
+function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddSet, onRemoveSet, onCopyPreviousSet, onRemoveExercise, onSwap, onMoveUp, onMoveDown, onSetComplete, onOpenWeightCalculator }: {
     exerciseIndex: number;
     state: ExerciseState;
     onToggle: () => void;
@@ -929,6 +935,7 @@ function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddS
     onMoveUp: () => void;
     onMoveDown: () => void;
     onSetComplete: (setIndex: number) => void;
+    onOpenWeightCalculator: (setIndex: number) => void;
 }) {
     const { open, sets, plannedSets, lastSession } = state;
     const done = sets.filter((s) => s.completed).length;
@@ -976,6 +983,7 @@ function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddS
                                 onRemove={() => onRemoveSet(i)}
                                 onCopyAbove={() => onCopyPreviousSet(i)}
                                 onComplete={onSetComplete}
+                                onOpenWeightCalculator={() => onOpenWeightCalculator(i)}
                             />
                         ))}
                     </div>
@@ -1016,6 +1024,8 @@ export default function TodayPage() {
     const [restTimerLeft, setRestTimerLeft] = useState<number | null>(null);
     const [restRunning, setRestRunning] = useState(false);
     const [restDefaultSeconds, setRestDefaultSeconds] = useState(120);
+    const [shortBarWeight, setShortBarWeight] = useState(35);
+    const [plateTarget, setPlateTarget] = useState<{ exerciseIdx: number; setIdx: number } | null>(null);
     const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
     const undoTimeoutRef = useRef<number | null>(null);
     const draftReadyRef = useRef(false);
@@ -1244,6 +1254,13 @@ export default function TodayPage() {
         return () => { cancelled = true; };
     }, [applyPlanWithRecovery, loadDayMeta]);
 
+    useEffect(() => {
+        api
+            .getPersonalProfile()
+            .then((profile) => setShortBarWeight(profile.preferred_short_bar_lbs ?? 35))
+            .catch(() => {});
+    }, []);
+
     const handleGenerate = async () => {
         if (!selectedDay) return;
         setGenerating(true);
@@ -1454,6 +1471,20 @@ export default function TodayPage() {
         focusNextSetInput(exerciseIdx, setIdx);
     };
 
+    const closePlateCalculator = () => setPlateTarget(null);
+
+    const savePlateWeight = (weight: number) => {
+        if (!plateTarget) return;
+        const { exerciseIdx, setIdx } = plateTarget;
+        const targetSet = exercises[exerciseIdx]?.sets[setIdx];
+        if (!targetSet) {
+            closePlateCalculator();
+            return;
+        }
+        updateSet(exerciseIdx, setIdx, { ...targetSet, actual_weight: weight });
+        closePlateCalculator();
+    };
+
     const totalSets = exercises.reduce((n, e) => n + e.sets.length, 0);
     const enteredSets = exercises.reduce((n, e) => n + e.sets.filter((s) => hasSetData(s)).length, 0);
     const completedSets = exercises.reduce((n, e) => n + e.sets.filter((s) => s.completed).length, 0);
@@ -1500,6 +1531,14 @@ export default function TodayPage() {
 
     return (
         <div className="max-w-6xl mx-auto pb-36 sm:pb-8 overflow-x-hidden">
+            {plateTarget && (
+                <PlateCalculatorModal
+                    initialWeight={exercises[plateTarget.exerciseIdx]?.sets[plateTarget.setIdx]?.actual_weight ?? 0}
+                    shortBarWeight={shortBarWeight}
+                    onClose={closePlateCalculator}
+                    onSave={savePlateWeight}
+                />
+            )}
             {/* Modals */}
             {swapFor !== null && swapIndex >= 0 && (
                 <SwapModal exerciseName={swapFor} onClose={() => setSwapFor(null)} onSwap={(alt) => swapExercise(swapIndex, alt)} />
@@ -1756,6 +1795,7 @@ export default function TodayPage() {
                                 onMoveUp={() => moveExercise(i, -1)}
                                 onMoveDown={() => moveExercise(i, 1)}
                                 onSetComplete={(si) => startRestTimer(i, si)}
+                                onOpenWeightCalculator={(si) => setPlateTarget({ exerciseIdx: i, setIdx: si })}
                             />
                         ))}
                     </div>

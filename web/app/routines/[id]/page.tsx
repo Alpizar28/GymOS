@@ -12,6 +12,7 @@ import {
   type RoutineProgressionPreviewResponse,
   type RoutineSetTemplate,
 } from "@/lib/api";
+import { PlateCalculatorModal } from "@/components/plate-calculator-modal";
 import { TrashIcon } from "@/components/icons";
 
 const SET_TYPE_OPTIONS = [
@@ -83,6 +84,8 @@ export default function RoutineDetailPage() {
   const [loadingProgression, setLoadingProgression] = useState(false);
   const [applyingProgression, setApplyingProgression] = useState(false);
   const [progressionError, setProgressionError] = useState("");
+  const [shortBarWeight, setShortBarWeight] = useState(35);
+  const [plateTarget, setPlateTarget] = useState<{ exIdx: number; setIdx: number } | null>(null);
 
   function showToast(message: string) {
     setToast(message);
@@ -98,6 +101,10 @@ export default function RoutineDetailPage() {
       ]);
       setDraft(detail);
       setLibrary(exercises);
+      api
+        .getPersonalProfile()
+        .then((profile) => setShortBarWeight(profile.preferred_short_bar_lbs ?? 35))
+        .catch(() => {});
     } finally {
       setLoading(false);
     }
@@ -315,12 +322,34 @@ export default function RoutineDetailPage() {
     }
   }
 
+  function openPlateCalculator(exIdx: number, setIdx: number) {
+    setPlateTarget({ exIdx, setIdx });
+  }
+
+  function closePlateCalculator() {
+    setPlateTarget(null);
+  }
+
+  function savePlateWeight(weight: number) {
+    if (!plateTarget) return;
+    updateSet(plateTarget.exIdx, plateTarget.setIdx, { target_weight_lbs: weight });
+    closePlateCalculator();
+  }
+
   if (loading || !draft) {
     return <div className="text-sm text-zinc-500 py-10 text-center">Cargando rutina...</div>;
   }
 
   return (
     <div className="max-w-3xl mx-auto overflow-x-hidden">
+      {plateTarget && (
+        <PlateCalculatorModal
+          initialWeight={draft.exercises[plateTarget.exIdx]?.sets[plateTarget.setIdx]?.target_weight_lbs ?? 0}
+          shortBarWeight={shortBarWeight}
+          onClose={closePlateCalculator}
+          onSave={savePlateWeight}
+        />
+      )}
       <div className="flex items-center justify-between mb-4">
         <button onClick={() => router.push("/routines")} className="w-10 h-10 rounded-full border border-zinc-800">
           ←
@@ -529,6 +558,10 @@ export default function RoutineDetailPage() {
                     <input
                       type="number"
                       value={set.target_weight_lbs ?? ""}
+                      onFocus={(e) => {
+                        e.currentTarget.blur();
+                        openPlateCalculator(exIdx, setIdx);
+                      }}
                       onChange={(e) =>
                         updateSet(exIdx, setIdx, {
                           target_weight_lbs: e.target.value ? Number(e.target.value) : null,

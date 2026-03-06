@@ -306,6 +306,7 @@ class PersonalProfileResponse(BaseModel):
     days_per_week: int | None = None
     session_duration_min: int | None = None
     preferred_split: str | None = None
+    preferred_short_bar_lbs: float | None = 35
     equipment_access: list[str] = Field(default_factory=list)
     injuries: list[dict] = Field(default_factory=list)
     limitations: str | None = None
@@ -338,6 +339,7 @@ class PersonalProfileUpdateRequest(StrictRequestModel):
     days_per_week: int | None = Field(default=None, ge=1, le=7)
     session_duration_min: int | None = Field(default=None, ge=20, le=240)
     preferred_split: str | None = Field(default=None, max_length=80)
+    preferred_short_bar_lbs: float | None = Field(default=None, ge=0, le=100)
     equipment_access: list[str] | None = Field(default=None, max_length=20)
     injuries: list[dict] | None = Field(default=None, max_length=30)
     limitations: str | None = Field(default=None, max_length=1000)
@@ -1065,6 +1067,7 @@ async def get_personal_profile() -> PersonalProfileResponse:
             "days_per_week": None,
             "session_duration_min": None,
             "preferred_split": None,
+            "preferred_short_bar_lbs": 35,
             "equipment_access": [],
             "injuries": [],
             "limitations": None,
@@ -1194,6 +1197,7 @@ async def update_personal_profile(payload: PersonalProfileUpdateRequest) -> Pers
             "days_per_week": None,
             "session_duration_min": None,
             "preferred_split": None,
+            "preferred_short_bar_lbs": 35,
             "equipment_access": [],
             "injuries": [],
             "limitations": None,
@@ -1238,6 +1242,7 @@ async def update_personal_profile(payload: PersonalProfileUpdateRequest) -> Pers
             days_per_week=data.get("days_per_week"),
             session_duration_min=data.get("session_duration_min"),
             preferred_split=data.get("preferred_split"),
+            preferred_short_bar_lbs=data.get("preferred_short_bar_lbs", 35),
             equipment_access=data.get("equipment_access") or [],
             injuries=data.get("injuries") or [],
             limitations=data.get("limitations"),

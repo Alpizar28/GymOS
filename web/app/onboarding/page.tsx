@@ -31,6 +31,7 @@ const EMPTY_PROFILE: PersonalProfile = {
   days_per_week: null,
   session_duration_min: null,
   preferred_split: null,
+  preferred_short_bar_lbs: 35,
   equipment_access: [],
   injuries: [],
   limitations: null,

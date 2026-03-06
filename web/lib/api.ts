@@ -103,6 +103,7 @@ export interface PersonalProfile {
     days_per_week: number | null;
     session_duration_min: number | null;
     preferred_split: string | null;
+    preferred_short_bar_lbs: number | null;
     equipment_access: string[];
     injuries: Array<{ area: string; severity: "low" | "medium" | "high"; notes?: string | null }>;
     limitations: string | null;
