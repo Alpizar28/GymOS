@@ -15,6 +15,48 @@ function formatWeight(value: number): string {
   return value.toFixed(1);
 }
 
+function plateHeight(plate: number): number {
+  if (plate >= 45) return 68;
+  if (plate >= 35) return 62;
+  if (plate >= 25) return 56;
+  if (plate >= 22) return 52;
+  if (plate >= 10) return 44;
+  if (plate >= 5) return 36;
+  return 30;
+}
+
+function plateColor(plate: number): string {
+  if (plate >= 45) return "bg-zinc-200";
+  if (plate >= 35) return "bg-zinc-300";
+  if (plate >= 25) return "bg-blue-300";
+  if (plate >= 22) return "bg-blue-400";
+  if (plate >= 10) return "bg-zinc-400";
+  return "bg-zinc-500";
+}
+
+function PlateStack({ plates, side }: { plates: number[]; side: "left" | "right" }) {
+  const maxVisible = 8;
+  const visible = plates.slice(0, maxVisible);
+  const hiddenCount = Math.max(0, plates.length - maxVisible);
+  const sideClass = side === "left" ? "flex-row-reverse" : "flex-row";
+
+  return (
+    <div className={`flex items-end ${sideClass} gap-0.5 min-w-[68px]`}>
+      {hiddenCount > 0 && (
+        <span className="text-[10px] text-zinc-400 px-1">+{hiddenCount}</span>
+      )}
+      {visible.map((plate, idx) => (
+        <div
+          key={`${side}-${plate}-${idx}`}
+          className={`w-3 sm:w-3.5 rounded-sm border border-zinc-800 ${plateColor(plate)}`}
+          style={{ height: `${plateHeight(plate)}px` }}
+          title={`${formatWeight(plate)} lb`}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function PlateCalculatorModal({
   initialWeight,
   shortBarWeight,
@@ -27,10 +69,10 @@ export function PlateCalculatorModal({
   onSave: (weight: number) => void;
 }) {
   const [barType, setBarType] = useState<BarType>("standard");
-  const [selectedPlates, setSelectedPlates] = useState<number[]>([]);
+  const [plateSizes, setPlateSizes] = useState<number[]>([...PLATE_OPTIONS]);
+  const [plateCounts, setPlateCounts] = useState<Record<number, number>>({});
   const [customPlate, setCustomPlate] = useState<string>("");
   const [showCustomInput, setShowCustomInput] = useState(false);
-  const [manualOffset, setManualOffset] = useState(0);
 
   const barWeight = useMemo(() => {
     if (barType === "standard") return 45;
@@ -39,27 +81,45 @@ export function PlateCalculatorModal({
     return 0;
   }, [barType, shortBarWeight]);
 
-  const platesTotal = useMemo(
-    () => selectedPlates.reduce((sum, p) => sum + p, 0) * 2,
-    [selectedPlates]
+  const platesPerSideTotal = useMemo(
+    () => Object.entries(plateCounts).reduce((sum, [plate, count]) => sum + Number(plate) * count, 0),
+    [plateCounts]
   );
 
-  const total = useMemo(
-    () => roundToNearestHalf(initialWeight + barWeight + platesTotal + manualOffset),
-    [initialWeight, barWeight, platesTotal, manualOffset]
-  );
+  const platesTotal = platesPerSideTotal * 2;
 
-  function togglePlate(plate: number) {
-    setSelectedPlates((prev) =>
-      prev.includes(plate) ? prev.filter((value) => value !== plate) : [...prev, plate]
-    );
+  const total = useMemo(() => roundToNearestHalf(initialWeight + barWeight + platesTotal), [initialWeight, barWeight, platesTotal]);
+
+  const visualPerSide = useMemo(() => {
+    const stack: number[] = [];
+    const sorted = [...plateSizes].sort((a, b) => b - a);
+    sorted.forEach((plate) => {
+      const count = plateCounts[plate] ?? 0;
+      for (let i = 0; i < count; i += 1) {
+        stack.push(plate);
+      }
+    });
+    return stack;
+  }, [plateCounts, plateSizes]);
+
+  function changePlateCount(plate: number, delta: number) {
+    setPlateCounts((prev) => {
+      const next = { ...prev };
+      const current = next[plate] ?? 0;
+      const updated = current + delta;
+      if (updated <= 0) {
+        delete next[plate];
+      } else {
+        next[plate] = updated;
+      }
+      return next;
+    });
   }
 
   function clear() {
-    setSelectedPlates([]);
+    setPlateCounts({});
     setShowCustomInput(false);
     setCustomPlate("");
-    setManualOffset(0);
     setBarType("standard");
   }
 
@@ -67,9 +127,10 @@ export function PlateCalculatorModal({
     const value = Number(customPlate);
     if (!Number.isFinite(value) || value <= 0) return;
     const rounded = roundToNearestHalf(value);
-    if (!selectedPlates.includes(rounded)) {
-      setSelectedPlates((prev) => [...prev, rounded]);
-    }
+    setPlateSizes((prev) =>
+      prev.includes(rounded) ? prev : [...prev, rounded].sort((a, b) => b - a)
+    );
+    changePlateCount(rounded, 1);
     setCustomPlate("");
     setShowCustomInput(false);
   }
@@ -90,44 +151,58 @@ export function PlateCalculatorModal({
           </button>
         </div>
 
-        <div className="mt-4 grid grid-cols-[1fr_auto] gap-3 items-center">
-          <input
-            type="range"
-            min={0}
-            max={400}
-            step={2.5}
-            value={manualOffset}
-            onChange={(e) => setManualOffset(Number(e.target.value))}
-            className="w-full accent-blue-400"
-          />
-          <p className="text-3xl font-bold text-white tabular-nums">{formatWeight(total)} lbs</p>
+        <div className="mt-4 rounded-2xl border border-zinc-700 bg-[#17171f] p-4">
+          <p className="text-center text-4xl font-bold text-white tabular-nums">{formatWeight(total)} lbs</p>
+          <p className="text-center text-xs text-zinc-400 mt-1">
+            Bar {formatWeight(barWeight)} + Plates {formatWeight(platesTotal)} + Initial {formatWeight(initialWeight)}
+          </p>
+
+          <div className="mt-4 flex items-center justify-center gap-1">
+            <PlateStack plates={visualPerSide} side="left" />
+            <div className="h-2 w-16 sm:w-20 rounded-full bg-zinc-400" />
+            <div className="h-5 w-3 rounded bg-zinc-200" />
+            <div className="h-2 w-16 sm:w-20 rounded-full bg-zinc-400" />
+            <PlateStack plates={visualPerSide} side="right" />
+          </div>
         </div>
 
         <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">Add Plates (+lbs)</p>
-          <div className="flex flex-wrap gap-2">
-            {PLATE_OPTIONS.map((plate) => {
-              const active = selectedPlates.includes(plate);
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">Add Plates (+lbs per side)</p>
+          <div className="space-y-2">
+            {plateSizes.map((plate) => {
+              const count = plateCounts[plate] ?? 0;
               return (
-                <button
+                <div
                   key={plate}
-                  type="button"
-                  onClick={() => togglePlate(plate)}
-                  className={`h-10 min-w-10 rounded-full border px-3 text-xs font-semibold ${active
-                    ? "bg-[#4da3ff] border-[#4da3ff] text-white"
-                    : "bg-zinc-800 border-zinc-700 text-zinc-300"
-                    }`}
+                  className="grid grid-cols-[44px_1fr_44px] items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900/70 px-2 py-2"
                 >
-                  {formatWeight(plate)}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => changePlateCount(plate, -1)}
+                    className="h-11 w-11 rounded-xl border border-zinc-600 bg-zinc-800 text-lg font-bold text-zinc-200 active:scale-[0.98]"
+                  >
+                    -
+                  </button>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold text-white">{formatWeight(plate)} lb</p>
+                    <p className="text-xs text-zinc-400">{count} por lado</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => changePlateCount(plate, 1)}
+                    className="h-11 w-11 rounded-xl border border-[#4da3ff]/70 bg-[#4da3ff]/20 text-lg font-bold text-[#9acaff] active:scale-[0.98]"
+                  >
+                    +
+                  </button>
+                </div>
               );
             })}
             <button
               type="button"
               onClick={() => setShowCustomInput((prev) => !prev)}
-              className="h-10 w-10 rounded-full border border-dashed border-zinc-600 text-zinc-400 text-lg leading-none"
+              className="h-11 w-full rounded-xl border border-dashed border-zinc-600 text-zinc-400 text-sm font-semibold"
             >
-              +
+              Add custom plate (+)
             </button>
           </div>
           {showCustomInput && (
@@ -144,7 +219,7 @@ export function PlateCalculatorModal({
               <button
                 type="button"
                 onClick={addCustomPlate}
-                className="px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-zinc-200"
+                className="px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-semibold text-zinc-200 h-10"
               >
                 Add
               </button>

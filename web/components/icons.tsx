@@ -168,3 +168,45 @@ export function OfflineIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function BackspaceIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <path d="M9 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9L3 12z" />
+      <path d="M12 10l4 4" />
+      <path d="M16 10l-4 4" />
+    </svg>
+  );
+}
+
+export function BarbellIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <path d="M3 10h2" />
+      <path d="M19 10h2" />
+      <path d="M5 8v4" />
+      <path d="M19 8v4" />
+      <path d="M7 10h10" />
+      <path d="M3 14h2" />
+      <path d="M19 14h2" />
+      <path d="M5 12v4" />
+      <path d="M19 12v4" />
+      <path d="M7 14h10" />
+    </svg>
+  );
+}
+
+export function CalculatorIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <rect x="6" y="3" width="12" height="18" rx="2" />
+      <path d="M9 7h6" />
+      <path d="M9 12h.01" />
+      <path d="M12 12h.01" />
+      <path d="M15 12h.01" />
+      <path d="M9 16h.01" />
+      <path d="M12 16h.01" />
+      <path d="M15 16h.01" />
+    </svg>
+  );
+}

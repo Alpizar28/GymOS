@@ -13,6 +13,7 @@ import {
   type RoutineSetTemplate,
 } from "@/lib/api";
 import { PlateCalculatorModal } from "@/components/plate-calculator-modal";
+import { WeightKeypadSheet } from "@/components/weight-keypad-sheet";
 import { TrashIcon } from "@/components/icons";
 
 const SET_TYPE_OPTIONS = [
@@ -85,6 +86,7 @@ export default function RoutineDetailPage() {
   const [applyingProgression, setApplyingProgression] = useState(false);
   const [progressionError, setProgressionError] = useState("");
   const [shortBarWeight, setShortBarWeight] = useState(35);
+  const [keypadTarget, setKeypadTarget] = useState<{ exIdx: number; setIdx: number } | null>(null);
   const [plateTarget, setPlateTarget] = useState<{ exIdx: number; setIdx: number } | null>(null);
 
   function showToast(message: string) {
@@ -322,8 +324,23 @@ export default function RoutineDetailPage() {
     }
   }
 
-  function openPlateCalculator(exIdx: number, setIdx: number) {
-    setPlateTarget({ exIdx, setIdx });
+  function openWeightKeypad(exIdx: number, setIdx: number) {
+    setKeypadTarget({ exIdx, setIdx });
+  }
+
+  function closeWeightKeypad() {
+    setKeypadTarget(null);
+  }
+
+  function updateWeightFromKeypad(value: number | null) {
+    if (!keypadTarget) return;
+    updateSet(keypadTarget.exIdx, keypadTarget.setIdx, { target_weight_lbs: value });
+  }
+
+  function openPlateCalculatorFromKeypad() {
+    if (!keypadTarget) return;
+    setPlateTarget(keypadTarget);
+    setKeypadTarget(null);
   }
 
   function closePlateCalculator() {
@@ -342,6 +359,14 @@ export default function RoutineDetailPage() {
 
   return (
     <div className="max-w-3xl mx-auto overflow-x-hidden">
+      {keypadTarget && (
+        <WeightKeypadSheet
+          initialValue={draft.exercises[keypadTarget.exIdx]?.sets[keypadTarget.setIdx]?.target_weight_lbs ?? null}
+          onChange={updateWeightFromKeypad}
+          onClose={closeWeightKeypad}
+          onOpenPlateCalculator={openPlateCalculatorFromKeypad}
+        />
+      )}
       {plateTarget && (
         <PlateCalculatorModal
           initialWeight={draft.exercises[plateTarget.exIdx]?.sets[plateTarget.setIdx]?.target_weight_lbs ?? 0}
@@ -560,7 +585,7 @@ export default function RoutineDetailPage() {
                       value={set.target_weight_lbs ?? ""}
                       onFocus={(e) => {
                         e.currentTarget.blur();
-                        openPlateCalculator(exIdx, setIdx);
+                        openWeightKeypad(exIdx, setIdx);
                       }}
                       onChange={(e) =>
                         updateSet(exIdx, setIdx, {

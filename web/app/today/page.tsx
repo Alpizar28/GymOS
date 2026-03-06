@@ -16,6 +16,7 @@ import {
     type ExerciseItem,
 } from "@/lib/api";
 import { PlateCalculatorModal } from "@/components/plate-calculator-modal";
+import { WeightKeypadSheet } from "@/components/weight-keypad-sheet";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1025,6 +1026,7 @@ export default function TodayPage() {
     const [restRunning, setRestRunning] = useState(false);
     const [restDefaultSeconds, setRestDefaultSeconds] = useState(120);
     const [shortBarWeight, setShortBarWeight] = useState(35);
+    const [keypadTarget, setKeypadTarget] = useState<{ exerciseIdx: number; setIdx: number } | null>(null);
     const [plateTarget, setPlateTarget] = useState<{ exerciseIdx: number; setIdx: number } | null>(null);
     const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
     const undoTimeoutRef = useRef<number | null>(null);
@@ -1450,28 +1452,27 @@ export default function TodayPage() {
         return () => window.clearInterval(timer);
     }, [restRunning, restTimerLeft]);
 
-    const focusNextSetInput = useCallback((exerciseIdx: number, setIdx: number) => {
-        const focusTarget = (exIndex: number, sIndex: number) => {
-            const el = document.getElementById(`set-${exIndex}-${sIndex}-weight`) as HTMLInputElement | null;
-            if (!el) return false;
-            el.focus();
-            el.select();
-            return true;
-        };
-
-        window.setTimeout(() => {
-            if (focusTarget(exerciseIdx, setIdx + 1)) return;
-            focusTarget(exerciseIdx + 1, 0);
-        }, 50);
-    }, []);
-
-    const startRestTimer = (exerciseIdx: number, setIdx: number) => {
+    const startRestTimer = () => {
         setRestTimerLeft(restDefaultSeconds);
         setRestRunning(true);
-        focusNextSetInput(exerciseIdx, setIdx);
     };
 
     const closePlateCalculator = () => setPlateTarget(null);
+
+    const closeWeightKeypad = () => setKeypadTarget(null);
+
+    const updateWeightFromKeypad = (value: number | null) => {
+        if (!keypadTarget) return;
+        const targetSet = exercises[keypadTarget.exerciseIdx]?.sets[keypadTarget.setIdx];
+        if (!targetSet) return;
+        updateSet(keypadTarget.exerciseIdx, keypadTarget.setIdx, { ...targetSet, actual_weight: value });
+    };
+
+    const openPlateCalculatorFromKeypad = () => {
+        if (!keypadTarget) return;
+        setPlateTarget(keypadTarget);
+        setKeypadTarget(null);
+    };
 
     const savePlateWeight = (weight: number) => {
         if (!plateTarget) return;
@@ -1537,6 +1538,14 @@ export default function TodayPage() {
                     shortBarWeight={shortBarWeight}
                     onClose={closePlateCalculator}
                     onSave={savePlateWeight}
+                />
+            )}
+            {keypadTarget && (
+                <WeightKeypadSheet
+                    initialValue={exercises[keypadTarget.exerciseIdx]?.sets[keypadTarget.setIdx]?.actual_weight ?? null}
+                    onChange={updateWeightFromKeypad}
+                    onClose={closeWeightKeypad}
+                    onOpenPlateCalculator={openPlateCalculatorFromKeypad}
                 />
             )}
             {/* Modals */}
@@ -1794,8 +1803,8 @@ export default function TodayPage() {
                                 onSwap={() => setSwapFor(ex.name)}
                                 onMoveUp={() => moveExercise(i, -1)}
                                 onMoveDown={() => moveExercise(i, 1)}
-                                onSetComplete={(si) => startRestTimer(i, si)}
-                                onOpenWeightCalculator={(si) => setPlateTarget({ exerciseIdx: i, setIdx: si })}
+                                onSetComplete={() => startRestTimer()}
+                                onOpenWeightCalculator={(si) => setKeypadTarget({ exerciseIdx: i, setIdx: si })}
                             />
                         ))}
                     </div>
