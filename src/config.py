@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     openai_api_key: str = ""
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres"
+    database_statement_cache_size: int = 0
     log_level: str = "INFO"
     web_url: str = "http://localhost:3000"
     port: int = 8000

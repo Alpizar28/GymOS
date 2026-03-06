@@ -18,10 +18,18 @@ class Base(DeclarativeBase):
     pass
 
 
-engine = create_async_engine(
-    settings.database_url,
-    echo=settings.log_level == "DEBUG",
-)
+engine_kwargs: dict[str, object] = {
+    "echo": settings.log_level == "DEBUG",
+}
+
+if settings.database_url.startswith("postgresql+asyncpg"):
+    # Supabase pooler/pgbouncer in transaction mode is incompatible with asyncpg
+    # prepared statements unless statement cache is disabled.
+    engine_kwargs["connect_args"] = {
+        "statement_cache_size": settings.database_statement_cache_size,
+    }
+
+engine = create_async_engine(settings.database_url, **engine_kwargs)
 
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
