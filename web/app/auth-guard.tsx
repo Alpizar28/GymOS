@@ -21,8 +21,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data.user) {
         router.replace("/login");
         return;
       }
@@ -33,9 +33,9 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange((event) => {
       if (PUBLIC_PATHS.has(pathname)) return;
-      if (event === "SIGNED_OUT" || !session) {
+      if (event === "SIGNED_OUT") {
         router.replace("/login");
       }
     });

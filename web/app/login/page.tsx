@@ -18,15 +18,25 @@ export default function LoginPage() {
     let mounted = true;
 
     async function recoverSession() {
-      const { data } = await supabase.auth.getSession();
-      if (data.session && mounted) {
+      const { data, error } = await supabase.auth.getUser();
+      if (!error && data.user && mounted) {
         router.replace("/today");
       }
     }
 
     void recoverSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session) {
+        router.replace("/today");
+      }
+    });
+
     return () => {
       mounted = false;
+      subscription.unsubscribe();
     };
   }, [router]);
 

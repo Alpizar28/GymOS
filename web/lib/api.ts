@@ -391,16 +391,29 @@ export interface AnchorProgress {
 // --- API Functions ---
 
 async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
-    const headers = new Headers(init?.headers ?? {});
-    const token = await getAccessToken();
-    if (token) {
-        headers.set("Authorization", `Bearer ${token}`);
+    const firstHeaders = new Headers(init?.headers ?? {});
+    const firstToken = await getAccessToken();
+    if (firstToken) {
+        firstHeaders.set("Authorization", `Bearer ${firstToken}`);
     }
 
-    const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+    let res = await fetch(`${API_BASE}${path}`, { ...init, headers: firstHeaders });
+
     if (res.status === 401 && typeof window !== "undefined") {
+        const refreshedToken = await getAccessToken();
+        if (refreshedToken && refreshedToken !== firstToken) {
+            const retryHeaders = new Headers(init?.headers ?? {});
+            retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);
+            res = await fetch(`${API_BASE}${path}`, { ...init, headers: retryHeaders });
+        }
+    }
+
+    if (res.status === 401 && typeof window !== "undefined") {
+        const { supabase } = await import("@/lib/supabase");
+        await supabase.auth.signOut();
         window.location.href = "/login";
     }
+
     if (!res.ok) throw new Error(`API ${path}: ${res.status}`);
     return res.json();
 }
