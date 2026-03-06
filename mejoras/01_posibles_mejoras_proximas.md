@@ -174,85 +174,27 @@ Este documento define mejoras de alto impacto y bajo riesgo para elevar diseno, 
 
 ---
 
-## F. Migracion a Supabase (muy detallado, corto plazo)
+## F. Migracion a Supabase (completada)
 
-### F0. Preparacion y definiciones
-**Objetivo**: pasar de SQLite local a Postgres administrado (Supabase) sin romper el flujo actual.
+### Estado
+- Infra principal migrada a Supabase/Postgres.
+- Auth (email + Google) activa.
+- Backend validando JWT.
+- RLS activo para tablas de negocio principales.
+- Storage de perfil activo (`profile-photos`).
 
-**Definiciones clave**
-- Proyecto Supabase unico para produccion.
-- Auth con Google via Supabase Auth.
-- Backend FastAPI sigue siendo fuente de verdad de negocio.
-- Plan de retencion inicial: 3 meses para datos detallados.
+### Entregables cerrados
+1. Configuracion de entornos en Coolify para frontend/backend.
+2. Conexion estable al pooler de Supabase.
+3. Ajuste de compatibilidad `asyncpg` + pooler (`DATABASE_STATEMENT_CACHE_SIZE=0`).
+4. Script SQL de hardening post-cutover.
+5. Validacion funcional E2E en dominios nuevos.
 
-### F1. Configuracion de infraestructura Supabase
-1. Crear proyecto Supabase en la region mas cercana a los usuarios.
-2. Configurar plan Pro y limites de uso.
-3. Habilitar backups diarios y retencion 7 dias.
-4. Configurar alertas de uso (egress, disk, compute).
-5. Crear claves de servicio y anon para uso en backend.
-
-### F2. Auth Google (Supabase Auth)
-1. Crear OAuth Client en Google Cloud Console.
-2. Configurar redirect URIs para:
-   - Produccion
-   - Staging
-   - Local dev
-3. Activar proveedor Google en Supabase Auth.
-4. Probar flujo login/logout desde frontend.
-5. Asegurar que el backend valida el JWT emitido por Supabase.
-
-### F3. Preparar backend para Postgres
-1. Introducir Alembic si no existe.
-2. Crear migracion inicial con el schema actual.
-3. Ajustar modelos SQLAlchemy si se requieren tipos especificos Postgres.
-4. Asegurar que `DATABASE_URL` soporte `postgresql+asyncpg`.
-
-### F4. Migracion de datos desde SQLite
-1. Congelar escritura en SQLite (modo mantenimiento temporal).
-2. Exportar datos de SQLite:
-   - workouts, workout_exercises, sets
-   - routines, routine_exercises, routine_sets
-   - plans, plan_days
-   - anchor_targets, athlete_state, settings
-   - body_metrics
-3. Transformar datos si hay cambios de schema.
-4. Importar a Postgres en orden correcto respetando FK.
-5. Validar conteos por tabla (SQLite vs Postgres).
-
-### F5. Cambios de configuracion
-1. Actualizar variables de entorno en Coolify:
-   - `DATABASE_URL`
-   - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-2. Ajustar el pool de conexiones (asyncpg) para produccion.
-
-### F6. Verificacion funcional
-1. Ejecutar smoke tests backend.
-2. Verificar endpoints criticos:
-   - Today logging
-   - Historial
-   - Routines
-   - Body metrics
-3. Validar latencia y queries pesadas.
-
-### F7. Cortes y rollout
-1. Ventana de mantenimiento corta para cutover.
-2. Cambio de `DATABASE_URL` a Postgres.
-3. Monitoreo intensivo primeras 24-48h.
-4. Plan de rollback (volver a SQLite si falla).
-
-### F8. Post-migracion
-1. Activar retencion de 3 meses (purga automatizada).
-2. Implementar job de resumen mensual si se conserva historico.
-3. Revisar indices en tablas de alto volumen.
-4. Revisar costos reales vs estimados.
-
-### F9. Seguridad y aislamiento
-1. Definir estrategia de `user_id` para multiusuario futuro.
-2. Preparar RLS opcional (si se usa Supabase directamente en frontend).
-3. Mantener backend como capa de autorizacion principal.
+### Pendientes posteriores al cutover
+1. Rotacion periodica de credenciales sensibles.
+2. Automatizar backup/restore drills.
+3. Definir politica de retencion y purga historica.
+4. Revisar costos reales y alertas operativas mensuales.
 
 ---
 

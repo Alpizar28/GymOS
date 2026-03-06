@@ -336,7 +336,7 @@ Objetivo: cruzar training + body metrics con recomendaciones simples y accionabl
 ## Siguiente bloque recomendado
 1. Cerrar HIS-09 con checklist manual final (mobile + desktop) y evidencia.
 2. Iniciar E3 (BM-01 y BM-02) para desbloquear body metrics.
-3. Iniciar SP-01 (Supabase setup + env) como base de migracion.
+3. Ejecutar seguimiento post-cutover (retencion, costos y monitoreo).
 
 ## Checklist tecnico detallado (HIS-09 + BM-01..BM-04)
 
@@ -502,7 +502,7 @@ Objetivo: mover a Postgres administrado con Auth Google sin romper el flujo actu
 
 ### SP-01 — Provisionar proyecto Supabase
 - Tipo: Infra
-- Estado: PENDIENTE
+- Estado: COMPLETADO
 - Estimacion: 3 pts
 - Dependencias: ninguna
 - Criterios de aceptacion:
@@ -518,7 +518,7 @@ Objetivo: mover a Postgres administrado con Auth Google sin romper el flujo actu
 
 ### SP-02 — Configurar Auth Google en Supabase
 - Tipo: Infra/Auth
-- Estado: PENDIENTE
+- Estado: COMPLETADO
 - Estimacion: 3 pts
 - Dependencias: SP-01
 - Criterios de aceptacion:
@@ -532,25 +532,21 @@ Objetivo: mover a Postgres administrado con Auth Google sin romper el flujo actu
    - Activar Google provider en Supabase Auth
    - Probar flujo login/logout en local
 
-### SP-03 — Preparar backend para Postgres + Alembic
+### SP-03 — Preparar backend para Postgres + Auth JWT
 - Tipo: Backend
-- Estado: PENDIENTE
+- Estado: COMPLETADO
 - Estimacion: 5 pts
 - Dependencias: SP-01
 - Criterios de aceptacion:
-  - Alembic inicializado
-  - Migracion base generada
   - `DATABASE_URL` soporta `postgresql+asyncpg`
-  - Configuracion de pool definida
+  - Configuracion de pool y compatibilidad con pooler definida
  - Subtareas:
-   - Inicializar Alembic (config + env)
-   - Generar migracion base desde modelos actuales
    - Agregar soporte `asyncpg` en settings
-   - Definir pool size/timeouts para prod
+   - Definir compatibilidad de pooler para prod
 
 ### SP-04 — Migracion de datos SQLite -> Postgres
 - Tipo: Backend/Data
-- Estado: PENDIENTE
+- Estado: COMPLETADO
 - Estimacion: 8 pts
 - Dependencias: SP-03
 - Criterios de aceptacion:
@@ -565,7 +561,7 @@ Objetivo: mover a Postgres administrado con Auth Google sin romper el flujo actu
 
 ### SP-05 — Cutover en Coolify
 - Tipo: Infra/Deploy
-- Estado: PENDIENTE
+- Estado: COMPLETADO
 - Estimacion: 5 pts
 - Dependencias: SP-04
 - Criterios de aceptacion:
@@ -576,7 +572,7 @@ Objetivo: mover a Postgres administrado con Auth Google sin romper el flujo actu
  - Subtareas:
    - Actualizar `DATABASE_URL` y keys Supabase en Coolify
    - Definir ventana de mantenimiento
-   - Checklist de rollback a SQLite
+   - Checklist de rollback de servicio
    - Monitoreo intensivo 24-48h
 
 ### SP-06 — Retencion 3 meses + resumen mensual
@@ -595,7 +591,7 @@ Objetivo: mover a Postgres administrado con Auth Google sin romper el flujo actu
 
 ### SP-07 — Hardening Postgres
 - Tipo: Backend/Infra
-- Estado: PENDIENTE
+- Estado: COMPLETADO
 - Estimacion: 5 pts
 - Dependencias: SP-05
 - Criterios de aceptacion:

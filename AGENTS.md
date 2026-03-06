@@ -65,7 +65,6 @@ pytest tests -k "deload and progression" -v
 ```bash
 python scripts/seed_db.py
 python scripts/backfill_training_type.py
-python scripts/migrate_sqlite_to_postgres.py
 ```
 
 ## Required checks before finishing

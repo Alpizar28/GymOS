@@ -930,9 +930,6 @@ docker-compose logs -f backend
 ```bash
 # Seed inicial
 python scripts/seed_db.py
-
-# Migracion legacy SQLite -> Postgres
-python scripts/migrate_sqlite_to_postgres.py
 ```
 
 ---
