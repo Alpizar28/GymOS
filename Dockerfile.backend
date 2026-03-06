@@ -15,7 +15,7 @@ COPY src/ ./src/
 COPY scripts/ ./scripts/
 COPY alembic.ini ./
 COPY alembic/ ./alembic/
-COPY data/ATHLETE_PROFILE.json data/EXERCISE_LIBRARY.json data/PROGRAM_CONSTRAINTS.json ./
+COPY data/ ./data/
 
 # Install dependencies
 RUN pip install --no-cache-dir .
