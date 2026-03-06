@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   api,
   type DashboardData,
@@ -884,6 +885,7 @@ function ProtectionSection() {
 // ─── main page ────────────────────────────────────────────────────────────────
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [active, setActive] = useState<SectionId>("personal");
   const [personalSummary, setPersonalSummary] = useState<PersonalProfile | null>(null);
 
@@ -891,13 +893,29 @@ export default function ProfilePage() {
     api.getPersonalProfile().then(setPersonalSummary).catch(() => {});
   }, []);
 
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    router.replace("/login");
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
       {/* Header */}
       <div className="mb-5 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.16),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(239,68,68,0.12)]">
-        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">GymOS</p>
-        <h1 className="text-2xl font-bold tracking-tight">Perfil</h1>
-        <p className="text-sm text-zinc-500 mt-1">Tu historial, ejercicios y configuración</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">GymOS</p>
+            <h1 className="text-2xl font-bold tracking-tight">Perfil</h1>
+            <p className="text-sm text-zinc-500 mt-1">Tu historial, ejercicios y configuración</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleSignOut()}
+            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:border-red-500/60 hover:text-red-300"
+          >
+            Cerrar sesion
+          </button>
+        </div>
       </div>
 
       <ProfileIdentityCard profile={personalSummary} />
