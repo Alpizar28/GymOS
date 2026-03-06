@@ -157,6 +157,7 @@ Includes near-term UX improvements, medium-term body metrics integration
 - Auth is now Supabase JWT-based (backend expects `Authorization: Bearer <token>` when `AUTH_ENABLED=true`).
 - Profile photo upload now targets Supabase Storage bucket `profile-photos`.
 - SQL policy templates are included in `supabase/rls.sql` and `supabase/storage.sql`.
+- Post-deploy hardening script (unique indexes + RLS verification) is in `supabase/post_deploy_hardening.sql`.
 - SQLite -> Postgres copy script is available at `scripts/migrate_sqlite_to_postgres.py`.
 
 ---

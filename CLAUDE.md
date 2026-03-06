@@ -22,13 +22,15 @@ GymOS es un **sistema integral de entrenamiento personal** que combina:
 |------|------------|---------|
 | **Backend** | FastAPI + SQLAlchemy (async) | Python 3.11+ |
 | **Frontend** | Next.js + React + Tailwind | Next.js 16, React 19 |
-| **Base de Datos** | SQLite (aiosqlite) | - |
+| **Base de Datos** | PostgreSQL (Supabase + asyncpg) | - |
 | **LLM** | OpenAI API | GPT-4o |
 | **Deployment** | Docker Compose + Nginx | - |
 
-### Diseño Single-Tenant
+### Diseño Multiusuario
 
-GymOS está diseñado para **un solo atleta** (Jose Alpizar). El `AthleteState` es un singleton (siempre `id=1`). Todo el sistema se adapta basado en el historial personal del atleta.
+GymOS ahora usa autenticación con Supabase y aislamiento por `user_id`.
+Las entidades clave (workouts, plans, settings, routines, athlete_state, anchor_targets)
+están particionadas por usuario y protegidas con políticas RLS en Supabase.
 
 ---
 
@@ -61,8 +63,8 @@ GymOS está diseñado para **un solo atleta** (Jose Alpizar). El `AthleteState` 
 └───────────────────┘   └─────────┬─────────┘              │
                                   │                        │
                         ┌─────────▼─────────┐              │
-                        │     SQLite        │              │
-                        │   gym.db          │              │
+                        │ PostgreSQL/Supabase│             │
+                        │   (RLS + storage)  │             │
                         └───────────────────┘              │
                                                            │
                         ┌──────────────────────────────────┘
@@ -644,7 +646,7 @@ services:
   backend:
     build: {dockerfile: Dockerfile.backend}
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:////app/data/gym.db
+      - DATABASE_URL=postgresql+asyncpg://.../postgres?ssl=require
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
       - gym-data:/app/data
@@ -659,7 +661,7 @@ services:
       backend: {condition: service_healthy}
 
 volumes:
-  gym-data:  # Persistencia SQLite
+  pg-data:  # DB local opcional para desarrollo
 ```
 
 ### Nginx (Producción)
@@ -673,7 +675,10 @@ volumes:
 | Variable | Requerido | Descripción |
 |----------|-----------|-------------|
 | `OPENAI_API_KEY` | Sí | API key de OpenAI para generación |
-| `DATABASE_URL` | No | Default: `sqlite+aiosqlite:///gym.db` |
+| `DATABASE_URL` | Sí en prod | URL Postgres/Supabase (`postgresql+asyncpg://...`) |
+| `AUTH_ENABLED` | No | Activa validación JWT de Supabase en backend |
+| `SUPABASE_URL` | Sí con auth | URL del proyecto Supabase |
+| `SUPABASE_JWT_AUDIENCE` | No | Default: `authenticated` |
 | `LOG_LEVEL` | No | Default: `INFO` |
 | `PORT` | No | Default: `8000` |
 | `WEB_URL` | No | Para CORS en producción |
@@ -687,7 +692,7 @@ volumes:
 | Patrón | Uso |
 |--------|-----|
 | **Service Layer** | Separación API → Services → Models |
-| **Singleton** | `AthleteState` (id=1), cliente OpenAI |
+| **Singleton** | Cliente OpenAI |
 | **Factory** | `create_app()`, `async_sessionmaker` |
 | **Strategy** | Progression Engine con diferentes acciones |
 | **Fallback** | Plan básico cuando LLM no disponible |
@@ -926,20 +931,20 @@ docker-compose logs -f backend
 # Seed inicial
 python scripts/seed_db.py
 
-# Reset (eliminar y re-seed)
-rm -f gym.db && python scripts/seed_db.py
+# Migracion legacy SQLite -> Postgres
+python scripts/migrate_sqlite_to_postgres.py
 ```
 
 ---
 
 ## 16. NOTAS IMPORTANTES
 
-### Diseño Single-Tenant
+### Diseño Multiusuario
 
-- El sistema está diseñado para **un solo atleta**
-- `AthleteState` siempre tiene `id=1`
-- No hay autenticación de usuarios
-- Los datos JSON son específicos de Jose Alpizar
+- El sistema está diseñado para usuarios autenticados (Supabase Auth)
+- El aislamiento de datos se hace por `user_id` + políticas RLS
+- `AthleteState` es por usuario (no singleton global)
+- Se mantiene un `DEV_FALLBACK_USER_ID` para desarrollo local si auth está desactivada
 
 ### Motor de Progresión Determinista
 

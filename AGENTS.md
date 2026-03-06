@@ -7,6 +7,7 @@ Read this first, then `README.md`, then `CLAUDE.md`.
 - Product: gym training OS.
 - Backend: FastAPI + async SQLAlchemy + PostgreSQL (`asyncpg`), Python 3.11+.
 - Frontend: Next.js 16 App Router + React 19 + TypeScript + Tailwind v4.
+- Auth/storage: Supabase Auth (JWT) + Supabase Storage (`profile-photos`).
 - AI boundary: LLM for plan generation only; progression logic is deterministic.
 
 ## Cursor/Copilot rules
@@ -111,4 +112,5 @@ python scripts/migrate_sqlite_to_postgres.py
 - Auth via Supabase JWT when `AUTH_ENABLED=true`.
 - RLS SQL templates: `supabase/rls.sql`.
 - Storage SQL templates: `supabase/storage.sql`.
+- Post deploy hardening SQL: `supabase/post_deploy_hardening.sql`.
 - Profile photos use Supabase Storage bucket `profile-photos`.

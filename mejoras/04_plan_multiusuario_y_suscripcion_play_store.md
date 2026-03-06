@@ -1,12 +1,12 @@
 # GymOS — Plan Multiusuario y Suscripcion (Privado -> Play Store)
 
 ## Objetivo
-Definir una ruta realista para pasar de GymOS single-tenant a producto multiusuario con monetizacion por suscripcion, empezando con familia/amigos y evolucionando a lanzamiento publico en Play Store.
+Definir una ruta realista para consolidar GymOS como producto multiusuario con monetizacion por suscripcion, empezando con familia/amigos y evolucionando a lanzamiento publico en Play Store.
 
 ---
 
 ## Contexto Actual
-- Arquitectura actual: FastAPI + Next.js + SQLite (single-tenant).
+- Arquitectura actual: FastAPI + Next.js + PostgreSQL/Supabase (multiusuario con Auth + RLS).
 - Estado de producto: flujo Today-first estable, rutinas, progresion deterministica, historial unificado.
 - Necesidad de negocio:
   - corto/mediano plazo: cuentas separadas para novia, mama y amigos;

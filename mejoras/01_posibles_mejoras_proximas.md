@@ -5,7 +5,7 @@ Este documento define mejoras de alto impacto y bajo riesgo para elevar diseno, 
 
 ## Principios de esta fase
 - Priorizar mejoras que reduzcan friccion en uso diario.
-- Mantener compatibilidad con la arquitectura actual (single-tenant, FastAPI + Next.js).
+- Mantener compatibilidad con la arquitectura actual (multiusuario con Supabase Auth/RLS, FastAPI + Next.js).
 - Evitar cambios de dominio complejos (sin migraciones profundas en esta fase).
 - Garantizar que todo sea mobile-first y consistente con el estilo visual actual (dark + red).
 
