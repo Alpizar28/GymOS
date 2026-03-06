@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-import { api, type RoutineCard, type RoutineFolder } from "@/lib/api";
+import { api, type RoutineCard, type RoutineExerciseInput, type RoutineFolder } from "@/lib/api";
 
 const ROUTINE_TYPES = [
   { value: "push", label: "Push" },
@@ -19,6 +19,36 @@ const ROUTINE_TYPE_LABEL: Record<string, string> = {
   legs: "Legs",
   custom: "Custom",
 };
+
+type RoutineTrainingType = "push" | "pull" | "legs" | "custom";
+
+const QUICK_BLOCKS: Record<Exclude<RoutineTrainingType, "custom">, RoutineExerciseInput[]> = {
+  push: [
+    { name: "Bench Press", rest_seconds: 120, sets: [{ set_type: "normal", target_weight_lbs: null, target_reps: 8, rir_target: 2 }, { set_type: "normal", target_weight_lbs: null, target_reps: 8, rir_target: 2 }, { set_type: "normal", target_weight_lbs: null, target_reps: 10, rir_target: 1 }] },
+    { name: "Overhead Press", rest_seconds: 120, sets: [{ set_type: "normal", target_weight_lbs: null, target_reps: 8, rir_target: 2 }, { set_type: "normal", target_weight_lbs: null, target_reps: 10, rir_target: 1 }] },
+    { name: "Cable Fly", rest_seconds: 90, sets: [{ set_type: "normal", target_weight_lbs: null, target_reps: 12, rir_target: 1 }, { set_type: "normal", target_weight_lbs: null, target_reps: 12, rir_target: 1 }] },
+    { name: "Triceps Pushdown", rest_seconds: 90, sets: [{ set_type: "normal", target_weight_lbs: null, target_reps: 10, rir_target: 1 }, { set_type: "normal", target_weight_lbs: null, target_reps: 12, rir_target: 1 }] },
+  ],
+  pull: [
+    { name: "Lat Pulldown", rest_seconds: 120, sets: [{ set_type: "normal", target_weight_lbs: null, target_reps: 8, rir_target: 2 }, { set_type: "normal", target_weight_lbs: null, target_reps: 10, rir_target: 1 }, { set_type: "normal", target_weight_lbs: null, target_reps: 10, rir_target: 1 }] },
+    { name: "Chest Supported Row", rest_seconds: 120, sets: [{ set_type: "normal", target_weight_lbs: null, target_reps: 8, rir_target: 2 }, { set_type: "normal", target_weight_lbs: null, target_reps: 10, rir_target: 1 }] },
+    { name: "Rear Delt Fly", rest_seconds: 90, sets: [{ set_type: "normal", target_weight_lbs: null, target_reps: 12, rir_target: 1 }, { set_type: "normal", target_weight_lbs: null, target_reps: 15, rir_target: 1 }] },
+    { name: "Biceps Curl", rest_seconds: 90, sets: [{ set_type: "normal", target_weight_lbs: null, target_reps: 10, rir_target: 1 }, { set_type: "normal", target_weight_lbs: null, target_reps: 12, rir_target: 1 }] },
+  ],
+  legs: [
+    { name: "Back Squat", rest_seconds: 150, sets: [{ set_type: "normal", target_weight_lbs: null, target_reps: 6, rir_target: 2 }, { set_type: "normal", target_weight_lbs: null, target_reps: 8, rir_target: 2 }, { set_type: "normal", target_weight_lbs: null, target_reps: 8, rir_target: 1 }] },
+    { name: "Romanian Deadlift", rest_seconds: 120, sets: [{ set_type: "normal", target_weight_lbs: null, target_reps: 8, rir_target: 2 }, { set_type: "normal", target_weight_lbs: null, target_reps: 10, rir_target: 1 }] },
+    { name: "Leg Press", rest_seconds: 120, sets: [{ set_type: "normal", target_weight_lbs: null, target_reps: 10, rir_target: 1 }, { set_type: "normal", target_weight_lbs: null, target_reps: 12, rir_target: 1 }] },
+    { name: "Calf Raise", rest_seconds: 90, sets: [{ set_type: "normal", target_weight_lbs: null, target_reps: 12, rir_target: 1 }, { set_type: "normal", target_weight_lbs: null, target_reps: 15, rir_target: 1 }] },
+  ],
+};
+
+function cloneQuickBlock(type: Exclude<RoutineTrainingType, "custom">): RoutineExerciseInput[] {
+  return QUICK_BLOCKS[type].map((exercise) => ({
+    ...exercise,
+    sets: exercise.sets.map((setTemplate) => ({ ...setTemplate })),
+  }));
+}
 
 function CreateFolderModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState("");
@@ -82,7 +112,8 @@ function CreateRoutineModal({
   const [folderId, setFolderId] = useState<number>(folders[0]?.id ?? 0);
   const [name, setName] = useState("");
   const [subtitle, setSubtitle] = useState("");
-  const [trainingType, setTrainingType] = useState<"push" | "pull" | "legs" | "custom">("custom");
+  const [trainingType, setTrainingType] = useState<RoutineTrainingType>("custom");
+  const [quickBlockType, setQuickBlockType] = useState<Exclude<RoutineTrainingType, "custom"> | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -98,13 +129,14 @@ function CreateRoutineModal({
     setSaving(true);
     setError("");
     try {
+      const exercises = quickBlockType ? cloneQuickBlock(quickBlockType) : [];
       await api.createRoutine({
         folder_id: folderId,
         name: name.trim(),
         subtitle: subtitle.trim() || null,
         notes: null,
         training_type: trainingType,
-        exercises: [],
+        exercises,
       });
       onCreated();
     } catch {
@@ -143,7 +175,15 @@ function CreateRoutineModal({
         />
         <select
           value={trainingType}
-          onChange={(e) => setTrainingType(e.target.value as "push" | "pull" | "legs" | "custom")}
+          onChange={(e) => {
+            const next = e.target.value as RoutineTrainingType;
+            setTrainingType(next);
+            if (next === "custom") {
+              setQuickBlockType(null);
+            } else {
+              setQuickBlockType(next);
+            }
+          }}
           className="w-full px-3 py-3 rounded-xl bg-zinc-900 border border-zinc-700 text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
         >
           {ROUTINE_TYPES.map((option) => (
@@ -152,6 +192,45 @@ function CreateRoutineModal({
             </option>
           ))}
         </select>
+        <div className="space-y-2">
+          <p className="text-xs text-zinc-500">Bloques rapidos</p>
+          <div className="grid grid-cols-4 gap-2">
+            {(["push", "pull", "legs"] as const).map((type) => {
+              const selected = quickBlockType === type;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => {
+                    setTrainingType(type);
+                    setQuickBlockType(type);
+                  }}
+                  className={`px-2 py-2 rounded-lg text-xs font-semibold border ${selected
+                    ? "bg-red-600/25 text-red-200 border-red-500/40"
+                    : "bg-zinc-900 text-zinc-400 border-zinc-700"
+                    }`}
+                >
+                  {ROUTINE_TYPE_LABEL[type]}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => setQuickBlockType(null)}
+              className={`px-2 py-2 rounded-lg text-xs font-semibold border ${quickBlockType === null
+                ? "bg-red-600/25 text-red-200 border-red-500/40"
+                : "bg-zinc-900 text-zinc-400 border-zinc-700"
+                }`}
+            >
+              Vacia
+            </button>
+          </div>
+          <p className="text-[11px] text-zinc-600">
+            {quickBlockType
+              ? `Se creara con bloque ${ROUTINE_TYPE_LABEL[quickBlockType]} (${QUICK_BLOCKS[quickBlockType].length} ejercicios).`
+              : "Se creara sin ejercicios."}
+          </p>
+        </div>
         {error && <p className="text-xs text-red-400">{error}</p>}
         <div className="grid grid-cols-2 gap-2">
           <button onClick={onClose} className="py-2.5 rounded-lg border border-zinc-700 text-zinc-400 text-sm">
@@ -180,6 +259,7 @@ export default function RoutinesPage() {
   const [showRoutineModal, setShowRoutineModal] = useState(false);
   const [startingRoutine, setStartingRoutine] = useState<number | null>(null);
   const [updatingTypeRoutineId, setUpdatingTypeRoutineId] = useState<number | null>(null);
+  const [duplicatingRoutineId, setDuplicatingRoutineId] = useState<number | null>(null);
   const [toast, setToast] = useState("");
 
   async function load() {
@@ -248,6 +328,19 @@ export default function RoutinesPage() {
       showToast("No se pudo actualizar tipo");
     } finally {
       setUpdatingTypeRoutineId(null);
+    }
+  }
+
+  async function duplicateRoutine(routineId: number) {
+    setDuplicatingRoutineId(routineId);
+    try {
+      await api.duplicateRoutine(routineId);
+      await load();
+      showToast("Rutina duplicada");
+    } catch {
+      showToast("No se pudo duplicar rutina");
+    } finally {
+      setDuplicatingRoutineId(null);
     }
   }
 
@@ -357,7 +450,14 @@ export default function RoutinesPage() {
                             </select>
                           </div>
 
-                          <div className="mt-3 flex justify-end">
+                          <div className="mt-3 flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => void duplicateRoutine(routine.id)}
+                              disabled={duplicatingRoutineId === routine.id}
+                              className="px-2.5 py-1.5 rounded-lg border border-zinc-700 text-xs text-zinc-300 disabled:opacity-40"
+                            >
+                              {duplicatingRoutineId === routine.id ? "Duplicando..." : "Duplicar"}
+                            </button>
                             <Link
                               href={`/routines/${routine.id}`}
                               className="text-xs text-red-300 hover:text-red-200"
