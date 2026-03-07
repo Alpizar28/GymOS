@@ -40,6 +40,8 @@ interface TodayDraft {
     savedId: number | null;
     savedAt: number;
     startedAt?: number | null;
+    elapsedSeconds?: number;
+    timerRunning?: boolean;
     exercises: ExerciseState[];
 }
 
@@ -1257,8 +1259,8 @@ export default function TodayPage() {
     const [restTimerLeft, setRestTimerLeft] = useState<number | null>(null);
     const [restRunning, setRestRunning] = useState(false);
     const [restDefaultSeconds, setRestDefaultSeconds] = useState(120);
-    const [workoutStartedAt, setWorkoutStartedAt] = useState<number | null>(null);
-    const [durationNow, setDurationNow] = useState<number>(() => Date.now());
+    const [workoutElapsedSeconds, setWorkoutElapsedSeconds] = useState(0);
+    const [workoutTimerRunning, setWorkoutTimerRunning] = useState(false);
     const [shortBarWeight, setShortBarWeight] = useState(35);
     const [keypadTarget, setKeypadTarget] = useState<KeypadTarget | null>(null);
     const [plateTarget, setPlateTarget] = useState<{ exerciseIdx: number; setIdx: number } | null>(null);
@@ -1266,6 +1268,8 @@ export default function TodayPage() {
     const undoTimeoutRef = useRef<number | null>(null);
     const generateRequestRef = useRef(0);
     const draftReadyRef = useRef(false);
+    const workoutElapsedRef = useRef(0);
+    const workoutTimerRunningRef = useRef(false);
     const [lastDraftSaveAt, setLastDraftSaveAt] = useState<number | null>(null);
     const [restoredDraft, setRestoredDraft] = useState(false);
 
@@ -1294,6 +1298,14 @@ export default function TodayPage() {
         setUndoAction(null);
         showToast("Undo applied");
     }, [undoAction, clearUndoTimeout]);
+
+    useEffect(() => {
+        workoutElapsedRef.current = workoutElapsedSeconds;
+    }, [workoutElapsedSeconds]);
+
+    useEffect(() => {
+        workoutTimerRunningRef.current = workoutTimerRunning;
+    }, [workoutTimerRunning]);
 
     const buildExerciseStateFromPlan = useCallback((data: TodayPlan): ExerciseState[] => (
         data.exercises.map((ex) => ({
@@ -1326,7 +1338,8 @@ export default function TodayPage() {
         dayName: string,
         exerciseState: ExerciseState[],
         draftSavedId: number | null,
-        draftStartedAt: number | null = workoutStartedAt
+        draftElapsedSeconds: number,
+        draftTimerRunning: boolean
     ) => {
         if (typeof window === "undefined") return;
         const draft: TodayDraft = {
@@ -1335,7 +1348,9 @@ export default function TodayPage() {
             date: localDateISO(),
             savedId: draftSavedId,
             savedAt: Date.now(),
-            startedAt: draftStartedAt,
+            startedAt: draftTimerRunning ? Date.now() - draftElapsedSeconds * 1000 : null,
+            elapsedSeconds: draftElapsedSeconds,
+            timerRunning: draftTimerRunning,
             exercises: exerciseState.map((ex) => ({
                 ...ex,
                 lastSession: null,
@@ -1344,7 +1359,7 @@ export default function TodayPage() {
         };
         window.localStorage.setItem(draftKey(dayName), JSON.stringify(draft));
         setLastDraftSaveAt(draft.savedAt);
-    }, [workoutStartedAt]);
+    }, []);
 
     const clearDraft = useCallback((dayName?: string) => {
         if (typeof window === "undefined") return;
@@ -1409,7 +1424,11 @@ export default function TodayPage() {
         }
 
         const localDraft = readDraft(data.day_name);
-        const nextStartedAt = localDraft?.startedAt ?? Date.now();
+        const legacyElapsedSeconds = localDraft?.startedAt
+            ? Math.max(0, Math.floor((Date.now() - localDraft.startedAt) / 1000))
+            : 0;
+        const nextElapsedSeconds = Math.max(0, localDraft?.elapsedSeconds ?? legacyElapsedSeconds);
+        const nextTimerRunning = localDraft?.timerRunning ?? true;
         if (localDraft) {
             merged = mergeExercises(merged, localDraft.exercises);
             recoveredWorkoutId = localDraft.savedId ?? recoveredWorkoutId;
@@ -1428,14 +1447,14 @@ export default function TodayPage() {
         setNextDay(null);
         setStreakDays(0);
         setFinishSummary(null);
-        setWorkoutStartedAt(nextStartedAt);
-        setDurationNow(Date.now());
+        setWorkoutElapsedSeconds(nextElapsedSeconds);
+        setWorkoutTimerRunning(nextTimerRunning);
         setRestTimerLeft(null);
         setRestRunning(false);
         clearUndoTimeout();
         setUndoAction(null);
 
-        writeDraftNow(data.day_name, merged, recoveredWorkoutId, nextStartedAt);
+        writeDraftNow(data.day_name, merged, recoveredWorkoutId, nextElapsedSeconds, nextTimerRunning);
         draftReadyRef.current = true;
     }, [buildExerciseStateFromPlan, clearUndoTimeout, hydrateFromLoggedWorkout, readDraft, writeDraftNow]);
 
@@ -1453,31 +1472,43 @@ export default function TodayPage() {
     useEffect(() => {
         if (!plan || !draftReadyRef.current) return;
         const timer = window.setTimeout(() => {
-            writeDraftNow(plan.day_name, exercises, savedId);
+            writeDraftNow(
+                plan.day_name,
+                exercises,
+                savedId,
+                workoutElapsedRef.current,
+                workoutTimerRunningRef.current,
+            );
         }, 400);
         return () => window.clearTimeout(timer);
     }, [plan, exercises, savedId, writeDraftNow]);
 
+    useEffect(() => {
+        if (!plan || !draftReadyRef.current) return;
+        if (workoutElapsedSeconds === 0 || workoutElapsedSeconds % 15 !== 0) return;
+        writeDraftNow(plan.day_name, exercises, savedId, workoutElapsedSeconds, workoutTimerRunning);
+    }, [plan, exercises, savedId, workoutElapsedSeconds, workoutTimerRunning, writeDraftNow]);
+
     useEffect(() => () => clearUndoTimeout(), [clearUndoTimeout]);
 
     useEffect(() => {
-        if (!workoutStartedAt || completed) return;
+        if (completed || !workoutTimerRunning) return;
         const timer = window.setInterval(() => {
-            setDurationNow(Date.now());
+            setWorkoutElapsedSeconds((prev) => prev + 1);
         }, 1000);
         return () => window.clearInterval(timer);
-    }, [workoutStartedAt, completed]);
+    }, [workoutTimerRunning, completed]);
 
     useEffect(() => {
         if (!plan) return;
         const handler = () => {
-            writeDraftNow(plan.day_name, exercises, savedId);
+            writeDraftNow(plan.day_name, exercises, savedId, workoutElapsedSeconds, workoutTimerRunning);
         };
         window.addEventListener("beforeunload", handler);
         return () => {
             window.removeEventListener("beforeunload", handler);
         };
-    }, [plan, exercises, savedId, writeDraftNow]);
+    }, [plan, exercises, savedId, workoutElapsedSeconds, workoutTimerRunning, writeDraftNow]);
 
     useEffect(() => {
         let cancelled = false;
@@ -1720,7 +1751,7 @@ export default function TodayPage() {
             const res = await api.logToday(payload);
             setSavedId(res.workout_id);
             if (plan) {
-                writeDraftNow(plan.day_name, exercises, res.workout_id);
+                writeDraftNow(plan.day_name, exercises, res.workout_id, workoutElapsedSeconds, workoutTimerRunning);
             }
             if (!silent) {
                 showToast(`Saved as Workout #${res.workout_id}`);
@@ -1729,7 +1760,7 @@ export default function TodayPage() {
         } catch { if (!silent) showToast("Save failed."); }
         finally { if (!silent) setSaving(false); }
         return null;
-    }, [buildPayload, writeDraftNow, plan, exercises]);
+    }, [buildPayload, writeDraftNow, plan, exercises, workoutElapsedSeconds, workoutTimerRunning]);
 
     const openFinishModal = useCallback(() => {
         const summary = buildFinishSummary(exercises);
@@ -1750,8 +1781,8 @@ export default function TodayPage() {
             throw new Error("Workout save failed");
         }
 
-        const durationMin = workoutStartedAt
-            ? Math.max(1, Math.round((Date.now() - workoutStartedAt) / 60000))
+        const durationMin = workoutElapsedSeconds > 0
+            ? Math.max(1, Math.round(workoutElapsedSeconds / 60))
             : undefined;
 
         const response = await api.completeSession(workoutId, fatigue, durationMin);
@@ -1760,7 +1791,7 @@ export default function TodayPage() {
         setNextDay(response.next_day_index);
         setCompleted(true);
         setShowComplete(false);
-    }, [savedId, save, clearDraft, workoutStartedAt]);
+    }, [savedId, save, clearDraft, workoutElapsedSeconds]);
 
     const startAnotherRoutine = useCallback(() => {
         clearDraft();
@@ -1775,7 +1806,8 @@ export default function TodayPage() {
         setUiStep(1);
         setFocusMode(false);
         setFocusIndex(0);
-        setWorkoutStartedAt(null);
+        setWorkoutElapsedSeconds(0);
+        setWorkoutTimerRunning(false);
         setPlateTarget(null);
         setKeypadTarget(null);
         setRestTimerLeft(null);
@@ -1861,7 +1893,7 @@ export default function TodayPage() {
     const totalSets = exercises.reduce((n, e) => n + e.sets.length, 0);
     const enteredSets = exercises.reduce((n, e) => n + e.sets.filter((s) => hasSetData(s)).length, 0);
     const completedSets = exercises.reduce((n, e) => n + e.sets.filter((s) => s.completed).length, 0);
-    const workoutDurationSeconds = workoutStartedAt ? Math.max(0, Math.floor((durationNow - workoutStartedAt) / 1000)) : 0;
+    const workoutDurationSeconds = workoutElapsedSeconds;
     const workoutDurationLabel = formatElapsedTime(workoutDurationSeconds);
     const visibleExerciseItems = focusMode
         ? exercises[focusIndex]
@@ -2127,9 +2159,30 @@ export default function TodayPage() {
                                 <span>{completedSets}/{totalSets} sets</span>
                                 <span>{plan.estimated_duration_min} min est.</span>
                             </div>
-                            <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/70 px-2.5 py-1 text-xs text-zinc-300">
-                                <span className="text-zinc-500">Duration</span>
-                                <span className="font-mono text-red-200">{workoutDurationLabel}</span>
+                            <div className="mt-2 flex items-center gap-2">
+                                <div className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-xs ${workoutTimerRunning
+                                    ? "border-red-500/35 bg-red-500/10 text-red-100"
+                                    : "border-zinc-700 bg-zinc-900/70 text-zinc-300"
+                                    }`}>
+                                    <span className={workoutTimerRunning ? "text-red-200/80" : "text-zinc-500"}>Duration</span>
+                                    <span className={`font-mono ${workoutTimerRunning ? "text-red-100" : "text-zinc-200"}`}>{workoutDurationLabel}</span>
+                                    <span className={`h-1.5 w-1.5 rounded-full ${workoutTimerRunning ? "bg-red-300" : "bg-zinc-500"}`} />
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        const nextRunning = !workoutTimerRunning;
+                                        setWorkoutTimerRunning(nextRunning);
+                                        if (plan && draftReadyRef.current) {
+                                            writeDraftNow(plan.day_name, exercises, savedId, workoutElapsedSeconds, nextRunning);
+                                        }
+                                    }}
+                                    className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors ${workoutTimerRunning
+                                        ? "border-red-500/40 bg-red-500/20 text-red-100 hover:bg-red-500/30"
+                                        : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500"
+                                        }`}
+                                >
+                                    {workoutTimerRunning ? "Pause" : "Resume"}
+                                </button>
                             </div>
                             <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden mt-3">
                                 <div
