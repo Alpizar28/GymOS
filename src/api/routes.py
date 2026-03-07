@@ -2165,6 +2165,7 @@ async def routine_progression_apply(
 class CompleteSessionRequest(StrictRequestModel):
     workout_id: int = Field(ge=1)
     fatigue: float = Field(ge=1, le=10)
+    duration_min: int | None = Field(default=None, ge=1, le=600)
 
 
 @router.post("/today/complete")
@@ -2181,6 +2182,10 @@ async def complete_today_session(payload: CompleteSessionRequest) -> dict:
         workout = await session.get(Workout, payload.workout_id)
         if not workout or workout.user_id != user_id:
             raise HTTPException(status_code=404, detail="Workout not found")
+
+        if payload.duration_min is not None:
+            workout.duration_min = payload.duration_min
+            session.add(workout)
 
         # Save fatigue feedback
         feedback = await session.get(SessionFeedback, payload.workout_id)

@@ -1,6 +1,8 @@
 const API_BASE = "/api";
+const AUTH_BYPASS_ENABLED = process.env.NEXT_PUBLIC_AUTH_BYPASS === "true";
 
 async function getAccessToken(): Promise<string | null> {
+    if (AUTH_BYPASS_ENABLED) return null;
     if (typeof window === "undefined") return null;
 
     const { supabase } = await import("@/lib/supabase");
@@ -576,11 +578,11 @@ export const api = {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         }),
-    completeSession: (workout_id: number, fatigue: number) =>
+    completeSession: (workout_id: number, fatigue: number, duration_min?: number) =>
         fetchApi<{ workout_id: number; next_day_index: number; fatigue_saved: number; streak_days: number }>("/today/complete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ workout_id, fatigue }),
+            body: JSON.stringify({ workout_id, fatigue, duration_min }),
         }),
     getWeekPlan: () => fetchApi<WeekDay[]>("/week"),
     generateWeek: () => fetchApi<WeekDay[]>("/week/generate", { method: "POST" }),

@@ -30,6 +30,7 @@ Optional/proxy related:
 - `BACKEND_URL` (server-side proxy target)
 - `NEXT_PUBLIC_BACKEND_URL`
 - `PROXY_TIMEOUT_MS`
+- `NEXT_PUBLIC_AUTH_BYPASS` (`true` to skip frontend auth guard in local dev)
 
 ## Build and checks
 

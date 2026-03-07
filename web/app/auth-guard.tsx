@@ -8,11 +8,12 @@ import { supabase } from "@/lib/supabase";
 
 const PUBLIC_PATHS = new Set(["/login", "/offline"]);
 const ONBOARDING_PATH = "/onboarding";
+const AUTH_BYPASS_ENABLED = process.env.NEXT_PUBLIC_AUTH_BYPASS === "true";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(AUTH_BYPASS_ENABLED);
 
   useEffect(() => {
     let mounted = true;
@@ -25,6 +26,15 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     async function check() {
+      if (AUTH_BYPASS_ENABLED) {
+        if (pathname === "/login" && mounted) {
+          router.replace("/today");
+          return;
+        }
+        if (mounted) setReady(true);
+        return;
+      }
+
       if (PUBLIC_PATHS.has(pathname)) {
         if (mounted) setReady(true);
         return;
@@ -57,6 +67,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
+      if (AUTH_BYPASS_ENABLED) return;
       if (PUBLIC_PATHS.has(pathname)) return;
       if (event === "SIGNED_OUT") {
         router.replace("/login");

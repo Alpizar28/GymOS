@@ -89,6 +89,10 @@ function formatLabel(d: Date) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function formatDuration(durationMin: number | null | undefined) {
+  return durationMin ? `${durationMin} min` : "—";
+}
+
 function WorkoutModal({
   workout,
   onClose,
@@ -116,6 +120,11 @@ function WorkoutModal({
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200 text-2xl">
             ×
           </button>
+        </div>
+
+        <div className="mb-4 inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/70 px-3 py-1.5 text-xs text-zinc-300">
+          <span className="text-zinc-500">Duration</span>
+          <span className="font-mono text-red-200">{formatDuration(workout.duration_min)}</span>
         </div>
 
         {workout.notes && (
@@ -731,9 +740,7 @@ export default function CalendarPage() {
                               {w.total_sets} sets · {Math.round(w.total_volume_lbs).toLocaleString()} lbs
                             </p>
                           </div>
-                          {w.duration_min && (
-                            <span className="text-xs text-zinc-500">{w.duration_min} min</span>
-                          )}
+                          <span className="text-xs text-zinc-500">{formatDuration(w.duration_min)}</span>
                         </div>
                       </button>
                     ))}

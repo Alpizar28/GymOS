@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     llm_model: str = "gpt-4o"
     llm_max_tokens: int = 4096
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()

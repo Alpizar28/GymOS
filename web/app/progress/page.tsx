@@ -117,6 +117,66 @@ export default function ProgressPage() {
 
   const streak = useMemo(() => computeStreaks([...workoutSet], today), [workoutSet, today]);
 
+  const weeklyDuration = useMemo(() => {
+    let sessions = 0;
+    let trackedSessions = 0;
+    let totalMinutes = 0;
+
+    for (const day of days) {
+      const date = localDateFromKey(day.date);
+      const diff = dayDiff(today, date);
+      if (diff < 0 || diff > 6) continue;
+
+      for (const workout of day.workouts) {
+        sessions += 1;
+        if (workout.duration_min && workout.duration_min > 0) {
+          trackedSessions += 1;
+          totalMinutes += workout.duration_min;
+        }
+      }
+    }
+
+    return {
+      sessions,
+      trackedSessions,
+      totalMinutes,
+      avgMinutes: trackedSessions > 0 ? Math.round(totalMinutes / trackedSessions) : null,
+    };
+  }, [days, today]);
+
+  const previousWeeklyDuration = useMemo(() => {
+    let sessions = 0;
+    let trackedSessions = 0;
+    let totalMinutes = 0;
+
+    for (const day of days) {
+      const date = localDateFromKey(day.date);
+      const diff = dayDiff(today, date);
+      if (diff < 7 || diff > 13) continue;
+
+      for (const workout of day.workouts) {
+        sessions += 1;
+        if (workout.duration_min && workout.duration_min > 0) {
+          trackedSessions += 1;
+          totalMinutes += workout.duration_min;
+        }
+      }
+    }
+
+    return {
+      sessions,
+      trackedSessions,
+      totalMinutes,
+      avgMinutes: trackedSessions > 0 ? Math.round(totalMinutes / trackedSessions) : null,
+    };
+  }, [days, today]);
+
+  const weeklyDurationDelta = weeklyDuration.totalMinutes - previousWeeklyDuration.totalMinutes;
+  const avgDurationDelta =
+    weeklyDuration.avgMinutes !== null && previousWeeklyDuration.avgMinutes !== null
+      ? weeklyDuration.avgMinutes - previousWeeklyDuration.avgMinutes
+      : null;
+
   const months = useMemo(() => {
     const result: { key: string; label: string; cells: (Date | null)[] }[] = [];
     for (let month = 0; month <= today.getMonth(); month += 1) {
@@ -172,6 +232,47 @@ export default function ProgressPage() {
         </div>
         <p className="text-base font-semibold mt-2 text-red-100">current streak!</p>
         <p className="text-xs text-red-200/80 mt-1">Longest: {streak.longest}</p>
+      </div>
+
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 mb-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-zinc-200">Weekly Duration</p>
+          <span className="text-[10px] uppercase tracking-wide text-zinc-500">Last 7 days</span>
+        </div>
+        <div className="mt-1.5 flex items-center justify-between text-[11px]">
+          <span className="text-zinc-500">vs previous week</span>
+          <span className={weeklyDurationDelta > 0 ? "text-emerald-300" : weeklyDurationDelta < 0 ? "text-amber-300" : "text-zinc-400"}>
+            {weeklyDurationDelta > 0 ? "+" : ""}
+            {weeklyDurationDelta} min
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2 mt-3">
+          <div className="rounded-lg border border-zinc-800 bg-zinc-950/70 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Total</p>
+            <p className="text-base font-semibold text-zinc-100">{weeklyDuration.totalMinutes} min</p>
+            <p className="text-[10px] mt-1 text-zinc-500">prev {previousWeeklyDuration.totalMinutes} min</p>
+          </div>
+          <div className="rounded-lg border border-zinc-800 bg-zinc-950/70 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Avg / session</p>
+            <p className="text-base font-semibold text-red-200">
+              {weeklyDuration.avgMinutes !== null ? `${weeklyDuration.avgMinutes} min` : "—"}
+            </p>
+            <p className="text-[10px] mt-1 text-zinc-500">
+              {avgDurationDelta === null
+                ? "prev —"
+                : `prev ${previousWeeklyDuration.avgMinutes} min (${avgDurationDelta > 0 ? "+" : ""}${avgDurationDelta})`}
+            </p>
+          </div>
+          <div className="rounded-lg border border-zinc-800 bg-zinc-950/70 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-zinc-500">Tracked</p>
+            <p className="text-base font-semibold text-zinc-100">
+              {weeklyDuration.trackedSessions}/{weeklyDuration.sessions}
+            </p>
+            <p className="text-[10px] mt-1 text-zinc-500">
+              prev {previousWeeklyDuration.trackedSessions}/{previousWeeklyDuration.sessions}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
