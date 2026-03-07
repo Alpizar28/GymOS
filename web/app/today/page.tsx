@@ -205,13 +205,14 @@ function mergeExercises(base: ExerciseState[], incoming: ExerciseState[]) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function newSet(index: number): ActualSet {
-    return { index, actual_weight: null, actual_reps: null, actual_rir: null, completed: false };
+function newSet(index: number, setType: ActualSet["set_type"] = "normal"): ActualSet {
+    return { index, set_type: setType, actual_weight: null, actual_reps: null, actual_rir: null, completed: false };
 }
 
 function initSets(planned: TodaySet[]): ActualSet[] {
     return planned.map((s) => ({
         index: s.index,
+        set_type: (s.set_type as ActualSet["set_type"]) || "normal",
         actual_weight: s.weight_lbs,
         actual_reps: s.target_reps,
         actual_rir: s.rir_target,
@@ -220,7 +221,7 @@ function initSets(planned: TodaySet[]): ActualSet[] {
 }
 
 function setTypeVisual(planned: TodaySet | null, actual: ActualSet) {
-    const setType = planned?.set_type ?? "normal";
+    const setType = planned?.set_type ?? actual.set_type ?? "normal";
     const rir = planned?.rir_target ?? actual.actual_rir ?? null;
 
     if (setType === "warmup") {
@@ -229,6 +230,24 @@ function setTypeVisual(planned: TodaySet | null, actual: ActualSet) {
             label: "Warm Up",
             badge: "text-zinc-300 bg-zinc-800 border border-zinc-700",
             bar: "border-l-zinc-500",
+        };
+    }
+
+    if (setType === "approach") {
+        return {
+            code: "A",
+            label: "Approach",
+            badge: "text-red-200 bg-red-950/30 border border-red-500/20",
+            bar: "border-l-red-400",
+        };
+    }
+
+    if (setType === "drop") {
+        return {
+            code: "D",
+            label: "Drop",
+            badge: "text-orange-200 bg-orange-950/30 border border-orange-500/20",
+            bar: "border-l-orange-400",
         };
     }
 
@@ -1062,7 +1081,7 @@ function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddS
     state: ExerciseState;
     onToggle: () => void;
     onSetChange: (si: number, u: ActualSet) => void;
-    onAddSet: () => void;
+    onAddSet: (setType: ActualSet["set_type"]) => void;
     onRemoveSet: (si: number) => void;
     onCopyPreviousSet: (si: number) => void;
     onRemoveExercise: () => void;
@@ -1125,10 +1144,24 @@ function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddS
                         ))}
                     </div>
 
-                    <button onClick={onAddSet}
-                        className="w-full py-3 rounded-xl border border-dashed border-zinc-700 text-zinc-500 text-sm active:border-red-500 active:text-red-400 touch-manipulation">
-                        + Add set
-                    </button>
+                    <div className="grid grid-cols-4 gap-2">
+                        <button onClick={() => onAddSet("warmup")}
+                            className="py-2 rounded-xl border border-dashed border-zinc-700 text-zinc-500 text-xs active:border-red-500 active:text-red-400 touch-manipulation">
+                            + W
+                        </button>
+                        <button onClick={() => onAddSet("approach")}
+                            className="py-2 rounded-xl border border-dashed border-zinc-700 text-zinc-500 text-xs active:border-red-500 active:text-red-400 touch-manipulation">
+                            + A
+                        </button>
+                        <button onClick={() => onAddSet("normal")}
+                            className="py-2 rounded-xl border border-dashed border-zinc-700 text-zinc-500 text-xs active:border-red-500 active:text-red-400 touch-manipulation">
+                            + E
+                        </button>
+                        <button onClick={() => onAddSet("drop")}
+                            className="py-2 rounded-xl border border-dashed border-zinc-700 text-zinc-500 text-xs active:border-red-500 active:text-red-400 touch-manipulation">
+                            + D
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
@@ -1268,6 +1301,7 @@ export default function TodayPage() {
             const sets = normalizeIndices(
                 ex.sets.map((s, i) => ({
                     index: i,
+                    set_type: (s.set_type as ActualSet["set_type"]) || "normal",
                     actual_weight: s.weight,
                     actual_reps: s.reps,
                     actual_rir: s.rir,
@@ -1468,8 +1502,8 @@ export default function TodayPage() {
     const updateSet = (exIdx: number, si: number, u: ActualSet) =>
         setExercises((p) => p.map((e, i) => i === exIdx ? { ...e, sets: e.sets.map((s, j) => j === si ? u : s) } : e));
 
-    const addSet = (exIdx: number) =>
-        setExercises((p) => p.map((e, i) => i === exIdx ? { ...e, sets: [...e.sets, newSet(e.sets.length)] } : e));
+    const addSet = (exIdx: number, setType: ActualSet["set_type"] = "normal") =>
+        setExercises((p) => p.map((e, i) => i === exIdx ? { ...e, sets: [...e.sets, newSet(e.sets.length, setType)] } : e));
 
     const removeSet = (exIdx: number, si: number) =>
         setExercises((p) => {
@@ -1493,6 +1527,7 @@ export default function TodayPage() {
                     j === si
                         ? {
                             ...s,
+                            set_type: previous.set_type,
                             actual_weight: previous.actual_weight,
                             actual_reps: previous.actual_reps,
                             actual_rir: previous.actual_rir,
@@ -1521,7 +1556,7 @@ export default function TodayPage() {
                 is_anchor: exercise.is_anchor,
                 notes: "",
                 plannedSets: [],
-                sets: [newSet(0)],
+                sets: [newSet(0, "normal")],
                 open: true,
                 lastSession: [],
             },
@@ -1551,7 +1586,9 @@ export default function TodayPage() {
         const exEntries: ExerciseLogEntry[] = exercises
             .map((e) => ({
                 name: e.name,
-                sets: e.sets.filter((s) => s.completed || hasSetData(s)),
+                sets: e.sets
+                    .filter((s) => s.completed || hasSetData(s))
+                    .map((s) => ({ ...s, set_type: s.set_type ?? "normal" })),
             }))
             .filter((e) => e.sets.length > 0);
         return { day_name: plan.day_name, training_type: plan.training_type, exercises: exEntries };
@@ -2011,7 +2048,7 @@ export default function TodayPage() {
                                 state={ex}
                                 onToggle={() => handleToggle(i)}
                                 onSetChange={(si, u) => updateSet(i, si, u)}
-                                onAddSet={() => addSet(i)}
+                                onAddSet={(setType) => addSet(i, setType)}
                                 onRemoveSet={(si) => removeSet(i, si)}
                                 onCopyPreviousSet={(si) => copyPreviousSet(i, si)}
                                 onRemoveExercise={() => removeExercise(i)}

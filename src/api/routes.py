@@ -579,6 +579,7 @@ async def get_workout(workout_id: int) -> WorkoutDetail:
 
 class SetLogEntry(StrictRequestModel):
     index: int = Field(ge=0, le=100)
+    set_type: str = Field(default="normal", pattern=r"^(normal|warmup|approach|drop)$")
     actual_weight: float | None = Field(default=None, ge=0, le=2000)
     actual_reps: int | None = Field(default=None, ge=0, le=200)
     actual_rir: int | None = Field(default=None, ge=0, le=10)
@@ -726,6 +727,7 @@ async def log_today_workout(payload: TodayLogRequest) -> dict:
                 s.reps = set_entry.actual_reps
                 s.actual_rir = set_entry.actual_rir
                 s.rir = set_entry.actual_rir
+                s.set_type = set_entry.set_type
                 s.completed = set_entry.completed
 
             if len(existing_sets) > len(ex_entry.sets):

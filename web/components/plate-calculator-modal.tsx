@@ -152,7 +152,7 @@ export function PlateCalculatorModal({
           </button>
         </div>
 
-        <div className="overflow-y-auto px-3 pb-3 sm:px-4 sm:pb-4">
+        <div className="overflow-y-auto px-3 pb-4 sm:px-4 sm:pb-5">
           <div className="mt-3 rounded-2xl border border-zinc-700 bg-[#17171f] p-3">
             <p className="text-center text-3xl sm:text-4xl font-bold text-white tabular-nums">{formatWeight(total)} lbs</p>
             <p className="text-center text-xs text-zinc-400 mt-1">
@@ -256,10 +256,13 @@ export function PlateCalculatorModal({
             </div>
           </div>
 
+        </div>
+
+        <div className="border-t border-zinc-800 bg-[#1c1c24]/98 px-3 py-2.5 pb-[calc(10px+env(safe-area-inset-bottom))] sm:px-4">
           <button
             type="button"
             onClick={onClose}
-            className="mt-4 w-full py-2.5 rounded-xl border border-zinc-700 text-zinc-300 text-sm"
+            className="w-full py-3 rounded-xl border border-zinc-600 bg-zinc-900 text-zinc-100 text-sm font-semibold shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
           >
             Close
           </button>

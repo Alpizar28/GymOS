@@ -25,6 +25,54 @@ from src.services.recommendation_service import suggest_day
 logger = logging.getLogger(__name__)
 
 
+def _limit_warmups(plan_json: dict) -> dict:
+    """Keep warmups focused on top compounds, avoid warmups on every exercise."""
+    exercises = plan_json.get("exercises")
+    if not isinstance(exercises, list):
+        return plan_json
+
+    allowed_indexes: list[int] = []
+    for idx, exercise in enumerate(exercises):
+        if exercise.get("is_anchor"):
+            allowed_indexes.append(idx)
+        if len(allowed_indexes) >= 2:
+            break
+
+    if not allowed_indexes and exercises:
+        allowed_indexes = [0]
+
+    allowed_set = set(allowed_indexes)
+    for idx, exercise in enumerate(exercises):
+        sets = exercise.get("sets", [])
+        if not isinstance(sets, list):
+            continue
+
+        warmups_seen = 0
+        normalized_sets = []
+        for set_row in sets:
+            if not isinstance(set_row, dict):
+                continue
+            row = dict(set_row)
+            set_type = str(row.get("set_type", "normal")).lower()
+
+            if set_type == "working":
+                set_type = "normal"
+
+            if set_type == "warmup":
+                if idx in allowed_set and warmups_seen < 2:
+                    warmups_seen += 1
+                else:
+                    set_type = "normal"
+
+            row["set_type"] = set_type
+            normalized_sets.append(row)
+
+        exercise["sets"] = normalized_sets
+
+    plan_json["total_sets"] = sum(len(ex.get("sets", [])) for ex in exercises)
+    return plan_json
+
+
 async def get_day_template(session: AsyncSession, day_index: int) -> WeekTemplate | None:
     """Get the week template for a given day index."""
     result = await session.execute(
@@ -210,12 +258,15 @@ async def generate_day_plan(
         logger.warning("LLM returned no plan — generating fallback")
         plan_json = _generate_fallback_plan(template.name, anchor_targets, day_rules)
 
+    plan_json = _limit_warmups(plan_json)
+
     # Validate
     validated = await _validate_plan(session, plan_json, flat_constraints)
     if validated and not validated.get("is_valid", True):
         logger.warning("Plan validation failed: %s", validated.get("violations"))
         if validated.get("corrected_plan"):
             plan_json = validated["corrected_plan"]
+            plan_json = _limit_warmups(plan_json)
 
     # Store
     plan = Plan(

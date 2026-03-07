@@ -669,7 +669,7 @@ export interface TodayExercise {
 
 export interface TodaySet {
     index: number;
-    set_type: string; // "warmup" | "normal" | "drop"
+    set_type: string; // "warmup" | "normal" | "approach" | "drop"
     weight_lbs: number | null;
     target_reps: number | null;
     rir_target: number | null;
@@ -678,6 +678,7 @@ export interface TodaySet {
 
 export interface SetLogEntry {
     index: number;
+    set_type: "normal" | "warmup" | "approach" | "drop";
     actual_weight: number | null;
     actual_reps: number | null;
     actual_rir: number | null;
