@@ -694,6 +694,7 @@ export interface ExerciseLogEntry {
 }
 
 export interface TodayLogPayload {
+    date: string;
     day_name: string;
     training_type?: "push" | "pull" | "legs" | "custom";
     exercises: ExerciseLogEntry[];

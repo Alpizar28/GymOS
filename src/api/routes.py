@@ -594,6 +594,7 @@ class ExerciseLogEntry(StrictRequestModel):
 
 
 class TodayLogRequest(StrictRequestModel):
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
     day_name: str = Field(min_length=1, max_length=80)
     training_type: str | None = Field(default=None, pattern=r"^(push|pull|legs|custom)$")
     exercises: list[ExerciseLogEntry] = Field(min_length=1, max_length=60)
@@ -653,13 +654,17 @@ async def log_today_workout(payload: TodayLogRequest) -> dict:
     Idempotently save/update today's workout log from the web UI.
     Creates a new Workout for today or updates the existing one.
     """
-    today = date.today()
+    try:
+        workout_date = date.fromisoformat(payload.date)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Invalid date format") from exc
+
     user_id = get_current_user_id()
     async with async_session() as session:
         existing = await session.execute(
             select(Workout)
             .where(Workout.user_id == user_id)
-            .where(Workout.date == today)
+            .where(Workout.date == workout_date)
             .where(Workout.template_day_name == payload.day_name)
             .order_by(desc(Workout.id))
             .limit(1)
@@ -670,7 +675,7 @@ async def log_today_workout(payload: TodayLogRequest) -> dict:
         if created:
             workout = Workout(
                 user_id=user_id,
-                date=today,
+                date=workout_date,
                 template_day_name=payload.day_name,
                 training_type=payload.training_type,
             )

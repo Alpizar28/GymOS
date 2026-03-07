@@ -6,9 +6,11 @@ from pydantic import ValidationError
 from src.api.routes import (
     CompleteSessionRequest,
     DayOptionCreate,
+    ExerciseLogEntry,
     ManualSet,
     ProtectionRequest,
     RoutineCreateRequest,
+    SetLogEntry,
     TodayLogRequest,
     _classify_training_type,
 )
@@ -38,12 +40,27 @@ def test_manual_set_rejects_out_of_range_values():
 def test_today_log_request_rejects_blank_day_name_after_strip():
     with pytest.raises(ValidationError):
         TodayLogRequest(
+            date="2026-03-07",
             day_name="   ",
             exercises=[
-                {
-                    "name": "Bench Press",
-                    "sets": [{"index": 0, "actual_weight": 135, "actual_reps": 8, "actual_rir": 2}],
-                }
+                ExerciseLogEntry(
+                    name="Bench Press",
+                    sets=[SetLogEntry(index=0, actual_weight=135, actual_reps=8, actual_rir=2)],
+                )
+            ],
+        )
+
+
+def test_today_log_request_rejects_invalid_date_format():
+    with pytest.raises(ValidationError):
+        TodayLogRequest(
+            date="07-03-2026",
+            day_name="Push_Heavy",
+            exercises=[
+                ExerciseLogEntry(
+                    name="Bench Press",
+                    sets=[SetLogEntry(index=0, actual_weight=135, actual_reps=8, actual_rir=2)],
+                )
             ],
         )
 

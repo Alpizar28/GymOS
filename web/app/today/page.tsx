@@ -2046,7 +2046,12 @@ export default function TodayPage() {
                     .map((s) => ({ ...s, set_type: s.set_type ?? "normal" })),
             }))
             .filter((e) => e.sets.length > 0);
-        return { day_name: plan.day_name, training_type: plan.training_type, exercises: exEntries };
+        return {
+            date: localDateISO(),
+            day_name: plan.day_name,
+            training_type: plan.training_type,
+            exercises: exEntries,
+        };
     }, [plan, exercises]);
 
     const save = useCallback(async (silent = false): Promise<number | null> => {
