@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 
 const DEFAULT_BACKEND = "http://backend:8000";
-const DEFAULT_PROXY_TIMEOUT_MS = 15000;
+const DEFAULT_PROXY_TIMEOUT_MS = 45000;
+const DEFAULT_LONG_PROXY_TIMEOUT_MS = 120000;
 const BACKEND_DISCOVERY_TTL_MS = 60_000;
 
 let cachedBackendBase: string | null = null;
@@ -82,11 +83,30 @@ async function resolveBackendBaseUrl() {
   return cachedBackendBase;
 }
 
-function proxyTimeoutMs() {
+function isLongRunningPath(path: string[]) {
+  const joined = path.join("/");
+  return (
+    joined === "generate-day" ||
+    joined === "generate-today" ||
+    joined === "today/log" ||
+    joined.startsWith("manual-workouts")
+  );
+}
+
+function proxyTimeoutMs(path: string[]) {
+  const longRaw = process.env.PROXY_TIMEOUT_LONG_MS;
+  const longParsed = longRaw ? Number(longRaw) : NaN;
+  const longTimeout = Number.isFinite(longParsed) && longParsed > 0
+    ? longParsed
+    : DEFAULT_LONG_PROXY_TIMEOUT_MS;
+
   const raw = process.env.PROXY_TIMEOUT_MS;
   const parsed = raw ? Number(raw) : NaN;
-  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_PROXY_TIMEOUT_MS;
-  return parsed;
+  const baseTimeout = Number.isFinite(parsed) && parsed > 0
+    ? parsed
+    : DEFAULT_PROXY_TIMEOUT_MS;
+
+  return isLongRunningPath(path) ? Math.max(baseTimeout, longTimeout) : baseTimeout;
 }
 
 async function proxy(request: NextRequest, method: string, path: string[]) {
@@ -95,7 +115,8 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
   const target = `${baseUrl}/api/${path.join("/")}${url.search}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), proxyTimeoutMs());
+  const timeoutMs = proxyTimeoutMs(path);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const headers = new Headers(request.headers);
@@ -133,7 +154,7 @@ async function proxy(request: NextRequest, method: string, path: string[]) {
 
     if (error instanceof Error && error.name === "AbortError") {
       return Response.json(
-        { detail: "Backend timeout" },
+        { detail: `Backend timeout after ${timeoutMs}ms` },
         { status: 504 }
       );
     }

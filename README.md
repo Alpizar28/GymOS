@@ -29,6 +29,7 @@ GymOS is designed to unify that lifecycle with a clear UX and a robust backend.
 - **Unified Historial**: calendar + streaks + selected-day drill-down in one view.
 - **Perfil hub**: personal data, exercise library, protections, and expanded stats.
 - **Weight unit system (lb/kg)**: global preference, onboarding selection, per-exercise override in active session, and plate calculator toggle.
+- **Local-day workout persistence**: today logs are stored using the client local date to avoid UTC/day-shift errors.
 - **PWA-ready frontend**: installable app shell with offline fallback.
 - **Coolify-friendly proxying**: resilient API proxy with timeout handling.
 
@@ -157,8 +158,15 @@ Includes near-term UX improvements, medium-term body metrics integration
 ## Deployment Notes
 
 - Frontend API traffic is proxied through `web/app/api/[...path]/route.ts`.
-- Proxy timeout is configurable via `PROXY_TIMEOUT_MS` (default 60s).
+- Proxy timeout is configurable via `PROXY_TIMEOUT_MS` (default 45s).
+- Long-running endpoints (`generate-day`, `generate-today`, `today/log`, `manual-workouts/*`) use an extended timeout via `PROXY_TIMEOUT_LONG_MS` (default 120s).
 - Designed for container deployment (Coolify-compatible).
+
+## Date/Timezone Safety
+
+- `POST /today/log` now receives an explicit `date` (`YYYY-MM-DD`) from the frontend.
+- Backend persists the workout using that provided local date instead of server `date.today()`.
+- This prevents sessions from being saved as the next calendar day when server timezone differs from user timezone.
 
 ## Supabase Migration Notes
 

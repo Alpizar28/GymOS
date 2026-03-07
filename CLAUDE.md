@@ -40,6 +40,18 @@ están particionadas por usuario y protegidas con políticas RLS en Supabase.
 - Regla canónica: backend/DB persisten pesos en libras (`*_lbs`) para evitar mezcla de unidades.
 - Conversión de unidades se realiza en capa UI al mostrar/editar datos.
 
+### Fecha Local y Zona Horaria en Today
+
+- El flujo `today/log` usa fecha explícita del cliente (`YYYY-MM-DD`) enviada por frontend.
+- Backend persiste workouts con esa fecha local, evitando desfasajes por UTC o zona horaria del servidor.
+- Resultado esperado: no registrar entrenamientos como "día siguiente" por diferencia horaria.
+
+### Proxy Timeouts (Web API Route)
+
+- Timeout base del proxy: `45s`.
+- Timeout extendido: `120s` para endpoints pesados (`generate-day`, `generate-today`, `today/log`, `manual-workouts/*`).
+- Variables relevantes: `PROXY_TIMEOUT_MS`, `PROXY_TIMEOUT_LONG_MS`.
+
 ---
 
 ## 2. ARQUITECTURA GENERAL
