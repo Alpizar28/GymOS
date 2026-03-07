@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { displayFromLbs, formatWeight, lbsFromDisplay, type WeightUnit } from "@/lib/units";
 
 type BarType = "standard" | "short" | "ez" | "none";
+type PlateMode = "double_side" | "single_side";
 
 const PLATE_OPTIONS = [45, 35, 25, 22, 10, 5, 2.5] as const;
 
@@ -67,6 +68,7 @@ export function PlateCalculatorModal({
   onSave: (weight: number) => void;
 }) {
   const [barType, setBarType] = useState<BarType>("standard");
+  const [plateMode, setPlateMode] = useState<PlateMode>("double_side");
   const [plateCounts, setPlateCounts] = useState<Record<number, number>>({});
   const [customPlateSizes, setCustomPlateSizes] = useState<number[]>([]);
   const [customPlate, setCustomPlate] = useState<string>("");
@@ -86,7 +88,7 @@ export function PlateCalculatorModal({
     [plateCounts]
   );
 
-  const platesTotal = platesPerSideTotal * 2;
+  const platesTotal = plateMode === "double_side" ? platesPerSideTotal * 2 : platesPerSideTotal;
 
   const totalLbs = useMemo(() => roundToNearestHalf(barWeightLbs + platesTotal), [barWeightLbs, platesTotal]);
 
@@ -121,6 +123,7 @@ export function PlateCalculatorModal({
     setShowCustomInput(false);
     setCustomPlate("");
     setBarType("standard");
+    setPlateMode("double_side");
   }
 
   function addCustomPlate() {
@@ -175,6 +178,23 @@ export function PlateCalculatorModal({
             </button>
           </div>
 
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setPlateMode("double_side")}
+              className={`rounded-full px-3 py-2 text-xs font-semibold border ${plateMode === "double_side" ? "bg-red-600/80 border-red-500 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-300"}`}
+            >
+              Incluir dos platos
+            </button>
+            <button
+              type="button"
+              onClick={() => setPlateMode("single_side")}
+              className={`rounded-full px-3 py-2 text-xs font-semibold border ${plateMode === "single_side" ? "bg-red-600/80 border-red-500 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-300"}`}
+            >
+              Solo uno
+            </button>
+          </div>
+
           <div className="mt-3 rounded-2xl border border-zinc-700 bg-[#17171f] p-3">
             <p className="text-center text-3xl sm:text-4xl font-bold text-white tabular-nums">{formatWeight(totalDisplay)} {unit}</p>
             <p className="text-center text-xs text-zinc-400 mt-1">
@@ -182,7 +202,7 @@ export function PlateCalculatorModal({
             </p>
 
             <div className="mt-3 flex items-center justify-center gap-1">
-              <PlateStack plates={visualPerSide} side="left" unit={unit} />
+              {plateMode === "double_side" ? <PlateStack plates={visualPerSide} side="left" unit={unit} /> : null}
               <div className="h-2 w-14 sm:w-20 rounded-full bg-zinc-400" />
               <div className="h-4 w-2.5 rounded bg-zinc-200" />
               <div className="h-2 w-14 sm:w-20 rounded-full bg-zinc-400" />
@@ -191,7 +211,9 @@ export function PlateCalculatorModal({
           </div>
 
           <div className="mt-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">Add Plates (+{unit} per side)</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">
+              Add Plates (+{unit} {plateMode === "double_side" ? "per side" : "total"})
+            </p>
             <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory">
               {selectablePlates.map((plate) => {
                 const count = plateCounts[plate] ?? 0;
@@ -200,7 +222,7 @@ export function PlateCalculatorModal({
                   <div key={plate} className="snap-start shrink-0 w-[124px] rounded-xl border border-zinc-700 bg-zinc-900/70 px-2 py-2">
                     <div className="text-center mb-2">
                       <p className="text-sm font-semibold text-white">{formatWeight(plateDisplay)} {unit}</p>
-                      <p className="text-xs text-zinc-400">{count} por lado</p>
+                      <p className="text-xs text-zinc-400">{count} {plateMode === "double_side" ? "por lado" : "total"}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <button

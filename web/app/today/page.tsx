@@ -313,6 +313,20 @@ function normalizeSetType(value: string | null | undefined): ActualSet["set_type
     return "normal";
 }
 
+const SET_TYPE_MENU_OPTIONS: Array<{ value: ActualSet["set_type"]; label: string }> = [
+    { value: "warmup", label: "Warmup" },
+    { value: "approach", label: "Approach" },
+    { value: "normal", label: "Working" },
+    { value: "drop", label: "Drop Set" },
+];
+
+function setTypeShortLabel(value: ActualSet["set_type"]): string {
+    if (value === "warmup") return "W";
+    if (value === "approach") return "A";
+    if (value === "drop") return "D";
+    return "N";
+}
+
 function initSets(planned: TodaySet[]): ActualSet[] {
     return planned.map((s) => ({
         index: s.index,
@@ -1032,145 +1046,364 @@ function SetCard({ exerciseIndex, index, actual, lastData, weightUnit, onChange,
     onOpenFieldKeypad: (field: KeypadField) => void;
     activeField: KeypadField | null;
 }) {
+    const SWIPE_THRESHOLD = 72;
+    const SWIPE_LIMIT = 120;
     const upd = (f: Partial<ActualSet>) => onChange({ ...actual, ...f });
     const isEditingThisSet = activeField !== null;
     const setType = normalizeSetType(actual.set_type);
     const displayActualWeight = displayFromLbs(actual.actual_weight, weightUnit);
     const displayLastWeight = displayFromLbs(lastData?.weight ?? null, weightUnit);
+    const isCompletedLocked = actual.completed;
+    const completedFieldTone = actual.completed ? "bg-red-950/30 border-red-500/40" : "bg-zinc-800 border-zinc-700";
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [typeMenuOpen, setTypeMenuOpen] = useState(false);
+    const [menuOpensUp, setMenuOpensUp] = useState(false);
+    const [typeMenuOpensUp, setTypeMenuOpensUp] = useState(false);
+    const [menuAlign, setMenuAlign] = useState<"left" | "right">("right");
+    const [typeMenuAlign, setTypeMenuAlign] = useState<"left" | "right">("left");
+    const [translateX, setTranslateX] = useState(0);
+    const [isDragging, setIsDragging] = useState(false);
+    const [flashTone, setFlashTone] = useState<"complete" | "delete" | null>(null);
+    const [lockedHintVisible, setLockedHintVisible] = useState(false);
+    const swipeStartRef = useRef<{ id: number; x: number; y: number } | null>(null);
+    const flashTimeoutRef = useRef<number | null>(null);
+    const lockedHintTimeoutRef = useRef<number | null>(null);
+    const cardRef = useRef<HTMLDivElement | null>(null);
+    const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+    const typeButtonRef = useRef<HTMLButtonElement | null>(null);
+    const isAnyMenuOpen = menuOpen || typeMenuOpen;
+
+    const shouldOpenUp = (trigger: HTMLElement | null, estimatedHeight: number): boolean => {
+        if (!trigger) return false;
+        const rect = trigger.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        return spaceBelow < estimatedHeight && spaceAbove > spaceBelow;
+    };
+
+    const resolveHorizontalAlign = (
+        trigger: HTMLElement | null,
+        estimatedWidth: number,
+        preferred: "left" | "right"
+    ): "left" | "right" => {
+        if (!trigger) return preferred;
+        const rect = trigger.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const margin = 8;
+
+        const fitsLeft = rect.left + estimatedWidth <= viewportWidth - margin;
+        const fitsRight = rect.right - estimatedWidth >= margin;
+
+        if (preferred === "left") {
+            if (fitsLeft) return "left";
+            if (fitsRight) return "right";
+            return "left";
+        }
+
+        if (fitsRight) return "right";
+        if (fitsLeft) return "left";
+        return "right";
+    };
+
+    const triggerFlash = (tone: "complete" | "delete") => {
+        if (flashTimeoutRef.current !== null) {
+            window.clearTimeout(flashTimeoutRef.current);
+        }
+        setFlashTone(tone);
+        flashTimeoutRef.current = window.setTimeout(() => {
+            setFlashTone(null);
+            flashTimeoutRef.current = null;
+        }, 180);
+    };
+
+    const notifyLockedEdit = () => {
+        if (lockedHintTimeoutRef.current !== null) {
+            window.clearTimeout(lockedHintTimeoutRef.current);
+        }
+        setLockedHintVisible(true);
+        lockedHintTimeoutRef.current = window.setTimeout(() => {
+            setLockedHintVisible(false);
+            lockedHintTimeoutRef.current = null;
+        }, 1200);
+    };
+
+    useEffect(() => {
+        return () => {
+            if (flashTimeoutRef.current !== null) {
+                window.clearTimeout(flashTimeoutRef.current);
+            }
+            if (lockedHintTimeoutRef.current !== null) {
+                window.clearTimeout(lockedHintTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!menuOpen && !typeMenuOpen) return;
+        const onPointerDown = (event: PointerEvent) => {
+            if (!cardRef.current) return;
+            if (!cardRef.current.contains(event.target as Node)) {
+                setMenuOpen(false);
+                setTypeMenuOpen(false);
+            }
+        };
+
+        document.addEventListener("pointerdown", onPointerDown);
+        return () => document.removeEventListener("pointerdown", onPointerDown);
+    }, [menuOpen, typeMenuOpen]);
+
+    const toggleComplete = () => {
+        upd({ completed: !actual.completed });
+        if (!actual.completed) onDone(index);
+    };
+
+    const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        const target = event.target as HTMLElement;
+        if (target.closest("input,select,button,textarea")) return;
+        swipeStartRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+        setMenuOpen(false);
+        setTypeMenuOpen(false);
+        setIsDragging(true);
+    };
+
+    const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+        const start = swipeStartRef.current;
+        if (!start || start.id !== event.pointerId) return;
+        const dx = event.clientX - start.x;
+        const dy = event.clientY - start.y;
+        if (Math.abs(dy) > Math.abs(dx) + 6) {
+            setTranslateX(0);
+            return;
+        }
+        const clamped = Math.max(-SWIPE_LIMIT, Math.min(SWIPE_LIMIT, dx));
+        setTranslateX(clamped);
+    };
+
+    const finishSwipe = () => {
+        if (translateX <= -SWIPE_THRESHOLD) {
+            triggerFlash("complete");
+            toggleComplete();
+        } else if (translateX >= SWIPE_THRESHOLD) {
+            triggerFlash("delete");
+            onRemove();
+        }
+        setIsDragging(false);
+        setTranslateX(0);
+        swipeStartRef.current = null;
+    };
 
     return (
-        <div className={`bg-zinc-900/60 border rounded-xl transition-all ${isEditingThisSet ? "border-red-500/70 ring-1 ring-red-500/40" : "border-zinc-800"}`}>
-            {/* Top row */}
-            <div className="px-3 pt-2.5 pb-1.5 min-h-[22px]">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                    {lastData ? (
-                        <span className="text-xs text-zinc-600 leading-none">
-                            Last: {displayLastWeight && `${formatWeight(displayLastWeight)}${weightUnit}`}{lastData.reps && ` × ${lastData.reps}`}
-                        </span>
-                    ) : null}
-                    {isEditingThisSet ? (
-                        <span className="text-[11px] font-semibold uppercase tracking-wide text-red-300 leading-none">
-                            Editing {fieldLabel(activeField, weightUnit)}
-                        </span>
-                    ) : null}
+        <div ref={cardRef} className={`relative overflow-visible rounded-lg ${isAnyMenuOpen ? "z-40" : "z-0"}`}>
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-between px-3">
+                <div className={`text-[11px] font-semibold uppercase tracking-wide transition-opacity ${translateX >= 28 ? "opacity-100 text-red-300" : "opacity-0 text-zinc-600"}`}>
+                    Delete
+                </div>
+                <div className={`text-[11px] font-semibold uppercase tracking-wide transition-opacity ${translateX <= -28 ? "opacity-100 text-red-200" : "opacity-0 text-zinc-600"}`}>
+                    {actual.completed ? "Undo" : "Complete"}
                 </div>
             </div>
+            {lockedHintVisible ? (
+                <div className="absolute top-1.5 right-2.5 z-[60] pointer-events-none rounded-md border border-red-500/45 bg-red-950/90 px-2 py-1 text-[10px] font-semibold text-red-100 shadow-lg">
+                    Desmarca el set para editar
+                </div>
+            ) : null}
 
-            {/* Actions row */}
-            <div className="px-3 pb-2">
-                <div className="grid grid-cols-5 gap-1">
-                    <button
-                        onClick={onCopyAbove}
-                        title="Copiar set anterior"
-                        disabled={index === 0}
-                        className="h-9 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 active:text-red-300 active:bg-red-900/30 disabled:opacity-30 disabled:active:text-zinc-400 disabled:active:bg-zinc-800 flex items-center justify-center text-sm touch-manipulation"
-                    >
-                        ⧉
-                    </button>
-                    <button
-                        onClick={onMoveUp}
-                        title="Mover arriba"
-                        disabled={!canMoveUp}
-                        className="h-9 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 active:text-red-300 active:bg-red-900/30 disabled:opacity-30 disabled:active:text-zinc-400 disabled:active:bg-zinc-800 flex items-center justify-center text-sm touch-manipulation"
-                    >
-                        ↑
-                    </button>
-                    <button
-                        onClick={onMoveDown}
-                        title="Mover abajo"
-                        disabled={!canMoveDown}
-                        className="h-9 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 active:text-red-300 active:bg-red-900/30 disabled:opacity-30 disabled:active:text-zinc-400 disabled:active:bg-zinc-800 flex items-center justify-center text-sm touch-manipulation"
-                    >
-                        ↓
-                    </button>
-                    <button
-                        onClick={onRemove}
-                        title="Remove set"
-                        className="h-9 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 active:text-red-300 active:bg-red-900/30 flex items-center justify-center text-lg touch-manipulation"
-                    >
-                        ×
-                    </button>
-                    <button
-                        onClick={() => {
-                            upd({ completed: !actual.completed });
-                            if (!actual.completed) onDone(index);
-                        }}
-                        title="Marcar completado"
-                        className={`h-9 rounded-lg font-bold text-sm transition-colors touch-manipulation ${actual.completed
-                                ? "bg-red-600 text-white"
-                                : "bg-zinc-800 border border-zinc-700 text-zinc-500"
-                            }`}
-                    >
-                        ✓
-                    </button>
+            <div
+                className={`relative bg-zinc-900/60 border transition-all ${isEditingThisSet ? "border-red-500/70 ring-1 ring-red-500/40" : "border-zinc-800"} ${flashTone === "complete" ? "bg-red-600/25" : flashTone === "delete" ? "bg-red-900/35" : ""}`}
+                style={{ transform: `translateX(${translateX}px)`, transition: isDragging ? "none" : "transform 140ms ease-out" }}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={finishSwipe}
+                onPointerCancel={finishSwipe}
+            >
+                {/* Top row */}
+                <div className="px-2.5 pt-2 pb-1 min-h-[18px]">
+                    <div className="flex items-center justify-between gap-2 whitespace-nowrap">
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                            {lastData ? (
+                                <span className="text-[11px] text-zinc-600 leading-none block truncate">
+                                    Last: {displayLastWeight && `${formatWeight(displayLastWeight)}${weightUnit}`}{lastData.reps && ` × ${lastData.reps}`}
+                                </span>
+                            ) : null}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            {isEditingThisSet ? (
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-300 leading-none">
+                                    {fieldLabel(activeField, weightUnit)}
+                                </span>
+                            ) : null}
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            {/* Inputs row */}
-            <div className="grid grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 px-3 pb-3 pt-0.5 items-center">
-                <div className="h-full">
-                    <select
-                        value={setType}
-                        onChange={(e) => upd({ set_type: normalizeSetType(e.target.value) })}
-                        className="w-full h-full min-h-[44px] bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2 text-xs font-semibold text-zinc-200 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                        aria-label={`Set ${index + 1} type`}
-                    >
-                        <option value="normal">Normal</option>
-                        <option value="approach">Approach</option>
-                        <option value="warmup">Warmup</option>
-                        <option value="drop">Drop set</option>
-                    </select>
-                </div>
-                <div>
-                    <input type="number" step={weightUnit === "kg" ? 1 : 2.5} inputMode="decimal"
-                        id={`set-${exerciseIndex}-${index}-weight`}
-                        aria-label={`Set ${index + 1} weight in ${weightUnit}`}
-                        value={displayActualWeight ?? ""}
-                        onFocus={(e) => {
-                            e.currentTarget.blur();
-                            onOpenFieldKeypad("weight");
-                        }}
-                        onChange={(e) => {
-                            const parsed = e.target.value ? parseFloat(e.target.value) : null;
-                            upd({ actual_weight: lbsFromDisplay(parsed, weightUnit) });
-                        }}
-                        placeholder={weightUnit}
-                        className={`w-full bg-zinc-800 border rounded-lg px-2 py-2 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${activeField === "weight"
-                                ? "border-red-500 ring-1 ring-red-500"
-                                : "border-zinc-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                            }`} />
-                </div>
-                <div>
-                    <input type="number" inputMode="numeric"
-                        id={`set-${exerciseIndex}-${index}-reps`}
-                        aria-label={`Set ${index + 1} reps`}
-                        value={actual.actual_reps ?? ""}
-                        onFocus={(e) => {
-                            e.currentTarget.blur();
-                            onOpenFieldKeypad("reps");
-                        }}
-                        onChange={(e) => upd({ actual_reps: e.target.value ? parseInt(e.target.value) : null })}
-                        placeholder="reps"
-                        className={`w-full bg-zinc-800 border rounded-lg px-2 py-2 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${activeField === "reps"
-                                ? "border-red-500 ring-1 ring-red-500"
-                                : "border-zinc-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                            }`} />
-                </div>
-                <div>
-                    <input type="number" inputMode="numeric" min="0" max="5"
-                        id={`set-${exerciseIndex}-${index}-rir`}
-                        aria-label={`Set ${index + 1} RIR`}
-                        value={actual.actual_rir ?? ""}
-                        onFocus={(e) => {
-                            e.currentTarget.blur();
-                            onOpenFieldKeypad("rir");
-                        }}
-                        onChange={(e) => upd({ actual_rir: e.target.value ? parseInt(e.target.value) : null })}
-                        placeholder="RIR"
-                        className={`w-full bg-zinc-800 border rounded-lg px-2 py-2 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${activeField === "rir"
-                                ? "border-red-500 ring-1 ring-red-500"
-                                : "border-zinc-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                            }`} />
+                {menuOpen ? (
+                    <div className={`absolute z-50 rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl p-1 flex items-center gap-1 ${menuOpensUp ? "bottom-10" : "top-9"} ${menuAlign === "right" ? "right-2.5" : "left-2.5"}`}>
+                        <button type="button" onClick={() => { onCopyAbove(); setMenuOpen(false); }} disabled={index === 0} className="h-7 px-2 rounded-md text-[11px] text-zinc-300 bg-zinc-800/70 disabled:opacity-30">⧉</button>
+                        <button type="button" onClick={() => { onMoveUp(); setMenuOpen(false); }} disabled={!canMoveUp} className="h-7 px-2 rounded-md text-[11px] text-zinc-300 bg-zinc-800/70 disabled:opacity-30">↑</button>
+                        <button type="button" onClick={() => { onMoveDown(); setMenuOpen(false); }} disabled={!canMoveDown} className="h-7 px-2 rounded-md text-[11px] text-zinc-300 bg-zinc-800/70 disabled:opacity-30">↓</button>
+                        <button type="button" onClick={() => { triggerFlash("complete"); toggleComplete(); setMenuOpen(false); }} className="h-7 px-2 rounded-md text-[11px] text-red-200 bg-zinc-800/70">{actual.completed ? "Undo" : "Done"}</button>
+                        <button type="button" onClick={() => { triggerFlash("delete"); onRemove(); setMenuOpen(false); }} className="h-7 px-2 rounded-md text-[11px] text-red-300 bg-zinc-800/70">Del</button>
+                    </div>
+                ) : null}
+
+                {typeMenuOpen ? (
+                    <div className={`absolute z-50 rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl p-1 min-w-[130px] ${typeMenuOpensUp ? "bottom-10" : "top-9"} ${typeMenuAlign === "left" ? "left-2.5" : "right-2.5"}`}>
+                        {SET_TYPE_MENU_OPTIONS.map((option) => (
+                            <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => {
+                                    if (isCompletedLocked) {
+                                        notifyLockedEdit();
+                                        return;
+                                    }
+                                    upd({ set_type: option.value });
+                                    setTypeMenuOpen(false);
+                                }}
+                                className={`w-full px-2.5 py-1.5 rounded-md text-left text-xs ${setType === option.value ? "bg-red-600/20 text-red-200" : "text-zinc-300 hover:bg-zinc-800"}`}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
+                ) : null}
+
+                {/* Inputs row */}
+                <div className="grid grid-cols-[minmax(0,0.65fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_34px] gap-1.5 px-2.5 pb-2 pt-0 items-center">
+                    <div className="h-full">
+                        <button
+                            ref={typeButtonRef}
+                            type="button"
+                            onClick={() => {
+                                if (isCompletedLocked) {
+                                    notifyLockedEdit();
+                                    return;
+                                }
+                                setMenuOpen(false);
+                                const next = !typeMenuOpen;
+                                setTypeMenuOpensUp(shouldOpenUp(typeButtonRef.current, 170));
+                                setTypeMenuAlign(resolveHorizontalAlign(typeButtonRef.current, 150, "left"));
+                                setTypeMenuOpen(next);
+                            }}
+                            className={`w-full h-full min-h-[38px] border rounded-lg px-2 py-1.5 text-[11px] font-semibold text-zinc-200 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 ${completedFieldTone} ${isCompletedLocked ? "opacity-75" : ""}`}
+                            aria-label={`Set ${index + 1} type`}
+                            title="Tap to select set type"
+                        >
+                            {setTypeShortLabel(setType)}
+                        </button>
+                    </div>
+                    <div>
+                        <input type="number" step={weightUnit === "kg" ? 1 : 2.5} inputMode="decimal"
+                            id={`set-${exerciseIndex}-${index}-weight`}
+                            aria-label={`Set ${index + 1} weight in ${weightUnit}`}
+                            value={displayActualWeight ?? ""}
+                            readOnly={isCompletedLocked}
+                            onPointerDown={(e) => {
+                                if (isCompletedLocked) {
+                                    e.preventDefault();
+                                    notifyLockedEdit();
+                                }
+                            }}
+                            onFocus={(e) => {
+                                if (isCompletedLocked) {
+                                    e.currentTarget.blur();
+                                    notifyLockedEdit();
+                                    return;
+                                }
+                                e.currentTarget.blur();
+                                onOpenFieldKeypad("weight");
+                            }}
+                            onChange={(e) => {
+                                if (isCompletedLocked) return;
+                                const parsed = e.target.value ? parseFloat(e.target.value) : null;
+                                upd({ actual_weight: lbsFromDisplay(parsed, weightUnit) });
+                            }}
+                            placeholder={weightUnit}
+                            className={`w-full border rounded-lg px-2 py-1.5 text-sm font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${completedFieldTone} ${activeField === "weight"
+                                    ? "border-red-500 ring-1 ring-red-500"
+                                    : "focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                                }`} />
+                    </div>
+                    <div>
+                        <input type="number" inputMode="numeric"
+                            id={`set-${exerciseIndex}-${index}-reps`}
+                            aria-label={`Set ${index + 1} reps`}
+                            value={actual.actual_reps ?? ""}
+                            readOnly={isCompletedLocked}
+                            onPointerDown={(e) => {
+                                if (isCompletedLocked) {
+                                    e.preventDefault();
+                                    notifyLockedEdit();
+                                }
+                            }}
+                            onFocus={(e) => {
+                                if (isCompletedLocked) {
+                                    e.currentTarget.blur();
+                                    notifyLockedEdit();
+                                    return;
+                                }
+                                e.currentTarget.blur();
+                                onOpenFieldKeypad("reps");
+                            }}
+                            onChange={(e) => {
+                                if (isCompletedLocked) return;
+                                upd({ actual_reps: e.target.value ? parseInt(e.target.value) : null });
+                            }}
+                            placeholder="reps"
+                            className={`w-full border rounded-lg px-2 py-1.5 text-sm font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${completedFieldTone} ${activeField === "reps"
+                                    ? "border-red-500 ring-1 ring-red-500"
+                                    : "focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                                }`} />
+                    </div>
+                    <div>
+                        <input type="number" inputMode="numeric" min="0" max="5"
+                            id={`set-${exerciseIndex}-${index}-rir`}
+                            aria-label={`Set ${index + 1} RIR`}
+                            value={actual.actual_rir ?? ""}
+                            readOnly={isCompletedLocked}
+                            onPointerDown={(e) => {
+                                if (isCompletedLocked) {
+                                    e.preventDefault();
+                                    notifyLockedEdit();
+                                }
+                            }}
+                            onFocus={(e) => {
+                                if (isCompletedLocked) {
+                                    e.currentTarget.blur();
+                                    notifyLockedEdit();
+                                    return;
+                                }
+                                e.currentTarget.blur();
+                                onOpenFieldKeypad("rir");
+                            }}
+                            onChange={(e) => {
+                                if (isCompletedLocked) return;
+                                upd({ actual_rir: e.target.value ? parseInt(e.target.value) : null });
+                            }}
+                            placeholder="RIR"
+                            className={`w-full border rounded-lg px-2 py-1.5 text-sm font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${completedFieldTone} ${activeField === "rir"
+                                    ? "border-red-500 ring-1 ring-red-500"
+                                    : "focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                                }`} />
+                    </div>
+                    <div className="flex justify-end">
+                        <button
+                            ref={menuButtonRef}
+                            type="button"
+                            onClick={() => {
+                                setTypeMenuOpen(false);
+                                const next = !menuOpen;
+                                setMenuOpensUp(shouldOpenUp(menuButtonRef.current, 48));
+                                setMenuAlign(resolveHorizontalAlign(menuButtonRef.current, 230, "right"));
+                                setMenuOpen(next);
+                            }}
+                            className={`h-8 w-8 rounded-md border text-zinc-300 text-sm ${completedFieldTone}`}
+                            aria-label={`Open set ${index + 1} actions`}
+                        >
+                            ⋯
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1204,11 +1437,11 @@ function ExerciseAccordion({ exerciseIndex, state, weightUnit, onToggleWeightUni
     const allDone = done === total && total > 0;
 
     return (
-        <div className={`rounded-xl border overflow-hidden ${allDone ? "border-red-600/50 bg-red-950/10" : "border-zinc-700/50 bg-zinc-800/50"}`}>
-            <button onClick={onToggle} className="w-full flex items-center gap-3 px-4 py-4 text-left touch-manipulation active:bg-zinc-700/20">
+        <div className={`rounded-xl border overflow-visible ${allDone ? "border-red-600/50 bg-red-950/10" : "border-zinc-700/50 bg-zinc-800/50"}`}>
+            <button onClick={onToggle} className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left touch-manipulation active:bg-zinc-700/20">
                 <span className="text-[10px] px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-500">{state.is_anchor ? "anchor" : "std"}</span>
                 <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-white text-base truncate">{state.name}</p>
+                    <p className="font-semibold text-white text-sm truncate">{state.name}</p>
                     {state.is_anchor && <span className="text-xs text-red-400 font-bold uppercase">Anchor</span>}
                     {/* Last session summary under exercise name */}
                     {lastSession && lastSession.length > 0 && (
@@ -1221,7 +1454,7 @@ function ExerciseAccordion({ exerciseIndex, state, weightUnit, onToggleWeightUni
                         </p>
                     )}
                 </div>
-                <div className={`px-2.5 py-1 rounded-full text-sm font-bold flex-shrink-0 ${allDone ? "bg-red-600/30 text-red-400" : done > 0 ? "bg-red-600/20 text-red-300" : "bg-zinc-700/60 text-zinc-500"}`}>
+                <div className={`px-2 py-1 rounded-full text-xs font-bold flex-shrink-0 ${allDone ? "bg-red-600/30 text-red-400" : done > 0 ? "bg-red-600/20 text-red-300" : "bg-zinc-700/60 text-zinc-500"}`}>
                     {done}/{total}
                 </div>
                 <span
@@ -1237,20 +1470,21 @@ function ExerciseAccordion({ exerciseIndex, state, weightUnit, onToggleWeightUni
             </button>
 
             {open && (
-                <div className="px-4 pb-4 space-y-3">
-                    <div className="flex gap-2">
-                        <button onClick={onSwap} className="flex-1 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">Replace</button>
-                        <button onClick={onMoveUp} className="px-3 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">↑</button>
-                        <button onClick={onMoveDown} className="px-3 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">↓</button>
-                        <button onClick={onRemoveExercise} className="flex-1 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-400 touch-manipulation">Remove</button>
+                <div className="px-3.5 pb-3 space-y-2">
+                    <div className="flex gap-1.5">
+                        <button onClick={onSwap} className="flex-1 py-1.5 text-xs rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">Replace</button>
+                        <button onClick={onMoveUp} className="px-2.5 py-1.5 text-xs rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">↑</button>
+                        <button onClick={onMoveDown} className="px-2.5 py-1.5 text-xs rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">↓</button>
+                        <button onClick={onRemoveExercise} className="flex-1 py-1.5 text-xs rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-400 touch-manipulation">Remove</button>
                     </div>
-                    <div className="grid grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 px-3 pb-0.5 text-[10px] uppercase tracking-wide text-zinc-500 font-semibold text-center leading-none">
+                    <div className="grid grid-cols-[minmax(0,0.65fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_34px] gap-1.5 px-2.5 pb-0 text-[10px] uppercase tracking-wide text-zinc-500 font-semibold text-center leading-none">
                         <span className="text-center">type</span>
                         <span className="text-center">{weightUnit}</span>
                         <span className="text-center">reps</span>
                         <span className="text-center">rir</span>
+                        <span className="text-center">⋯</span>
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                         {sets.map((actual, i) => (
                             <SetCard
                                 key={i}
@@ -1275,7 +1509,7 @@ function ExerciseAccordion({ exerciseIndex, state, weightUnit, onToggleWeightUni
 
                     <div className="grid grid-cols-1">
                         <button onClick={() => onAddSet("normal")}
-                            className="py-2 rounded-xl border border-dashed border-zinc-700 text-zinc-500 text-xs active:border-red-500 active:text-red-400 touch-manipulation">
+                            className="py-1.5 rounded-xl border border-dashed border-zinc-700 text-zinc-500 text-xs active:border-red-500 active:text-red-400 touch-manipulation">
                             + Add set
                         </button>
                     </div>
@@ -1705,10 +1939,16 @@ export default function TodayPage() {
     };
 
     const updateSet = (exIdx: number, si: number, u: ActualSet) =>
-        setExercises((p) => p.map((e, i) => i === exIdx ? { ...e, sets: e.sets.map((s, j) => j === si ? u : s) } : e));
+        setExercises((p) => p.map((e, i) => {
+            if (i !== exIdx) return e;
+            const nextSets = e.sets.map((s, j) => j === si ? u : s);
+            return { ...e, sets: nextSets };
+        }));
 
     const addSet = (exIdx: number, setType: ActualSet["set_type"] = "normal") =>
-        setExercises((p) => p.map((e, i) => i === exIdx ? { ...e, sets: [...e.sets, newSet(e.sets.length, setType)] } : e));
+        setExercises((p) => p.map((e, i) => i === exIdx
+            ? { ...e, sets: [...e.sets, newSet(e.sets.length, setType)] }
+            : e));
 
     const moveSet = (exIdx: number, si: number, direction: -1 | 1) =>
         setExercises((p) => p.map((e, i) => {
