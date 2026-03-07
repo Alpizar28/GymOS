@@ -12,6 +12,7 @@ import {
 import PwaRegister from "./pwa-register";
 import AuthGuard from "./auth-guard";
 import { ThemeProvider } from "@/components/theme-provider";
+import { WeightUnitProvider } from "@/components/weight-unit-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -88,7 +89,8 @@ export default function RootLayout({
       </head>
       <body className="font-[Inter] antialiased bg-zinc-950 text-zinc-100 min-h-screen">
         <ThemeProvider>
-          <PwaRegister />
+          <WeightUnitProvider>
+            <PwaRegister />
           {/* ── Desktop top nav (hidden on mobile) ── */}
           <nav className="hidden sm:block fixed top-0 left-0 right-0 z-50 bg-zinc-950/85 backdrop-blur-xl border-b border-zinc-800/60">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center h-16 gap-6">
@@ -134,6 +136,7 @@ export default function RootLayout({
               ))}
             </div>
           </nav>
+          </WeightUnitProvider>
         </ThemeProvider>
       </body>
     </html>

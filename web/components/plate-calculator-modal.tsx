@@ -2,17 +2,14 @@
 
 import { useMemo, useState } from "react";
 
+import { displayFromLbs, formatWeight, lbsFromDisplay, type WeightUnit } from "@/lib/units";
+
 type BarType = "standard" | "short" | "ez" | "none";
 
 const PLATE_OPTIONS = [45, 35, 25, 22, 10, 5, 2.5] as const;
 
 function roundToNearestHalf(value: number): number {
   return Math.round(value * 2) / 2;
-}
-
-function formatWeight(value: number): string {
-  if (Number.isInteger(value)) return String(value);
-  return value.toFixed(1);
 }
 
 function plateHeight(plate: number): number {
@@ -34,7 +31,7 @@ function plateColor(plate: number): string {
   return "bg-zinc-500";
 }
 
-function PlateStack({ plates, side }: { plates: number[]; side: "left" | "right" }) {
+function PlateStack({ plates, side, unit }: { plates: number[]; side: "left" | "right"; unit: WeightUnit }) {
   const maxVisible = 7;
   const visible = plates.slice(0, maxVisible);
   const hiddenCount = Math.max(0, plates.length - maxVisible);
@@ -44,11 +41,12 @@ function PlateStack({ plates, side }: { plates: number[]; side: "left" | "right"
     <div className={`flex items-end ${sideClass} gap-0.5 min-w-[58px]`}>
       {hiddenCount > 0 && <span className="text-[10px] text-zinc-400 px-1">+{hiddenCount}</span>}
       {visible.map((plate, idx) => (
+        
         <div
           key={`${side}-${plate}-${idx}`}
           className={`w-3 rounded-sm border border-zinc-800 ${plateColor(plate)}`}
           style={{ height: `${plateHeight(plate)}px` }}
-          title={`${formatWeight(plate)} lb`}
+          title={`${formatWeight(displayFromLbs(plate, unit) ?? plate)} ${unit}`}
         />
       ))}
     </div>
@@ -57,10 +55,14 @@ function PlateStack({ plates, side }: { plates: number[]; side: "left" | "right"
 
 export function PlateCalculatorModal({
   shortBarWeight,
+  unit,
+  onUnitChange,
   onClose,
   onSave,
 }: {
   shortBarWeight: number;
+  unit: WeightUnit;
+  onUnitChange: (unit: WeightUnit) => void;
   onClose: () => void;
   onSave: (weight: number) => void;
 }) {
@@ -70,7 +72,7 @@ export function PlateCalculatorModal({
   const [customPlate, setCustomPlate] = useState<string>("");
   const [showCustomInput, setShowCustomInput] = useState(false);
 
-  const barWeight = useMemo(() => {
+  const barWeightLbs = useMemo(() => {
     if (barType === "standard") return 45;
     if (barType === "short") return shortBarWeight;
     if (barType === "ez") return 20;
@@ -86,10 +88,11 @@ export function PlateCalculatorModal({
 
   const platesTotal = platesPerSideTotal * 2;
 
-  const total = useMemo(
-    () => roundToNearestHalf(barWeight + platesTotal),
-    [barWeight, platesTotal]
-  );
+  const totalLbs = useMemo(() => roundToNearestHalf(barWeightLbs + platesTotal), [barWeightLbs, platesTotal]);
+
+  const barWeightDisplay = useMemo(() => displayFromLbs(barWeightLbs, unit) ?? 0, [barWeightLbs, unit]);
+  const platesTotalDisplay = useMemo(() => displayFromLbs(platesTotal, unit) ?? 0, [platesTotal, unit]);
+  const totalDisplay = useMemo(() => displayFromLbs(totalLbs, unit) ?? 0, [totalLbs, unit]);
 
   const visualPerSide = useMemo(() => {
     const stack: number[] = [];
@@ -123,7 +126,9 @@ export function PlateCalculatorModal({
   function addCustomPlate() {
     const value = Number(customPlate);
     if (!Number.isFinite(value) || value <= 0) return;
-    const rounded = roundToNearestHalf(value);
+    const normalizedLbs = lbsFromDisplay(value, unit);
+    if (normalizedLbs === null) return;
+    const rounded = roundToNearestHalf(normalizedLbs);
     if (!PLATE_OPTIONS.includes(rounded as (typeof PLATE_OPTIONS)[number])) {
       setCustomPlateSizes((prev) =>
         prev.includes(rounded) ? prev : [...prev, rounded].sort((a, b) => b - a)
@@ -143,38 +148,58 @@ export function PlateCalculatorModal({
           </button>
           <div className="text-center">
             <p className="text-sm sm:text-base font-semibold text-white">Plate Calculator</p>
-            <p className="text-xs text-zinc-400 mt-0.5">Starts at Standard Bar (45 lbs)</p>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Starts at Standard Bar ({formatWeight(displayFromLbs(45, unit) ?? 45)} {unit})
+            </p>
           </div>
-          <button onClick={() => onSave(total)} className="text-sm font-semibold text-red-300">
+          <button onClick={() => onSave(totalLbs)} className="text-sm font-semibold text-red-300">
             Save
           </button>
         </div>
 
         <div className="overflow-y-auto px-3 pb-4 sm:px-4 sm:pb-5">
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => onUnitChange("lb")}
+              className={`rounded-full px-3 py-2 text-xs font-semibold border ${unit === "lb" ? "bg-red-600/80 border-red-500 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-300"}`}
+            >
+              lb
+            </button>
+            <button
+              type="button"
+              onClick={() => onUnitChange("kg")}
+              className={`rounded-full px-3 py-2 text-xs font-semibold border ${unit === "kg" ? "bg-red-600/80 border-red-500 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-300"}`}
+            >
+              kg
+            </button>
+          </div>
+
           <div className="mt-3 rounded-2xl border border-zinc-700 bg-[#17171f] p-3">
-            <p className="text-center text-3xl sm:text-4xl font-bold text-white tabular-nums">{formatWeight(total)} lbs</p>
+            <p className="text-center text-3xl sm:text-4xl font-bold text-white tabular-nums">{formatWeight(totalDisplay)} {unit}</p>
             <p className="text-center text-xs text-zinc-400 mt-1">
-              Bar {formatWeight(barWeight)} + Plates {formatWeight(platesTotal)}
+              Bar {formatWeight(barWeightDisplay)} + Plates {formatWeight(platesTotalDisplay)}
             </p>
 
             <div className="mt-3 flex items-center justify-center gap-1">
-              <PlateStack plates={visualPerSide} side="left" />
+              <PlateStack plates={visualPerSide} side="left" unit={unit} />
               <div className="h-2 w-14 sm:w-20 rounded-full bg-zinc-400" />
               <div className="h-4 w-2.5 rounded bg-zinc-200" />
               <div className="h-2 w-14 sm:w-20 rounded-full bg-zinc-400" />
-              <PlateStack plates={visualPerSide} side="right" />
+              <PlateStack plates={visualPerSide} side="right" unit={unit} />
             </div>
           </div>
 
           <div className="mt-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">Add Plates (+lbs per side)</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">Add Plates (+{unit} per side)</p>
             <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory">
               {selectablePlates.map((plate) => {
                 const count = plateCounts[plate] ?? 0;
+                const plateDisplay = displayFromLbs(plate, unit) ?? plate;
                 return (
                   <div key={plate} className="snap-start shrink-0 w-[124px] rounded-xl border border-zinc-700 bg-zinc-900/70 px-2 py-2">
                     <div className="text-center mb-2">
-                      <p className="text-sm font-semibold text-white">{formatWeight(plate)} lb</p>
+                      <p className="text-sm font-semibold text-white">{formatWeight(plateDisplay)} {unit}</p>
                       <p className="text-xs text-zinc-400">{count} por lado</p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -210,11 +235,11 @@ export function PlateCalculatorModal({
               <div className="mt-2 flex items-center gap-2">
                 <input
                   type="number"
-                  step={0.5}
-                  min={0.5}
+                  step={unit === "kg" ? 1 : 0.5}
+                  min={unit === "kg" ? 1 : 0.5}
                   value={customPlate}
                   onChange={(e) => setCustomPlate(e.target.value)}
-                  placeholder="Custom plate"
+                  placeholder={`Custom plate (${unit})`}
                   className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
                 />
                 <button
@@ -229,13 +254,13 @@ export function PlateCalculatorModal({
           </div>
 
           <div className="mt-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">Bar Type (lbs)</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">Bar Type ({unit})</p>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { type: "standard" as const, label: "Standard Bar (45 lbs)" },
-                { type: "short" as const, label: `Short Bar (${formatWeight(shortBarWeight)} lbs)` },
-                { type: "ez" as const, label: "EZ Bar (20 lbs)" },
-                { type: "none" as const, label: "None (0 lbs)" },
+                { type: "standard" as const, label: `Standard Bar (${formatWeight(displayFromLbs(45, unit) ?? 45)} ${unit})` },
+                { type: "short" as const, label: `Short Bar (${formatWeight(displayFromLbs(shortBarWeight, unit) ?? shortBarWeight)} ${unit})` },
+                { type: "ez" as const, label: `EZ Bar (${formatWeight(displayFromLbs(20, unit) ?? 20)} ${unit})` },
+                { type: "none" as const, label: `None (0 ${unit})` },
               ].map((option) => {
                 const active = barType === option.type;
                 return (

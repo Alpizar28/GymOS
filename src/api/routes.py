@@ -296,6 +296,7 @@ class PersonalProfileResponse(BaseModel):
     age: int | None = None
     sex: str | None = None
     height_cm: float | None = None
+    weight_unit: str = "lb"
     weight_lbs: float | None = None
     body_fat_pct: float | None = None
     primary_goal: str | None = None
@@ -326,6 +327,7 @@ class PersonalProfileUpdateRequest(StrictRequestModel):
     age: int | None = Field(default=None, ge=10, le=110)
     sex: str | None = Field(default=None, pattern=r"^(male|female|other|prefer_not_to_say)$")
     height_cm: float | None = Field(default=None, ge=90, le=260)
+    weight_unit: str | None = Field(default=None, pattern=r"^(lb|kg)$")
     weight_lbs: float | None = Field(default=None, ge=50, le=900)
     body_fat_pct: float | None = Field(default=None, ge=2, le=80)
     primary_goal: str | None = Field(
@@ -1059,6 +1061,7 @@ async def get_personal_profile() -> PersonalProfileResponse:
             "age": None,
             "sex": None,
             "height_cm": None,
+            "weight_unit": "lb",
             "weight_lbs": weight_lbs,
             "body_fat_pct": None,
             "primary_goal": None,
@@ -1189,6 +1192,7 @@ async def update_personal_profile(payload: PersonalProfileUpdateRequest) -> Pers
             "age": None,
             "sex": None,
             "height_cm": None,
+            "weight_unit": "lb",
             "weight_lbs": None,
             "body_fat_pct": None,
             "primary_goal": None,
@@ -1234,6 +1238,7 @@ async def update_personal_profile(payload: PersonalProfileUpdateRequest) -> Pers
             age=data.get("age"),
             sex=data.get("sex"),
             height_cm=data.get("height_cm"),
+            weight_unit=data.get("weight_unit", "lb"),
             weight_lbs=data.get("weight_lbs"),
             body_fat_pct=data.get("body_fat_pct"),
             primary_goal=data.get("primary_goal"),

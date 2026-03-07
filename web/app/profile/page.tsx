@@ -14,6 +14,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { LibraryIcon, ProfileIcon, ShieldIcon, StatsIcon } from "@/components/icons";
 import ThemeToggle from "@/components/theme-toggle";
+import { useWeightUnit } from "@/components/weight-unit-provider";
+import { displayFromLbs, formatWeight, lbsFromDisplay, unitLabel } from "@/lib/units";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -135,7 +137,9 @@ function ProfileIdentityCard({ profile }: { profile: PersonalProfile | null }) {
           <p className="text-xs text-zinc-500 mt-0.5">
             {profile.age ? `${profile.age} años` : "Edad -"}
             {" · "}
-            {profile.weight_lbs ? `${profile.weight_lbs} lb` : "Peso -"}
+            {profile.weight_lbs
+              ? `${formatWeight(displayFromLbs(profile.weight_lbs, profile.weight_unit) ?? 0)} ${unitLabel(profile.weight_unit, true)}`
+              : "Peso -"}
             {" · "}
             {profile.height_cm ? `${profile.height_cm} cm` : "Estatura -"}
           </p>
@@ -147,6 +151,7 @@ function ProfileIdentityCard({ profile }: { profile: PersonalProfile | null }) {
 }
 
 function PersonalSection({ onSaved }: { onSaved?: (profile: PersonalProfile) => void }) {
+  const { unit, setUnit } = useWeightUnit();
   const [data, setData] = useState<PersonalProfile | null>(null);
   const [draft, setDraft] = useState<PersonalProfile | null>(null);
   const [editing, setEditing] = useState(false);
@@ -158,8 +163,9 @@ function PersonalSection({ onSaved }: { onSaved?: (profile: PersonalProfile) => 
     api.getPersonalProfile().then((profile) => {
       setData(profile);
       setDraft(profile);
+      setUnit(profile.weight_unit === "kg" ? "kg" : "lb");
     }).catch(() => {});
-  }, []);
+  }, [setUnit]);
 
   if (!data || !draft) return <Spinner />;
 
@@ -170,6 +176,7 @@ function PersonalSection({ onSaved }: { onSaved?: (profile: PersonalProfile) => 
       const updated = await api.updatePersonalProfile({ ...draft });
       setData(updated);
       setDraft(updated);
+      setUnit(updated.weight_unit === "kg" ? "kg" : "lb");
       onSaved?.(updated);
       setEditing(false);
       setToast("Datos actualizados");
@@ -333,32 +340,66 @@ function PersonalSection({ onSaved }: { onSaved?: (profile: PersonalProfile) => 
           </div>
 
           <div>
-            <label className="text-xs text-zinc-500 block mb-1">Peso (lb)</label>
+            <label className="text-xs text-zinc-500 block mb-1">Peso ({unitLabel(unit, true)})</label>
             {editing ? (
               <input
                 type="number"
-                value={draft.weight_lbs ?? ""}
-                onChange={(e) => setDraft((prev) => prev ? { ...prev, weight_lbs: e.target.value ? Number(e.target.value) : null } : prev)}
+                value={(() => {
+                  const display = displayFromLbs(draft.weight_lbs, unit);
+                  return display === null ? "" : formatWeight(display);
+                })()}
+                onChange={(e) => {
+                  const parsed = e.target.value ? Number(e.target.value) : null;
+                  setDraft((prev) => prev ? { ...prev, weight_lbs: lbsFromDisplay(parsed, unit) } : prev);
+                }}
                 className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
               />
             ) : (
-              <p className="text-sm text-zinc-200">{data.weight_lbs ?? "-"}</p>
+              <p className="text-sm text-zinc-200">
+                {data.weight_lbs === null
+                  ? "-"
+                  : `${formatWeight(displayFromLbs(data.weight_lbs, unit) ?? 0)} ${unitLabel(unit, true)}`}
+              </p>
             )}
           </div>
 
           <div>
-            <label className="text-xs text-zinc-500 block mb-1">Short Bar (lb)</label>
+            <label className="text-xs text-zinc-500 block mb-1">Short Bar ({unitLabel(unit, true)})</label>
             {editing ? (
               <input
                 type="number"
                 step="0.5"
                 min={0}
-                value={draft.preferred_short_bar_lbs ?? ""}
-                onChange={(e) => setDraft((prev) => prev ? { ...prev, preferred_short_bar_lbs: e.target.value ? Number(e.target.value) : null } : prev)}
+                value={(() => {
+                  const display = displayFromLbs(draft.preferred_short_bar_lbs, unit);
+                  return display === null ? "" : formatWeight(display);
+                })()}
+                onChange={(e) => {
+                  const parsed = e.target.value ? Number(e.target.value) : null;
+                  setDraft((prev) => prev ? { ...prev, preferred_short_bar_lbs: lbsFromDisplay(parsed, unit) } : prev);
+                }}
                 className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
               />
             ) : (
-              <p className="text-sm text-zinc-200">{data.preferred_short_bar_lbs ?? 35}</p>
+              <p className="text-sm text-zinc-200">
+                {formatWeight(displayFromLbs(data.preferred_short_bar_lbs ?? 35, unit) ?? 0)} {unitLabel(unit, true)}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs text-zinc-500 block mb-1">Sistema de medida</label>
+            {editing ? (
+              <select
+                value={draft.weight_unit}
+                onChange={(e) => setDraft((prev) => prev ? { ...prev, weight_unit: e.target.value === "kg" ? "kg" : "lb" } : prev)}
+                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
+              >
+                <option value="lb">US (lb)</option>
+                <option value="kg">LATAM / Metrico (kg)</option>
+              </select>
+            ) : (
+              <p className="text-sm text-zinc-200">{data.weight_unit === "kg" ? "LATAM / Metrico (kg)" : "US (lb)"}</p>
             )}
           </div>
 

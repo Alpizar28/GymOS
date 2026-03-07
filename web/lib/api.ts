@@ -95,6 +95,7 @@ export interface PersonalProfile {
     age: number | null;
     sex: "male" | "female" | "other" | "prefer_not_to_say" | null;
     height_cm: number | null;
+    weight_unit: "lb" | "kg";
     weight_lbs: number | null;
     body_fat_pct: number | null;
     primary_goal: "fat_loss" | "muscle_gain" | "recomp" | "strength" | "performance" | "health" | null;

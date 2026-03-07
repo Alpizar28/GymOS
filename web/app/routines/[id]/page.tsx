@@ -15,6 +15,8 @@ import {
 import { PlateCalculatorModal } from "@/components/plate-calculator-modal";
 import { WeightKeypadSheet } from "@/components/weight-keypad-sheet";
 import { TrashIcon } from "@/components/icons";
+import { useWeightUnit } from "@/components/weight-unit-provider";
+import { displayFromLbs, formatWeight, lbsFromDisplay, type WeightUnit } from "@/lib/units";
 
 type KeypadField = "weight" | "reps" | "rir";
 
@@ -80,6 +82,7 @@ function compactSetText(weight: number | null | undefined, reps: number | null |
 }
 
 export default function RoutineDetailPage() {
+  const { unit: globalUnit } = useWeightUnit();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const routineId = Number(params.id);
@@ -99,6 +102,9 @@ export default function RoutineDetailPage() {
   const [shortBarWeight, setShortBarWeight] = useState(35);
   const [keypadTarget, setKeypadTarget] = useState<{ exIdx: number; setIdx: number; field: KeypadField } | null>(null);
   const [plateTarget, setPlateTarget] = useState<{ exIdx: number; setIdx: number } | null>(null);
+  const [exerciseUnits, setExerciseUnits] = useState<Record<string, WeightUnit>>({});
+  const [replaceTargetIdx, setReplaceTargetIdx] = useState<number | null>(null);
+  const [replaceExerciseName, setReplaceExerciseName] = useState("");
 
   function showToast(message: string) {
     setToast(message);
@@ -253,6 +259,44 @@ export default function RoutineDetailPage() {
     setSelectedExerciseName("");
   }
 
+  function startReplaceExercise(exIdx: number) {
+    setReplaceTargetIdx(exIdx);
+    setReplaceExerciseName("");
+  }
+
+  function cancelReplaceExercise() {
+    setReplaceTargetIdx(null);
+    setReplaceExerciseName("");
+  }
+
+  function applyReplaceExercise() {
+    if (!draft || replaceTargetIdx === null || !replaceExerciseName) return;
+    const item = library.find((ex) => ex.name === replaceExerciseName);
+    if (!item) return;
+
+    const replacement: RoutineExerciseTemplate = {
+      name: item.name,
+      exercise_id: item.id,
+      rest_seconds: 90,
+      notes: null,
+      primary_muscle: item.primary_muscle,
+      is_anchor: item.is_anchor,
+      sets: [
+        {
+          set_index: 0,
+          set_type: "normal",
+          target_weight_lbs: null,
+          target_reps: 8,
+          rir_target: 2,
+        },
+      ],
+    };
+
+    const exercises = draft.exercises.map((exercise, idx) => (idx === replaceTargetIdx ? replacement : exercise));
+    setDraft({ ...draft, exercises });
+    cancelReplaceExercise();
+  }
+
   async function startRoutine() {
     setStarting(true);
     try {
@@ -346,7 +390,9 @@ export default function RoutineDetailPage() {
   function updateFromKeypad(value: number | null) {
     if (!keypadTarget) return;
     if (keypadTarget.field === "weight") {
-      updateSet(keypadTarget.exIdx, keypadTarget.setIdx, { target_weight_lbs: value });
+      const exerciseName = draft?.exercises[keypadTarget.exIdx]?.name;
+      const unit = exerciseName ? (exerciseUnits[exerciseName.toLowerCase()] ?? globalUnit) : globalUnit;
+      updateSet(keypadTarget.exIdx, keypadTarget.setIdx, { target_weight_lbs: lbsFromDisplay(value, unit) });
       return;
     }
 
@@ -389,12 +435,20 @@ export default function RoutineDetailPage() {
         <WeightKeypadSheet
           initialValue={
             keypadTarget.field === "weight"
-              ? draft.exercises[keypadTarget.exIdx]?.sets[keypadTarget.setIdx]?.target_weight_lbs ?? null
+              ? displayFromLbs(
+                  draft.exercises[keypadTarget.exIdx]?.sets[keypadTarget.setIdx]?.target_weight_lbs ?? null,
+                  draft.exercises[keypadTarget.exIdx]
+                    ? (exerciseUnits[draft.exercises[keypadTarget.exIdx].name.toLowerCase()] ?? globalUnit)
+                    : globalUnit
+                )
               : keypadTarget.field === "reps"
                 ? draft.exercises[keypadTarget.exIdx]?.sets[keypadTarget.setIdx]?.target_reps ?? null
                 : draft.exercises[keypadTarget.exIdx]?.sets[keypadTarget.setIdx]?.rir_target ?? null
           }
           mode={keypadTarget.field === "weight" ? "weight" : "count"}
+          weightUnit={keypadTarget?.field === "weight" && draft.exercises[keypadTarget.exIdx]
+            ? (exerciseUnits[draft.exercises[keypadTarget.exIdx].name.toLowerCase()] ?? globalUnit)
+            : globalUnit}
           onChange={updateFromKeypad}
           onClose={closeWeightKeypad}
           onOpenPlateCalculator={openPlateCalculatorFromKeypad}
@@ -403,6 +457,14 @@ export default function RoutineDetailPage() {
       {plateTarget && (
         <PlateCalculatorModal
           shortBarWeight={shortBarWeight}
+          unit={draft.exercises[plateTarget.exIdx]
+            ? (exerciseUnits[draft.exercises[plateTarget.exIdx].name.toLowerCase()] ?? globalUnit)
+            : globalUnit}
+          onUnitChange={(unit) => {
+            const name = draft.exercises[plateTarget.exIdx]?.name;
+            if (!name) return;
+            setExerciseUnits((prev) => ({ ...prev, [name.toLowerCase()]: unit }));
+          }}
           onClose={closePlateCalculator}
           onSave={savePlateWeight}
         />
@@ -593,8 +655,20 @@ export default function RoutineDetailPage() {
           <div key={`${exercise.name}-${exIdx}`} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3">
             <div className="flex items-center justify-between mb-2">
               <p className="font-semibold text-sm">{exercise.name}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  const key = exercise.name.toLowerCase();
+                  const current = exerciseUnits[key] ?? globalUnit;
+                  setExerciseUnits((prev) => ({ ...prev, [key]: current === "lb" ? "kg" : "lb" }));
+                }}
+                className="px-2 py-1 rounded-full text-[10px] font-semibold border border-zinc-700 text-zinc-300"
+              >
+                {exerciseUnits[exercise.name.toLowerCase()] ?? globalUnit}
+              </button>
               {editMode && (
                 <div className="flex gap-1">
+                  <button onClick={() => startReplaceExercise(exIdx)} className="px-2 h-8 rounded-lg bg-zinc-800 text-zinc-300 text-xs">Replace</button>
                   <button onClick={() => moveExercise(exIdx, -1)} className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-400">↑</button>
                   <button onClick={() => moveExercise(exIdx, 1)} className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-400">↓</button>
                   <button onClick={() => removeExercise(exIdx)} className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-400">×</button>
@@ -602,83 +676,48 @@ export default function RoutineDetailPage() {
               )}
             </div>
 
+            {editMode && replaceTargetIdx === exIdx && (
+              <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2 min-w-0">
+                <select
+                  value={replaceExerciseName}
+                  onChange={(e) => setReplaceExerciseName(e.target.value)}
+                  className="min-w-0 w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-700 text-sm"
+                >
+                  <option value="">Selecciona reemplazo...</option>
+                  {library.map((ex) => (
+                    <option key={ex.id} value={ex.name}>
+                      {ex.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={applyReplaceExercise}
+                  disabled={!replaceExerciseName}
+                  className="px-3 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold disabled:opacity-40"
+                >
+                  Apply
+                </button>
+                <button
+                  onClick={cancelReplaceExercise}
+                  className="px-3 py-2 rounded-lg border border-zinc-700 text-zinc-300 text-xs"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
             <div className="rounded-xl border border-zinc-800 overflow-hidden">
               <div className="grid grid-cols-5 gap-2 px-3 py-2 bg-zinc-950 text-[10px] text-zinc-500 uppercase tracking-wide font-semibold">
                 <span>Set</span>
                 <span>Prev</span>
-                <span>LBS</span>
+                <span>{(exerciseUnits[exercise.name.toLowerCase()] ?? globalUnit).toUpperCase()}</span>
                 <span>Reps</span>
                 <span>RIR</span>
               </div>
               {exercise.sets.map((set, setIdx) => (
-                <div key={setIdx} className="grid grid-cols-5 gap-2 px-3 py-2 border-t border-zinc-800 text-sm items-center">
-                  <span className="font-mono text-zinc-300">{setLabel(exercise.sets, setIdx)}</span>
-                  <span className="text-zinc-600">-</span>
-                  {editMode ? (
-                    <input
-                      type="number"
-                      value={set.target_weight_lbs ?? ""}
-                      onFocus={(e) => {
-                        e.currentTarget.blur();
-                        openWeightKeypad(exIdx, setIdx, "weight");
-                      }}
-                      onChange={(e) =>
-                        updateSet(exIdx, setIdx, {
-                          target_weight_lbs: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                      className={`w-full bg-zinc-950 border rounded px-2 py-1 text-sm ${keypadTarget?.exIdx === exIdx && keypadTarget?.setIdx === setIdx && keypadTarget.field === "weight"
-                        ? "border-red-500 ring-1 ring-red-500"
-                        : "border-zinc-800"
-                        }`}
-                    />
-                  ) : (
-                    <span>{set.target_weight_lbs ?? "-"}</span>
-                  )}
-                  {editMode ? (
-                    <input
-                      type="number"
-                      value={set.target_reps ?? ""}
-                      onFocus={(e) => {
-                        e.currentTarget.blur();
-                        openWeightKeypad(exIdx, setIdx, "reps");
-                      }}
-                      onChange={(e) =>
-                        updateSet(exIdx, setIdx, {
-                          target_reps: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                      className={`w-full bg-zinc-950 border rounded px-2 py-1 text-sm ${keypadTarget?.exIdx === exIdx && keypadTarget?.setIdx === setIdx && keypadTarget.field === "reps"
-                        ? "border-red-500 ring-1 ring-red-500"
-                        : "border-zinc-800"
-                        }`}
-                    />
-                  ) : (
-                    <span>{set.target_reps ?? "-"}</span>
-                  )}
-                  {editMode ? (
-                    <input
-                      type="number"
-                      value={set.rir_target ?? ""}
-                      onFocus={(e) => {
-                        e.currentTarget.blur();
-                        openWeightKeypad(exIdx, setIdx, "rir");
-                      }}
-                      onChange={(e) =>
-                        updateSet(exIdx, setIdx, {
-                          rir_target: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                      className={`w-full bg-zinc-950 border rounded px-2 py-1 text-sm ${keypadTarget?.exIdx === exIdx && keypadTarget?.setIdx === setIdx && keypadTarget.field === "rir"
-                        ? "border-red-500 ring-1 ring-red-500"
-                        : "border-zinc-800"
-                        }`}
-                    />
-                  ) : (
-                    <span>{set.rir_target ?? "-"}</span>
-                  )}
+                <div key={setIdx} className="border-t border-zinc-800 px-3 py-2 space-y-2">
                   {editMode && (
-                    <div className="col-span-5 flex items-center justify-between mt-1 gap-2">
+                    <div className="flex items-center justify-between gap-2">
                       <select
                         value={normalizeSetType(set.set_type)}
                         onChange={(e) =>
@@ -686,7 +725,7 @@ export default function RoutineDetailPage() {
                             set_type: e.target.value,
                           })
                         }
-                        className="px-2 py-1 rounded bg-zinc-950 border border-zinc-800 text-xs"
+                        className="px-2 py-1.5 rounded bg-zinc-950 border border-zinc-800 text-xs"
                       >
                         {SET_TYPE_OPTIONS.map((opt) => (
                           <option key={opt.value} value={opt.value}>
@@ -694,37 +733,116 @@ export default function RoutineDetailPage() {
                           </option>
                         ))}
                       </select>
-                      <div className="flex items-center gap-1">
+                      <div className="grid grid-cols-4 gap-1">
                         <button
                           onClick={() => copyFromPreviousSet(exIdx, setIdx)}
                           disabled={setIdx === 0}
-                          className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs disabled:opacity-30"
+                          className="h-8 w-8 rounded bg-zinc-800 text-zinc-400 text-xs disabled:opacity-30"
                         >
                           ⧉
                         </button>
                         <button
                           onClick={() => moveSet(exIdx, setIdx, -1)}
                           disabled={setIdx === 0}
-                          className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs disabled:opacity-30"
+                          className="h-8 w-8 rounded bg-zinc-800 text-zinc-400 text-xs disabled:opacity-30"
                         >
                           ↑
                         </button>
                         <button
                           onClick={() => moveSet(exIdx, setIdx, 1)}
                           disabled={setIdx === exercise.sets.length - 1}
-                          className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs disabled:opacity-30"
+                          className="h-8 w-8 rounded bg-zinc-800 text-zinc-400 text-xs disabled:opacity-30"
                         >
                           ↓
                         </button>
                         <button
                           onClick={() => removeSet(exIdx, setIdx)}
-                          className="px-2 py-1 rounded bg-zinc-800 text-zinc-400 text-xs"
+                          className="h-8 w-8 rounded bg-zinc-800 text-zinc-400 text-xs flex items-center justify-center"
                         >
                           <TrashIcon className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </div>
                   )}
+
+                  <div className="grid grid-cols-5 gap-2 text-sm items-center">
+                    <span className="font-mono text-zinc-300">{setLabel(exercise.sets, setIdx)}</span>
+                    <span className="text-zinc-600">-</span>
+                    {editMode ? (
+                      <input
+                        type="number"
+                        value={(() => {
+                          const u = exerciseUnits[exercise.name.toLowerCase()] ?? globalUnit;
+                          const display = displayFromLbs(set.target_weight_lbs, u);
+                          return display === null ? "" : formatWeight(display);
+                        })()}
+                        onFocus={(e) => {
+                          e.currentTarget.blur();
+                          openWeightKeypad(exIdx, setIdx, "weight");
+                        }}
+                        onChange={(e) =>
+                          updateSet(exIdx, setIdx, {
+                            target_weight_lbs: lbsFromDisplay(
+                              e.target.value ? Number(e.target.value) : null,
+                              exerciseUnits[exercise.name.toLowerCase()] ?? globalUnit
+                            ),
+                          })
+                        }
+                        className={`w-full bg-zinc-950 border rounded px-2 py-1 text-sm ${keypadTarget?.exIdx === exIdx && keypadTarget?.setIdx === setIdx && keypadTarget.field === "weight"
+                          ? "border-red-500 ring-1 ring-red-500"
+                          : "border-zinc-800"
+                          }`}
+                      />
+                    ) : (
+                      <span>
+                        {set.target_weight_lbs === null
+                          ? "-"
+                          : `${formatWeight(displayFromLbs(set.target_weight_lbs, exerciseUnits[exercise.name.toLowerCase()] ?? globalUnit) ?? 0)}`}
+                      </span>
+                    )}
+                    {editMode ? (
+                      <input
+                        type="number"
+                        value={set.target_reps ?? ""}
+                        onFocus={(e) => {
+                          e.currentTarget.blur();
+                          openWeightKeypad(exIdx, setIdx, "reps");
+                        }}
+                        onChange={(e) =>
+                          updateSet(exIdx, setIdx, {
+                            target_reps: e.target.value ? Number(e.target.value) : null,
+                          })
+                        }
+                        className={`w-full bg-zinc-950 border rounded px-2 py-1 text-sm ${keypadTarget?.exIdx === exIdx && keypadTarget?.setIdx === setIdx && keypadTarget.field === "reps"
+                          ? "border-red-500 ring-1 ring-red-500"
+                          : "border-zinc-800"
+                          }`}
+                      />
+                    ) : (
+                      <span>{set.target_reps ?? "-"}</span>
+                    )}
+                    {editMode ? (
+                      <input
+                        type="number"
+                        value={set.rir_target ?? ""}
+                        onFocus={(e) => {
+                          e.currentTarget.blur();
+                          openWeightKeypad(exIdx, setIdx, "rir");
+                        }}
+                        onChange={(e) =>
+                          updateSet(exIdx, setIdx, {
+                            rir_target: e.target.value ? Number(e.target.value) : null,
+                          })
+                        }
+                        className={`w-full bg-zinc-950 border rounded px-2 py-1 text-sm ${keypadTarget?.exIdx === exIdx && keypadTarget?.setIdx === setIdx && keypadTarget.field === "rir"
+                          ? "border-red-500 ring-1 ring-red-500"
+                          : "border-zinc-800"
+                          }`}
+                      />
+                    ) : (
+                      <span>{set.rir_target ?? "-"}</span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

@@ -18,6 +18,8 @@ import {
 import { PlateCalculatorModal } from "@/components/plate-calculator-modal";
 import { WeightKeypadSheet } from "@/components/weight-keypad-sheet";
 import { WorkoutCompletedIcon } from "@/components/icons";
+import { useWeightUnit } from "@/components/weight-unit-provider";
+import { displayFromLbs, formatWeight, lbsFromDisplay, type WeightUnit } from "@/lib/units";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +45,7 @@ interface TodayDraft {
     elapsedSeconds?: number;
     timerRunning?: boolean;
     exercises: ExerciseState[];
+    exerciseUnits?: Record<string, WeightUnit>;
 }
 
 interface WorkoutExerciseSummary {
@@ -90,8 +93,12 @@ function normalizeName(name: string) {
     return name.trim().toLowerCase();
 }
 
-function fieldLabel(field: KeypadField): string {
-    if (field === "weight") return "lbs";
+function exerciseUnitKey(name: string) {
+    return normalizeName(name);
+}
+
+function fieldLabel(field: KeypadField, unit: WeightUnit): string {
+    if (field === "weight") return unit;
     if (field === "reps") return "reps";
     return "RIR";
 }
@@ -111,10 +118,6 @@ function cloneExercises(state: ExerciseState[]) {
         sets: ex.sets.map((set) => ({ ...set })),
         lastSession: ex.lastSession ? ex.lastSession.map((set) => ({ ...set })) : ex.lastSession,
     }));
-}
-
-function formatWeightCompact(value: number): string {
-    return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function formatElapsedTime(totalSeconds: number): string {
@@ -151,7 +154,7 @@ function buildFinishSummary(exercises: ExerciseState[]): WorkoutFinishSummary {
             }, null);
 
             if (top && top.actual_weight !== null && top.actual_reps !== null) {
-                topSet = `${formatWeightCompact(top.actual_weight)} x ${top.actual_reps}`;
+                topSet = `${formatWeight(top.actual_weight)} x ${top.actual_reps}`;
             }
 
             return {
@@ -217,7 +220,7 @@ function CompletionConfetti() {
     );
 }
 
-function mergeExercises(base: ExerciseState[], incoming: ExerciseState[]) {
+function mergeExercises(base: ExerciseState[], incoming: ExerciseState[], preserveIncomingOrder = false) {
     const mergeSetRows = (baseSets: ActualSet[], incomingSets: ActualSet[]) => {
         const max = Math.max(baseSets.length, incomingSets.length);
         const merged: ActualSet[] = [];
@@ -234,6 +237,35 @@ function mergeExercises(base: ExerciseState[], incoming: ExerciseState[]) {
         }
         return merged;
     };
+
+    if (preserveIncomingOrder) {
+        const mergedIncoming = incoming.map((from) => {
+            const baseEx = base.find((cand) => normalizeName(cand.name) === normalizeName(from.name));
+            if (!baseEx) {
+                return {
+                    ...from,
+                    sets: normalizeIndices(from.sets),
+                    lastSession: null,
+                };
+            }
+
+            return {
+                ...baseEx,
+                is_anchor: from.is_anchor,
+                notes: from.notes || baseEx.notes,
+                plannedSets: from.plannedSets.length > 0 ? from.plannedSets : baseEx.plannedSets,
+                sets: mergeSetRows(baseEx.sets, from.sets),
+                open: from.open,
+            };
+        });
+
+        const incomingNames = new Set(incoming.map((ex) => normalizeName(ex.name)));
+        const missingFromIncoming = base
+            .filter((ex) => !incomingNames.has(normalizeName(ex.name)))
+            .map((ex) => ({ ...ex }));
+
+        return [...mergedIncoming, ...missingFromIncoming];
+    }
 
     const used = new Array(incoming.length).fill(false);
     const merged = base.map((baseEx) => {
@@ -859,10 +891,10 @@ function CreateTemplateModal({
     );
 }
 
-// ─── Swap Modal ───────────────────────────────────────────────────────────────
+// ─── Replace Modal ────────────────────────────────────────────────────────────
 
-function SwapModal({ exerciseName, onClose, onSwap }: {
-    exerciseName: string; onClose: () => void; onSwap: (alt: AlternativeExercise) => void;
+function ReplaceExerciseModal({ exerciseName, onClose, onReplace }: {
+    exerciseName: string; onClose: () => void; onReplace: (alt: AlternativeExercise) => void;
 }) {
     const [alts, setAlts] = useState<AlternativeExercise[]>([]);
     const [loading, setLoading] = useState(true);
@@ -871,14 +903,14 @@ function SwapModal({ exerciseName, onClose, onSwap }: {
         <div className="today-modal-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
             <div className="today-modal-panel bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl max-h-[80vh] flex flex-col">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 flex-shrink-0">
-                    <h3 className="font-semibold text-white truncate pr-4">Swap: {exerciseName}</h3>
+                    <h3 className="font-semibold text-white truncate pr-4">Replace: {exerciseName}</h3>
                     <button onClick={onClose} className="text-zinc-500 text-2xl w-10 h-10 flex items-center justify-center flex-shrink-0">✕</button>
                 </div>
                 <div className="p-4 space-y-2 overflow-y-auto pb-8">
                     {loading ? <div className="text-center py-10 text-zinc-600">Finding alternatives...</div>
                         : alts.length === 0 ? <div className="text-center py-10 text-zinc-600">No alternatives found</div>
                             : alts.map((alt) => (
-                                <button key={alt.id} onClick={() => onSwap(alt)}
+                                <button key={alt.id} onClick={() => onReplace(alt)}
                                     className="w-full flex justify-between p-4 rounded-xl bg-zinc-800/60 active:bg-zinc-700 border border-zinc-700/30 text-left touch-manipulation">
                                     <div>
                                         <p className="font-medium text-white">{alt.name}</p>
@@ -983,11 +1015,12 @@ function CompleteModal({ summary, onConfirm, onClose }: {
 
 // ─── Set Card ────────────────────────────────────────────────────────────────
 
-function SetCard({ exerciseIndex, index, actual, lastData, onChange, onRemove, onCopyAbove, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onComplete: onDone, onOpenFieldKeypad, activeField }: {
+function SetCard({ exerciseIndex, index, actual, lastData, weightUnit, onChange, onRemove, onCopyAbove, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onComplete: onDone, onOpenFieldKeypad, activeField }: {
     exerciseIndex: number;
     index: number;
     actual: ActualSet;
     lastData: LastSessionSet | null;
+    weightUnit: WeightUnit;
     onChange: (u: ActualSet) => void;
     onRemove: () => void;
     onCopyAbove: () => void;
@@ -1002,6 +1035,8 @@ function SetCard({ exerciseIndex, index, actual, lastData, onChange, onRemove, o
     const upd = (f: Partial<ActualSet>) => onChange({ ...actual, ...f });
     const isEditingThisSet = activeField !== null;
     const setType = normalizeSetType(actual.set_type);
+    const displayActualWeight = displayFromLbs(actual.actual_weight, weightUnit);
+    const displayLastWeight = displayFromLbs(lastData?.weight ?? null, weightUnit);
 
     return (
         <div className={`bg-zinc-900/60 border rounded-xl transition-all ${isEditingThisSet ? "border-red-500/70 ring-1 ring-red-500/40" : "border-zinc-800"}`}>
@@ -1010,19 +1045,69 @@ function SetCard({ exerciseIndex, index, actual, lastData, onChange, onRemove, o
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                     {lastData ? (
                         <span className="text-xs text-zinc-600 leading-none">
-                            Last: {lastData.weight && `${lastData.weight}lb`}{lastData.reps && ` × ${lastData.reps}`}
+                            Last: {displayLastWeight && `${formatWeight(displayLastWeight)}${weightUnit}`}{lastData.reps && ` × ${lastData.reps}`}
                         </span>
                     ) : null}
                     {isEditingThisSet ? (
                         <span className="text-[11px] font-semibold uppercase tracking-wide text-red-300 leading-none">
-                            Editing {fieldLabel(activeField)}
+                            Editing {fieldLabel(activeField, weightUnit)}
                         </span>
                     ) : null}
                 </div>
             </div>
 
+            {/* Actions row */}
+            <div className="px-3 pb-2">
+                <div className="grid grid-cols-5 gap-1">
+                    <button
+                        onClick={onCopyAbove}
+                        title="Copiar set anterior"
+                        disabled={index === 0}
+                        className="h-9 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 active:text-red-300 active:bg-red-900/30 disabled:opacity-30 disabled:active:text-zinc-400 disabled:active:bg-zinc-800 flex items-center justify-center text-sm touch-manipulation"
+                    >
+                        ⧉
+                    </button>
+                    <button
+                        onClick={onMoveUp}
+                        title="Mover arriba"
+                        disabled={!canMoveUp}
+                        className="h-9 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 active:text-red-300 active:bg-red-900/30 disabled:opacity-30 disabled:active:text-zinc-400 disabled:active:bg-zinc-800 flex items-center justify-center text-sm touch-manipulation"
+                    >
+                        ↑
+                    </button>
+                    <button
+                        onClick={onMoveDown}
+                        title="Mover abajo"
+                        disabled={!canMoveDown}
+                        className="h-9 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 active:text-red-300 active:bg-red-900/30 disabled:opacity-30 disabled:active:text-zinc-400 disabled:active:bg-zinc-800 flex items-center justify-center text-sm touch-manipulation"
+                    >
+                        ↓
+                    </button>
+                    <button
+                        onClick={onRemove}
+                        title="Remove set"
+                        className="h-9 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 active:text-red-300 active:bg-red-900/30 flex items-center justify-center text-lg touch-manipulation"
+                    >
+                        ×
+                    </button>
+                    <button
+                        onClick={() => {
+                            upd({ completed: !actual.completed });
+                            if (!actual.completed) onDone(index);
+                        }}
+                        title="Marcar completado"
+                        className={`h-9 rounded-lg font-bold text-sm transition-colors touch-manipulation ${actual.completed
+                                ? "bg-red-600 text-white"
+                                : "bg-zinc-800 border border-zinc-700 text-zinc-500"
+                            }`}
+                    >
+                        ✓
+                    </button>
+                </div>
+            </div>
+
             {/* Inputs row */}
-            <div className="grid grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.25fr)] gap-2 px-3 pb-3 pt-0.5 items-center">
+            <div className="grid grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 px-3 pb-3 pt-0.5 items-center">
                 <div className="h-full">
                     <select
                         value={setType}
@@ -1037,16 +1122,19 @@ function SetCard({ exerciseIndex, index, actual, lastData, onChange, onRemove, o
                     </select>
                 </div>
                 <div>
-                    <input type="number" step="2.5" inputMode="decimal"
+                    <input type="number" step={weightUnit === "kg" ? 1 : 2.5} inputMode="decimal"
                         id={`set-${exerciseIndex}-${index}-weight`}
-                        aria-label={`Set ${index + 1} weight in pounds`}
-                        value={actual.actual_weight ?? ""}
+                        aria-label={`Set ${index + 1} weight in ${weightUnit}`}
+                        value={displayActualWeight ?? ""}
                         onFocus={(e) => {
                             e.currentTarget.blur();
                             onOpenFieldKeypad("weight");
                         }}
-                        onChange={(e) => upd({ actual_weight: e.target.value ? parseFloat(e.target.value) : null })}
-                        placeholder="lb"
+                        onChange={(e) => {
+                            const parsed = e.target.value ? parseFloat(e.target.value) : null;
+                            upd({ actual_weight: lbsFromDisplay(parsed, weightUnit) });
+                        }}
+                        placeholder={weightUnit}
                         className={`w-full bg-zinc-800 border rounded-lg px-2 py-2 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${activeField === "weight"
                                 ? "border-red-500 ring-1 ring-red-500"
                                 : "border-zinc-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
@@ -1084,55 +1172,6 @@ function SetCard({ exerciseIndex, index, actual, lastData, onChange, onRemove, o
                                 : "border-zinc-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
                             }`} />
                 </div>
-                {/* Done button */}
-                <div>
-                    <div className="grid grid-cols-5 gap-1">
-                        <button
-                            onClick={onCopyAbove}
-                            title="Copiar set anterior"
-                            disabled={index === 0}
-                            className="h-[44px] rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 active:text-red-300 active:bg-red-900/30 disabled:opacity-30 disabled:active:text-zinc-400 disabled:active:bg-zinc-800 flex items-center justify-center text-base touch-manipulation"
-                        >
-                            ⧉
-                        </button>
-                        <button
-                            onClick={onMoveUp}
-                            title="Mover arriba"
-                            disabled={!canMoveUp}
-                            className="h-[44px] rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 active:text-red-300 active:bg-red-900/30 disabled:opacity-30 disabled:active:text-zinc-400 disabled:active:bg-zinc-800 flex items-center justify-center text-base touch-manipulation"
-                        >
-                            ↑
-                        </button>
-                        <button
-                            onClick={onMoveDown}
-                            title="Mover abajo"
-                            disabled={!canMoveDown}
-                            className="h-[44px] rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 active:text-red-300 active:bg-red-900/30 disabled:opacity-30 disabled:active:text-zinc-400 disabled:active:bg-zinc-800 flex items-center justify-center text-base touch-manipulation"
-                        >
-                            ↓
-                        </button>
-                        <button
-                            onClick={onRemove}
-                            title="Remove set"
-                            className="h-[44px] rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 active:text-red-300 active:bg-red-900/30 flex items-center justify-center text-xl touch-manipulation"
-                        >
-                            ×
-                        </button>
-                        <button
-                            onClick={() => {
-                                upd({ completed: !actual.completed });
-                                if (!actual.completed) onDone(index); // trigger rest timer on marking done
-                            }}
-                            title="Marcar completado"
-                            className={`h-[44px] rounded-lg font-bold text-base transition-colors touch-manipulation ${actual.completed
-                                    ? "bg-red-600 text-white"
-                                    : "bg-zinc-800 border border-zinc-700 text-zinc-500"
-                                }`}
-                        >
-                            ✓
-                        </button>
-                    </div>
-                </div>
             </div>
         </div>
     );
@@ -1140,9 +1179,11 @@ function SetCard({ exerciseIndex, index, actual, lastData, onChange, onRemove, o
 
 // ─── Exercise Accordion ──────────────────────────────────────────────────────
 
-function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddSet, onMoveSet, onRemoveSet, onCopyPreviousSet, onRemoveExercise, onSwap, onMoveUp, onMoveDown, onSetComplete, onOpenFieldKeypad, activeSetKeypadField }: {
+function ExerciseAccordion({ exerciseIndex, state, weightUnit, onToggleWeightUnit, onToggle, onSetChange, onAddSet, onMoveSet, onRemoveSet, onCopyPreviousSet, onRemoveExercise, onSwap, onMoveUp, onMoveDown, onSetComplete, onOpenFieldKeypad, activeSetKeypadField }: {
     exerciseIndex: number;
     state: ExerciseState;
+    weightUnit: WeightUnit;
+    onToggleWeightUnit: () => void;
     onToggle: () => void;
     onSetChange: (si: number, u: ActualSet) => void;
     onAddSet: (setType: ActualSet["set_type"]) => void;
@@ -1172,30 +1213,42 @@ function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddS
                     {/* Last session summary under exercise name */}
                     {lastSession && lastSession.length > 0 && (
                         <p className="text-xs text-zinc-600 mt-0.5">
-                            Last: {lastSession.filter(s => s.set_type !== "warmup").slice(0, 3).map(s => `${s.weight}×${s.reps}`).join(", ")}
+                            Last: {lastSession
+                                .filter((s) => s.set_type !== "warmup")
+                                .slice(0, 3)
+                                .map((s) => `${formatWeight(displayFromLbs(s.weight ?? 0, weightUnit) ?? 0)}×${s.reps}`)
+                                .join(", ")} {weightUnit}
                         </p>
                     )}
                 </div>
                 <div className={`px-2.5 py-1 rounded-full text-sm font-bold flex-shrink-0 ${allDone ? "bg-red-600/30 text-red-400" : done > 0 ? "bg-red-600/20 text-red-300" : "bg-zinc-700/60 text-zinc-500"}`}>
                     {done}/{total}
                 </div>
+                <span
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleWeightUnit();
+                    }}
+                    className="px-2 py-1 rounded-full text-[10px] font-semibold border border-zinc-700 text-zinc-300"
+                >
+                    {weightUnit}
+                </span>
                 <span className={`text-zinc-500 text-lg flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
             </button>
 
             {open && (
                 <div className="px-4 pb-4 space-y-3">
                     <div className="flex gap-2">
-                        <button onClick={onSwap} className="flex-1 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">Swap</button>
+                        <button onClick={onSwap} className="flex-1 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">Replace</button>
                         <button onClick={onMoveUp} className="px-3 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">↑</button>
                         <button onClick={onMoveDown} className="px-3 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">↓</button>
                         <button onClick={onRemoveExercise} className="flex-1 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-400 touch-manipulation">Remove</button>
                     </div>
-                    <div className="grid grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.25fr)] gap-2 px-3 pb-0.5 text-[10px] uppercase tracking-wide text-zinc-500 font-semibold text-center leading-none">
+                    <div className="grid grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 px-3 pb-0.5 text-[10px] uppercase tracking-wide text-zinc-500 font-semibold text-center leading-none">
                         <span className="text-center">type</span>
-                        <span className="text-center">lbs</span>
+                        <span className="text-center">{weightUnit}</span>
                         <span className="text-center">reps</span>
                         <span className="text-center">rir</span>
-                        <span className="text-center">actions</span>
                     </div>
                     <div className="space-y-3">
                         {sets.map((actual, i) => (
@@ -1205,6 +1258,7 @@ function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddS
                                 index={i}
                                 actual={actual}
                                 lastData={lastSession ? lastSession[i] ?? null : null}
+                                weightUnit={weightUnit}
                                 onChange={(u) => onSetChange(i, u)}
                                 onRemove={() => onRemoveSet(i)}
                                 onCopyAbove={() => onCopyPreviousSet(i)}
@@ -1234,8 +1288,10 @@ function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddS
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function TodayPage() {
+    const { unit: globalUnit } = useWeightUnit();
     const [plan, setPlan] = useState<TodayPlan | null>(null);
     const [exercises, setExercises] = useState<ExerciseState[]>([]);
+    const [exerciseUnits, setExerciseUnits] = useState<Record<string, WeightUnit>>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [dayOptions, setDayOptions] = useState<DayOption[]>([]);
@@ -1266,6 +1322,7 @@ export default function TodayPage() {
     const [plateTarget, setPlateTarget] = useState<{ exerciseIdx: number; setIdx: number } | null>(null);
     const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
     const undoTimeoutRef = useRef<number | null>(null);
+    const exerciseUnitsRef = useRef<Record<string, WeightUnit>>({});
     const generateRequestRef = useRef(0);
     const draftReadyRef = useRef(false);
     const workoutElapsedRef = useRef(0);
@@ -1307,6 +1364,10 @@ export default function TodayPage() {
         workoutTimerRunningRef.current = workoutTimerRunning;
     }, [workoutTimerRunning]);
 
+    useEffect(() => {
+        exerciseUnitsRef.current = exerciseUnits;
+    }, [exerciseUnits]);
+
     const buildExerciseStateFromPlan = useCallback((data: TodayPlan): ExerciseState[] => (
         data.exercises.map((ex) => ({
             name: ex.name,
@@ -1337,6 +1398,7 @@ export default function TodayPage() {
     const writeDraftNow = useCallback((
         dayName: string,
         exerciseState: ExerciseState[],
+        draftExerciseUnits: Record<string, WeightUnit>,
         draftSavedId: number | null,
         draftElapsedSeconds: number,
         draftTimerRunning: boolean
@@ -1351,6 +1413,7 @@ export default function TodayPage() {
             startedAt: draftTimerRunning ? Date.now() - draftElapsedSeconds * 1000 : null,
             elapsedSeconds: draftElapsedSeconds,
             timerRunning: draftTimerRunning,
+            exerciseUnits: draftExerciseUnits,
             exercises: exerciseState.map((ex) => ({
                 ...ex,
                 lastSession: null,
@@ -1429,9 +1492,11 @@ export default function TodayPage() {
             : 0;
         const nextElapsedSeconds = Math.max(0, localDraft?.elapsedSeconds ?? legacyElapsedSeconds);
         const nextTimerRunning = localDraft?.timerRunning ?? true;
+        let nextExerciseUnits: Record<string, WeightUnit> = {};
         if (localDraft) {
-            merged = mergeExercises(merged, localDraft.exercises);
+            merged = mergeExercises(merged, localDraft.exercises, true);
             recoveredWorkoutId = localDraft.savedId ?? recoveredWorkoutId;
+            nextExerciseUnits = localDraft.exerciseUnits ?? {};
             setRestoredDraft(true);
             if (showRestoreToast) {
                 showToast("Borrador restaurado");
@@ -1442,6 +1507,7 @@ export default function TodayPage() {
 
         setPlan(data);
         setExercises(merged);
+        setExerciseUnits(nextExerciseUnits);
         setSavedId(recoveredWorkoutId);
         setCompleted(false);
         setNextDay(null);
@@ -1454,7 +1520,7 @@ export default function TodayPage() {
         clearUndoTimeout();
         setUndoAction(null);
 
-        writeDraftNow(data.day_name, merged, recoveredWorkoutId, nextElapsedSeconds, nextTimerRunning);
+        writeDraftNow(data.day_name, merged, nextExerciseUnits, recoveredWorkoutId, nextElapsedSeconds, nextTimerRunning);
         draftReadyRef.current = true;
     }, [buildExerciseStateFromPlan, clearUndoTimeout, hydrateFromLoggedWorkout, readDraft, writeDraftNow]);
 
@@ -1475,6 +1541,7 @@ export default function TodayPage() {
             writeDraftNow(
                 plan.day_name,
                 exercises,
+                exerciseUnitsRef.current,
                 savedId,
                 workoutElapsedRef.current,
                 workoutTimerRunningRef.current,
@@ -1486,7 +1553,7 @@ export default function TodayPage() {
     useEffect(() => {
         if (!plan || !draftReadyRef.current) return;
         if (workoutElapsedSeconds === 0 || workoutElapsedSeconds % 15 !== 0) return;
-        writeDraftNow(plan.day_name, exercises, savedId, workoutElapsedSeconds, workoutTimerRunning);
+        writeDraftNow(plan.day_name, exercises, exerciseUnitsRef.current, savedId, workoutElapsedSeconds, workoutTimerRunning);
     }, [plan, exercises, savedId, workoutElapsedSeconds, workoutTimerRunning, writeDraftNow]);
 
     useEffect(() => () => clearUndoTimeout(), [clearUndoTimeout]);
@@ -1502,7 +1569,7 @@ export default function TodayPage() {
     useEffect(() => {
         if (!plan) return;
         const handler = () => {
-            writeDraftNow(plan.day_name, exercises, savedId, workoutElapsedSeconds, workoutTimerRunning);
+            writeDraftNow(plan.day_name, exercises, exerciseUnitsRef.current, savedId, workoutElapsedSeconds, workoutTimerRunning);
         };
         window.addEventListener("beforeunload", handler);
         return () => {
@@ -1751,7 +1818,7 @@ export default function TodayPage() {
             const res = await api.logToday(payload);
             setSavedId(res.workout_id);
             if (plan) {
-                writeDraftNow(plan.day_name, exercises, res.workout_id, workoutElapsedSeconds, workoutTimerRunning);
+                writeDraftNow(plan.day_name, exercises, exerciseUnitsRef.current, res.workout_id, workoutElapsedSeconds, workoutTimerRunning);
             }
             if (!silent) {
                 showToast(`Saved as Workout #${res.workout_id}`);
@@ -1802,6 +1869,7 @@ export default function TodayPage() {
         setFinishSummary(null);
         setSavedId(null);
         setPlan(null);
+        setExerciseUnits({});
         setExercises([]);
         setUiStep(1);
         setFocusMode(false);
@@ -1848,12 +1916,36 @@ export default function TodayPage() {
         });
     }, []);
 
+    const resolveExerciseUnit = useCallback((exerciseIdx: number): WeightUnit => {
+        const name = exercises[exerciseIdx]?.name;
+        if (!name) return globalUnit;
+        return exerciseUnits[exerciseUnitKey(name)] ?? globalUnit;
+    }, [exerciseUnits, exercises, globalUnit]);
+
+    const toggleExerciseUnit = useCallback((exerciseIdx: number) => {
+        const name = exercises[exerciseIdx]?.name;
+        if (!name) return;
+        const key = exerciseUnitKey(name);
+        setExerciseUnits((prev) => {
+            const current = prev[key] ?? globalUnit;
+            const next = current === "lb" ? "kg" : "lb";
+            return { ...prev, [key]: next };
+        });
+    }, [exercises, globalUnit]);
+
+    const keypadWeightUnit: WeightUnit = keypadTarget?.field === "weight" && keypadTarget
+        ? resolveExerciseUnit(keypadTarget.exerciseIdx)
+        : globalUnit;
+
     const updateFieldFromKeypad = (value: number | null) => {
         if (!keypadTarget) return;
         const targetSet = exercises[keypadTarget.exerciseIdx]?.sets[keypadTarget.setIdx];
         if (!targetSet) return;
         if (keypadTarget.field === "weight") {
-            updateSet(keypadTarget.exerciseIdx, keypadTarget.setIdx, { ...targetSet, actual_weight: value });
+            updateSet(keypadTarget.exerciseIdx, keypadTarget.setIdx, {
+                ...targetSet,
+                actual_weight: lbsFromDisplay(value, resolveExerciseUnit(keypadTarget.exerciseIdx)),
+            });
             return;
         }
 
@@ -1978,6 +2070,12 @@ export default function TodayPage() {
             {plateTarget && (
                 <PlateCalculatorModal
                     shortBarWeight={shortBarWeight}
+                    unit={resolveExerciseUnit(plateTarget.exerciseIdx)}
+                    onUnitChange={(unit) => {
+                        const name = exercises[plateTarget.exerciseIdx]?.name;
+                        if (!name) return;
+                        setExerciseUnits((prev) => ({ ...prev, [exerciseUnitKey(name)]: unit }));
+                    }}
                     onClose={closePlateCalculator}
                     onSave={savePlateWeight}
                 />
@@ -1986,13 +2084,14 @@ export default function TodayPage() {
                 <WeightKeypadSheet
                     initialValue={
                         keypadTarget.field === "weight"
-                            ? exercises[keypadTarget.exerciseIdx]?.sets[keypadTarget.setIdx]?.actual_weight ?? null
+                            ? displayFromLbs(exercises[keypadTarget.exerciseIdx]?.sets[keypadTarget.setIdx]?.actual_weight ?? null, keypadWeightUnit)
                             : keypadTarget.field === "reps"
                                 ? exercises[keypadTarget.exerciseIdx]?.sets[keypadTarget.setIdx]?.actual_reps ?? null
                                 : exercises[keypadTarget.exerciseIdx]?.sets[keypadTarget.setIdx]?.actual_rir ?? null
                     }
                     mode={keypadTarget.field === "weight" ? "weight" : "count"}
-                    activeTargetLabel={`Set ${keypadTarget.setIdx + 1} ${fieldLabel(keypadTarget.field)}`}
+                    weightUnit={keypadWeightUnit}
+                    activeTargetLabel={`Set ${keypadTarget.setIdx + 1} ${fieldLabel(keypadTarget.field, keypadWeightUnit)}`}
                     onChange={updateFieldFromKeypad}
                     onClose={closeWeightKeypad}
                     onOpenPlateCalculator={openPlateCalculatorFromKeypad}
@@ -2000,7 +2099,7 @@ export default function TodayPage() {
             )}
             {/* Modals */}
             {swapFor !== null && swapIndex >= 0 && (
-                <SwapModal exerciseName={swapFor} onClose={() => setSwapFor(null)} onSwap={(alt) => swapExercise(swapIndex, alt)} />
+                <ReplaceExerciseModal exerciseName={swapFor} onClose={() => setSwapFor(null)} onReplace={(alt) => swapExercise(swapIndex, alt)} />
             )}
             {showComplete && finishSummary && (
                 <CompleteModal
@@ -2173,7 +2272,7 @@ export default function TodayPage() {
                                         const nextRunning = !workoutTimerRunning;
                                         setWorkoutTimerRunning(nextRunning);
                                         if (plan && draftReadyRef.current) {
-                                            writeDraftNow(plan.day_name, exercises, savedId, workoutElapsedSeconds, nextRunning);
+                                            writeDraftNow(plan.day_name, exercises, exerciseUnitsRef.current, savedId, workoutElapsedSeconds, nextRunning);
                                         }
                                     }}
                                     className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors ${workoutTimerRunning
@@ -2302,6 +2401,8 @@ export default function TodayPage() {
                                 key={`${ex.name}-${i}`}
                                 exerciseIndex={i}
                                 state={ex}
+                                weightUnit={resolveExerciseUnit(i)}
+                                onToggleWeightUnit={() => toggleExerciseUnit(i)}
                                 onToggle={() => handleToggle(i)}
                                 onSetChange={(si, u) => updateSet(i, si, u)}
                                 onAddSet={(setType) => addSet(i, setType)}

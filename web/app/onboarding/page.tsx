@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { api, type PersonalProfile } from "@/lib/api";
+import { displayFromLbs, formatWeight, lbsFromDisplay, unitLabel } from "@/lib/units";
 
 const EQUIPMENT_OPTIONS = [
   "full_gym",
@@ -21,6 +22,7 @@ const EMPTY_PROFILE: PersonalProfile = {
   age: null,
   sex: null,
   height_cm: null,
+  weight_unit: "lb",
   weight_lbs: null,
   body_fat_pct: null,
   primary_goal: null,
@@ -82,6 +84,12 @@ export default function OnboardingPage() {
 
   function update<K extends keyof PersonalProfile>(key: K, value: PersonalProfile[K]) {
     setData((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function updateWeightInput(raw: string) {
+    const parsed = raw ? Number(raw) : null;
+    const valueLbs = lbsFromDisplay(parsed, data.weight_unit);
+    update("weight_lbs", valueLbs);
   }
 
   function toggleEquipment(value: string) {
@@ -156,6 +164,14 @@ export default function OnboardingPage() {
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5 space-y-4">
         <h2 className="text-sm font-semibold text-zinc-200">Datos base</h2>
         <div className="grid sm:grid-cols-2 gap-3">
+          <select
+            value={data.weight_unit}
+            onChange={(e) => update("weight_unit", (e.target.value === "kg" ? "kg" : "lb"))}
+            className="bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
+          >
+            <option value="lb">US (lb)</option>
+            <option value="kg">LATAM / Metrico (kg)</option>
+          </select>
           <input
             placeholder="Nombre completo"
             value={data.full_name}
@@ -177,10 +193,13 @@ export default function OnboardingPage() {
             className="bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
           />
           <input
-            placeholder="Peso (lb)"
+            placeholder={`Peso (${unitLabel(data.weight_unit, true)})`}
             type="number"
-            value={data.weight_lbs ?? ""}
-            onChange={(e) => update("weight_lbs", e.target.value ? Number(e.target.value) : null)}
+            value={(() => {
+              const display = displayFromLbs(data.weight_lbs, data.weight_unit);
+              return display === null ? "" : formatWeight(display);
+            })()}
+            onChange={(e) => updateWeightInput(e.target.value)}
             className="bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm"
           />
         </div>

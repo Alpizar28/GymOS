@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { BackspaceIcon, BarbellIcon, CalculatorIcon } from "@/components/icons";
+import type { WeightUnit } from "@/lib/units";
 
 function formatWeight(value: number): string {
   if (Number.isInteger(value)) return String(value);
@@ -17,6 +18,7 @@ function clampNonNegative(value: number): number {
 export function WeightKeypadSheet({
   initialValue,
   mode,
+  weightUnit = "lb",
   activeTargetLabel,
   onChange,
   onClose,
@@ -24,6 +26,7 @@ export function WeightKeypadSheet({
 }: {
   initialValue: number | null;
   mode: "weight" | "count";
+  weightUnit?: WeightUnit;
   activeTargetLabel?: string;
   onChange: (value: number | null) => void;
   onClose: () => void;
@@ -54,6 +57,7 @@ export function WeightKeypadSheet({
   function appendToken(token: string) {
     haptic();
     if (mode === "count" && token === ".") return;
+    if (mode === "weight" && weightUnit === "kg" && token === ".") return;
     if (token === ".") {
       if (raw.includes(".")) return;
       if (raw === "") {
@@ -93,7 +97,7 @@ export function WeightKeypadSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3 px-1">
-          <p className="text-xs uppercase tracking-wide text-zinc-500 font-semibold">Weight Input</p>
+            <p className="text-xs uppercase tracking-wide text-zinc-500 font-semibold">Weight Input</p>
           <button
             onClick={() => {
               haptic();
@@ -144,7 +148,7 @@ export function WeightKeypadSheet({
             <button
               type="button"
               onClick={() => appendToken(".")}
-              disabled={mode === "count"}
+              disabled={mode === "count" || (mode === "weight" && weightUnit === "kg")}
               className="today-keypad-key h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-white text-2xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-red-500/20 active:border-red-400 disabled:opacity-30 disabled:active:scale-100 disabled:active:bg-zinc-900 disabled:active:border-zinc-700"
             >
               .
@@ -172,17 +176,17 @@ export function WeightKeypadSheet({
           <div className="grid grid-rows-[56px_56px_1fr] gap-2">
             <button
               type="button"
-              onClick={() => step(mode === "count" ? 1 : 2.5)}
+              onClick={() => step(mode === "count" ? 1 : weightUnit === "kg" ? 1 : 2.5)}
               className="rounded-xl border border-red-500/80 bg-red-500/20 text-red-200 text-lg font-bold transition-transform duration-100 active:scale-[0.98]"
             >
-              {mode === "count" ? "+1" : "+2.5"}
+              {mode === "count" ? "+1" : weightUnit === "kg" ? "+1" : "+2.5"}
             </button>
             <button
               type="button"
-              onClick={() => step(mode === "count" ? -1 : -2.5)}
+              onClick={() => step(mode === "count" ? -1 : weightUnit === "kg" ? -1 : -2.5)}
               className="rounded-xl border border-zinc-600 bg-zinc-900 text-zinc-200 text-lg font-bold transition-transform duration-100 active:scale-[0.98]"
             >
-              {mode === "count" ? "-1" : "-2.5"}
+              {mode === "count" ? "-1" : weightUnit === "kg" ? "-1" : "-2.5"}
             </button>
             {mode === "weight" && onOpenPlateCalculator && (
               <button
