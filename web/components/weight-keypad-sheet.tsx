@@ -17,17 +17,20 @@ function clampNonNegative(value: number): number {
 export function WeightKeypadSheet({
   initialValue,
   mode,
+  activeTargetLabel,
   onChange,
   onClose,
   onOpenPlateCalculator,
 }: {
   initialValue: number | null;
   mode: "weight" | "count";
+  activeTargetLabel?: string;
   onChange: (value: number | null) => void;
   onClose: () => void;
   onOpenPlateCalculator?: () => void;
 }) {
   const [raw, setRaw] = useState(initialValue === null ? "" : formatWeight(initialValue));
+  const displayValue = raw === "" ? "" : raw;
 
   function haptic() {
     if (typeof navigator !== "undefined" && "vibrate" in navigator) {
@@ -102,7 +105,29 @@ export function WeightKeypadSheet({
           </button>
         </div>
 
-        <p className="text-[11px] text-zinc-500 mb-2 px-1">Editing value directly on active input</p>
+        <p className="text-[11px] text-zinc-500 mb-2 px-1">
+          Editing value directly on active input
+          {activeTargetLabel ? (
+            <span className="ml-1 text-red-300 font-semibold">- {activeTargetLabel}</span>
+          ) : null}
+        </p>
+
+        <div className="mb-3 rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-h-7 flex items-center font-mono text-2xl text-zinc-100 tracking-tight">
+              <span>{displayValue}</span>
+              <span className="inline-block w-[2px] h-6 ml-0.5 bg-red-400 animate-pulse" aria-hidden="true" />
+            </div>
+            <button
+              type="button"
+              onClick={() => applyRaw("")}
+              className="h-8 px-3 rounded-lg border border-zinc-600 bg-zinc-800 text-xs font-semibold text-zinc-200 active:bg-red-500/20 active:border-red-400"
+            >
+              Clear
+            </button>
+          </div>
+          <p className="mt-1 text-[10px] text-zinc-500">Typing starts at the end of the current value.</p>
+        </div>
 
         <div className="grid grid-cols-[1fr_112px] gap-2">
           <div className="grid grid-cols-3 gap-2">

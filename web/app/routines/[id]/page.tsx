@@ -70,6 +70,15 @@ function progressionActionTone(action: RoutineProgressionAnchor["suggestion"]["a
   return "border-zinc-700 bg-zinc-800/60 text-zinc-300";
 }
 
+function compactSetText(weight: number | null | undefined, reps: number | null | undefined, rir: number | null | undefined) {
+  const weightPart = weight ?? "-";
+  const repsPart = reps ?? "-";
+  if (rir === null || rir === undefined) {
+    return `${weightPart} x ${repsPart}`;
+  }
+  return `${weightPart} x ${repsPart} @${rir}`;
+}
+
 export default function RoutineDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
@@ -499,8 +508,7 @@ export default function RoutineDetailPage() {
                 <div className="flex flex-wrap gap-1.5">
                   {anchor.recent_top_sets.map((set) => (
                     <span key={`${anchor.routine_exercise_id}-${set.date}`} className="px-2 py-1 rounded border border-zinc-800 text-[11px] text-zinc-300 bg-zinc-900">
-                      {set.date} · {set.weight}lb x {set.reps}
-                      {set.rir !== null ? ` · RIR ${set.rir}` : ""}
+                      {set.date} · {compactSetText(set.weight, set.reps, set.rir)}
                     </span>
                   ))}
                 </div>
@@ -510,7 +518,7 @@ export default function RoutineDetailPage() {
                     <p className="text-[11px] uppercase tracking-wide text-zinc-500">Cambios sugeridos</p>
                     {anchor.proposed_updates.map((update) => (
                       <p key={`${anchor.routine_exercise_id}-${update.set_index}`} className="text-xs text-zinc-300">
-                        Set #{update.set_index + 1}: {update.target_weight_lbs ?? "-"} lb · {update.target_reps ?? "-"} reps
+                        Set #{update.set_index + 1}: {compactSetText(update.target_weight_lbs, update.target_reps, null)}
                       </p>
                     ))}
                   </div>
@@ -518,7 +526,11 @@ export default function RoutineDetailPage() {
 
                 {anchor.proposed_new_set && (
                   <p className="text-xs text-zinc-300">
-                    Nueva serie: {anchor.proposed_new_set.target_weight_lbs ?? "-"} lb · {anchor.proposed_new_set.target_reps ?? "-"} reps · RIR {anchor.proposed_new_set.rir_target ?? "-"}
+                    Nueva serie: {compactSetText(
+                      anchor.proposed_new_set.target_weight_lbs,
+                      anchor.proposed_new_set.target_reps,
+                      anchor.proposed_new_set.rir_target,
+                    )}
                   </p>
                 )}
 

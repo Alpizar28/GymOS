@@ -87,6 +87,12 @@ function normalizeName(name: string) {
     return name.trim().toLowerCase();
 }
 
+function fieldLabel(field: KeypadField): string {
+    if (field === "weight") return "lbs";
+    if (field === "reps") return "reps";
+    return "RIR";
+}
+
 function hasSetData(s: ActualSet) {
     return s.actual_weight !== null || s.actual_reps !== null || s.actual_rir !== null;
 }
@@ -1019,41 +1025,37 @@ function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, on
 }) {
     const upd = (f: Partial<ActualSet>) => onChange({ ...actual, ...f });
     const visual = setTypeVisual(planned, actual);
+    const isEditingThisSet = activeField !== null;
 
     return (
-        <div className={`border-l-4 ${visual.bar} bg-zinc-900/60 rounded-r-xl`}>
+        <div className={`bg-zinc-900/60 border rounded-xl transition-all ${isEditingThisSet ? "border-red-500/70 ring-1 ring-red-500/40" : "border-zinc-800"}`}>
             {/* Top row */}
-            <div className="flex items-center justify-between px-3 pt-3 pb-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${visual.badge}`}>{visual.code} · {visual.label}</span>
-                    {lastData && (
-                        <span className="text-xs text-zinc-600">
+            <div className="px-3 pt-2.5 pb-1.5 min-h-[22px]">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                    {lastData ? (
+                        <span className="text-xs text-zinc-600 leading-none">
                             Last: {lastData.weight && `${lastData.weight}lb`}{lastData.reps && ` × ${lastData.reps}`}
                         </span>
-                    )}
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <button
-                        onClick={onCopyAbove}
-                        title="Copiar set anterior"
-                        disabled={index === 0}
-                        className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-600 active:text-red-400 active:bg-red-900/30 disabled:opacity-30 disabled:active:text-zinc-600 disabled:active:bg-zinc-800 flex items-center justify-center text-base touch-manipulation"
-                    >
-                        ⧉
-                    </button>
-                    <button onClick={onRemove} title="Remove set"
-                        className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-600 active:text-red-400 active:bg-red-900/30 flex items-center justify-center text-xl touch-manipulation">
-                        ×
-                    </button>
+                    ) : null}
+                    {isEditingThisSet ? (
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-red-300 leading-none">
+                            Editing {fieldLabel(activeField)}
+                        </span>
+                    ) : null}
                 </div>
             </div>
 
             {/* Inputs row */}
-            <div className="grid grid-cols-4 gap-2 px-3 pb-3 pt-1 items-end">
+            <div className="grid grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.25fr)] gap-2 px-3 pb-3 pt-0.5 items-center">
+                <div className="h-full">
+                    <div className="w-full h-full min-h-[44px] bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2 text-base font-mono text-center text-zinc-200 flex items-center justify-center">
+                        {visual.code}
+                    </div>
+                </div>
                 <div>
-                    <label className="block text-xs text-zinc-600 mb-1">lbs</label>
                     <input type="number" step="2.5" inputMode="decimal"
                         id={`set-${exerciseIndex}-${index}-weight`}
+                        aria-label={`Set ${index + 1} weight in pounds`}
                         value={actual.actual_weight ?? ""}
                         onFocus={(e) => {
                             e.currentTarget.blur();
@@ -1061,15 +1063,15 @@ function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, on
                         }}
                         onChange={(e) => upd({ actual_weight: e.target.value ? parseFloat(e.target.value) : null })}
                         placeholder={planned?.weight_lbs ? String(planned.weight_lbs) : "lb"}
-                        className={`w-full bg-zinc-800 border rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${activeField === "weight"
+                        className={`w-full bg-zinc-800 border rounded-lg px-2 py-2 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${activeField === "weight"
                                 ? "border-red-500 ring-1 ring-red-500"
                                 : "border-zinc-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
                             }`} />
                 </div>
                 <div>
-                    <label className="block text-xs text-zinc-600 mb-1">reps</label>
                     <input type="number" inputMode="numeric"
                         id={`set-${exerciseIndex}-${index}-reps`}
+                        aria-label={`Set ${index + 1} reps`}
                         value={actual.actual_reps ?? ""}
                         onFocus={(e) => {
                             e.currentTarget.blur();
@@ -1077,15 +1079,15 @@ function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, on
                         }}
                         onChange={(e) => upd({ actual_reps: e.target.value ? parseInt(e.target.value) : null })}
                         placeholder={planned?.target_reps ? String(planned.target_reps) : "reps"}
-                        className={`w-full bg-zinc-800 border rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${activeField === "reps"
+                        className={`w-full bg-zinc-800 border rounded-lg px-2 py-2 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${activeField === "reps"
                                 ? "border-red-500 ring-1 ring-red-500"
                                 : "border-zinc-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
                             }`} />
                 </div>
                 <div>
-                    <label className="block text-xs text-zinc-600 mb-1">RIR</label>
                     <input type="number" inputMode="numeric" min="0" max="5"
                         id={`set-${exerciseIndex}-${index}-rir`}
+                        aria-label={`Set ${index + 1} RIR`}
                         value={actual.actual_rir ?? ""}
                         onFocus={(e) => {
                             e.currentTarget.blur();
@@ -1093,26 +1095,43 @@ function SetCard({ exerciseIndex, index, planned, actual, lastData, onChange, on
                         }}
                         onChange={(e) => upd({ actual_rir: e.target.value ? parseInt(e.target.value) : null })}
                         placeholder={planned?.rir_target != null ? String(planned.rir_target) : "RIR"}
-                        className={`w-full bg-zinc-800 border rounded-lg px-2 py-2.5 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${activeField === "rir"
+                        className={`w-full bg-zinc-800 border rounded-lg px-2 py-2 text-base font-mono text-center text-white placeholder-zinc-700 focus:outline-none ${activeField === "rir"
                                 ? "border-red-500 ring-1 ring-red-500"
                                 : "border-zinc-700 focus:border-red-500 focus:ring-1 focus:ring-red-500"
                             }`} />
                 </div>
                 {/* Done button */}
                 <div>
-                    <label className="block text-xs text-zinc-600 mb-1">&nbsp;</label>
-                    <button
-                        onClick={() => {
-                            upd({ completed: !actual.completed });
-                            if (!actual.completed) onDone(index); // trigger rest timer on marking done
-                        }}
-                        className={`w-full py-2.5 rounded-lg font-bold text-base transition-colors touch-manipulation ${actual.completed
-                                ? "bg-red-600 text-white"
-                                : "bg-zinc-800 border border-zinc-700 text-zinc-500"
-                            }`}
-                    >
-                        {actual.completed ? "✓" : "○"}
-                    </button>
+                    <div className="grid grid-cols-3 gap-1">
+                        <button
+                            onClick={onCopyAbove}
+                            title="Copiar set anterior"
+                            disabled={index === 0}
+                            className="h-[44px] rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 active:text-red-300 active:bg-red-900/30 disabled:opacity-30 disabled:active:text-zinc-400 disabled:active:bg-zinc-800 flex items-center justify-center text-base touch-manipulation"
+                        >
+                            ⧉
+                        </button>
+                        <button
+                            onClick={onRemove}
+                            title="Remove set"
+                            className="h-[44px] rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 active:text-red-300 active:bg-red-900/30 flex items-center justify-center text-xl touch-manipulation"
+                        >
+                            ×
+                        </button>
+                        <button
+                            onClick={() => {
+                                upd({ completed: !actual.completed });
+                                if (!actual.completed) onDone(index); // trigger rest timer on marking done
+                            }}
+                            title="Marcar completado"
+                            className={`h-[44px] rounded-lg font-bold text-base transition-colors touch-manipulation ${actual.completed
+                                    ? "bg-red-600 text-white"
+                                    : "bg-zinc-800 border border-zinc-700 text-zinc-500"
+                                }`}
+                        >
+                            ✓
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1169,6 +1188,13 @@ function ExerciseAccordion({ exerciseIndex, state, onToggle, onSetChange, onAddS
                         <button onClick={onMoveUp} className="px-3 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">↑</button>
                         <button onClick={onMoveDown} className="px-3 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-300 touch-manipulation">↓</button>
                         <button onClick={onRemoveExercise} className="flex-1 py-2 text-sm rounded-lg bg-zinc-700/40 text-zinc-400 active:bg-red-900/30 active:text-red-400 touch-manipulation">Remove</button>
+                    </div>
+                    <div className="grid grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.25fr)] gap-2 px-3 pb-0.5 text-[10px] uppercase tracking-wide text-zinc-500 font-semibold text-center leading-none">
+                        <span className="text-center">set</span>
+                        <span className="text-center">lbs</span>
+                        <span className="text-center">reps</span>
+                        <span className="text-center">rir</span>
+                        <span className="text-center">actions</span>
                     </div>
                     <div className="space-y-3">
                         {sets.map((actual, i) => (
@@ -1246,6 +1272,7 @@ export default function TodayPage() {
     const [plateTarget, setPlateTarget] = useState<{ exerciseIdx: number; setIdx: number } | null>(null);
     const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
     const undoTimeoutRef = useRef<number | null>(null);
+    const generateRequestRef = useRef(0);
     const draftReadyRef = useRef(false);
     const [lastDraftSaveAt, setLastDraftSaveAt] = useState<number | null>(null);
     const [restoredDraft, setRestoredDraft] = useState(false);
@@ -1482,38 +1509,68 @@ export default function TodayPage() {
             .catch(() => {});
     }, []);
 
-    const handleGenerate = async () => {
-        if (!selectedDay) return;
+    const mapGeneratedPlanToTodayPlan = useCallback((planData: Awaited<ReturnType<typeof api.generateDay>>): TodayPlan => ({
+        plan_id: 0,
+        day_name: planData.day_name,
+        estimated_duration_min: planData.estimated_duration_min,
+        total_sets: planData.total_sets,
+        exercises: planData.exercises.map((ex) => ({
+            name: ex.name,
+            is_anchor: ex.is_anchor,
+            notes: ex.notes || "",
+            sets: ex.sets.map((s, i) => ({
+                index: i,
+                set_type: s.set_type,
+                weight_lbs: s.weight_lbs,
+                target_reps: s.target_reps,
+                rir_target: s.rir_target ?? null,
+                rest_seconds: s.rest_seconds ?? null,
+            })),
+        })),
+    }), []);
+
+    const generateAndLoadDay = useCallback(async (
+        dayName: string,
+        options?: { showSuccessToast?: boolean; switchToTrain?: boolean }
+    ) => {
+        if (!dayName || generating) return;
+        const requestId = generateRequestRef.current + 1;
+        generateRequestRef.current = requestId;
         setGenerating(true);
         try {
-            const planData = await api.generateDay(selectedDay);
-            await applyPlanWithRecovery({
-                plan_id: 0,
-                day_name: planData.day_name,
-                estimated_duration_min: planData.estimated_duration_min,
-                total_sets: planData.total_sets,
-                exercises: planData.exercises.map((ex) => ({
-                    name: ex.name,
-                    is_anchor: ex.is_anchor,
-                    notes: ex.notes || "",
-                    sets: ex.sets.map((s, i) => ({
-                        index: i,
-                        set_type: s.set_type,
-                        weight_lbs: s.weight_lbs,
-                        target_reps: s.target_reps,
-                        rir_target: s.rir_target ?? null,
-                        rest_seconds: s.rest_seconds ?? null,
-                    })),
-                })),
-            }, true);
-            setUiStep(2);
-            showToast(`Plan generado: ${formatDayName(planData.day_name)}`);
+            const planData = await api.generateDay(dayName);
+            if (generateRequestRef.current !== requestId) return;
+            await applyPlanWithRecovery(mapGeneratedPlanToTodayPlan(planData), true);
+            setSelectedDay(planData.day_name);
+            if (options?.switchToTrain ?? true) {
+                setUiStep(2);
+            }
+            if (options?.showSuccessToast ?? true) {
+                showToast(`Plan generado: ${formatDayName(planData.day_name)}`);
+            }
         } catch (e: unknown) {
             showToast(e instanceof Error ? e.message : "Generation failed");
         } finally {
-            setGenerating(false);
+            if (generateRequestRef.current === requestId) {
+                setGenerating(false);
+            }
         }
-    };
+    }, [applyPlanWithRecovery, generating, mapGeneratedPlanToTodayPlan]);
+
+    const handleGenerate = useCallback(async () => {
+        if (!selectedDay) return;
+        await generateAndLoadDay(selectedDay, { showSuccessToast: true, switchToTrain: true });
+    }, [generateAndLoadDay, selectedDay]);
+
+    const handleSelectDay = useCallback(async (dayName: string) => {
+        setSelectedDay(dayName);
+        if (!dayName) return;
+        if (plan?.day_name === dayName) {
+            setUiStep(2);
+            return;
+        }
+        await generateAndLoadDay(dayName, { showSuccessToast: false, switchToTrain: true });
+    }, [generateAndLoadDay, plan?.day_name]);
 
     const handleCreateTemplate = async (payload: DayOptionCreate) => {
         try {
@@ -1731,6 +1788,14 @@ export default function TodayPage() {
 
     const closeWeightKeypad = () => setKeypadTarget(null);
 
+    const openSetFieldKeypad = useCallback((exerciseIdx: number, setIdx: number, field: KeypadField) => {
+        setKeypadTarget({ exerciseIdx, setIdx, field });
+        window.requestAnimationFrame(() => {
+            const el = document.getElementById(`set-${exerciseIdx}-${setIdx}-${field}`);
+            el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+    }, []);
+
     const updateFieldFromKeypad = (value: number | null) => {
         if (!keypadTarget) return;
         const targetSet = exercises[keypadTarget.exerciseIdx]?.sets[keypadTarget.setIdx];
@@ -1872,6 +1937,7 @@ export default function TodayPage() {
                                 : exercises[keypadTarget.exerciseIdx]?.sets[keypadTarget.setIdx]?.actual_rir ?? null
                     }
                     mode={keypadTarget.field === "weight" ? "weight" : "count"}
+                    activeTargetLabel={`Set ${keypadTarget.setIdx + 1} ${fieldLabel(keypadTarget.field)}`}
                     onChange={updateFieldFromKeypad}
                     onClose={closeWeightKeypad}
                     onOpenPlateCalculator={openPlateCalculatorFromKeypad}
@@ -1954,7 +2020,10 @@ export default function TodayPage() {
                     <div className="space-y-3">
                         <select
                             value={selectedDay}
-                            onChange={(e) => setSelectedDay(e.target.value)}
+                            onChange={(e) => {
+                                void handleSelectDay(e.target.value);
+                            }}
+                            disabled={generating}
                             className="w-full bg-zinc-900/70 border border-zinc-700 rounded-xl px-3 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-red-500"
                         >
                             <option value="" disabled>Select a day</option>
@@ -2130,7 +2199,7 @@ export default function TodayPage() {
                                 onMoveUp={() => moveExercise(i, -1)}
                                 onMoveDown={() => moveExercise(i, 1)}
                                 onSetComplete={() => startRestTimer()}
-                                onOpenFieldKeypad={(si, field) => setKeypadTarget({ exerciseIdx: i, setIdx: si, field })}
+                                onOpenFieldKeypad={(si, field) => openSetFieldKeypad(i, si, field)}
                                 activeSetKeypadField={keypadTarget?.exerciseIdx === i ? { setIdx: keypadTarget.setIdx, field: keypadTarget.field } : null}
                             />
                         ))}
