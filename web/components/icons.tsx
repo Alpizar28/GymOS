@@ -210,3 +210,14 @@ export function CalculatorIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function WorkoutCompletedIcon(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6l7-3z" />
+      <path d="M9 12l2 2 4-4" />
+      <path d="M5 20l-1.5 2" />
+      <path d="M19 20l1.5 2" />
+    </svg>
+  );
+}

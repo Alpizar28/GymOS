@@ -135,8 +135,8 @@ export function PlateCalculatorModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/25 flex items-end sm:items-center justify-center p-2 sm:p-3">
-      <div className="w-full max-w-lg rounded-2xl border border-zinc-700 bg-[#1c1c24]/98 shadow-2xl animate-in slide-in-from-bottom-4 fade-in duration-200 max-h-[76vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 bg-black/25 flex items-end sm:items-center justify-center p-1 sm:p-3">
+      <div className="w-full max-w-lg rounded-2xl border border-zinc-700 bg-[#1c1c24]/98 shadow-2xl animate-in slide-in-from-bottom-4 fade-in duration-200 h-[88dvh] sm:h-auto sm:max-h-[82vh] overflow-hidden flex flex-col">
         <div className="flex items-start justify-between gap-3 px-3 pt-3 pb-2 sm:px-4 sm:pt-4 sm:pb-3 border-b border-zinc-800 bg-[#1c1c24]/98 sticky top-0 z-10">
           <button onClick={clear} className="text-sm font-semibold text-red-400">
             Clear
@@ -256,7 +256,7 @@ export function PlateCalculatorModal({
 
         </div>
 
-        <div className="border-t border-zinc-800 bg-[#1c1c24]/98 px-3 py-3 pb-[calc(20px+env(safe-area-inset-bottom))] sm:px-4">
+        <div className="border-t border-zinc-800 bg-[#1c1c24]/98 px-3 py-3 pb-[calc(30px+env(safe-area-inset-bottom))] sm:px-4">
           <button
             type="button"
             onClick={onClose}

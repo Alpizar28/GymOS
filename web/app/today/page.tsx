@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
     api,
     type CreateExercisePayload,
@@ -17,6 +17,7 @@ import {
 } from "@/lib/api";
 import { PlateCalculatorModal } from "@/components/plate-calculator-modal";
 import { WeightKeypadSheet } from "@/components/weight-keypad-sheet";
+import { WorkoutCompletedIcon } from "@/components/icons";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -148,6 +149,50 @@ function buildFinishSummary(exercises: ExerciseState[]): WorkoutFinishSummary {
         totalVolume: rows.reduce((sum, row) => sum + row.volume, 0),
         exercises: rows,
     };
+}
+
+function CompletionConfetti() {
+    const pieces = useMemo(
+        () => Array.from({ length: 28 }, (_, i) => ({
+            id: i,
+            left: `${(i * 17) % 100}%`,
+            delay: `${(i % 7) * 0.06}s`,
+            duration: `${1.4 + (i % 5) * 0.22}s`,
+            rotate: `${(i % 2 === 0 ? 1 : -1) * (120 + (i % 4) * 45)}deg`,
+            color: i % 3 === 0 ? "#ef4444" : i % 3 === 1 ? "#fca5a5" : "#e4e4e7",
+        })),
+        []
+    );
+
+    return (
+        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+            {pieces.map((piece) => (
+                <span
+                    key={piece.id}
+                    className="absolute top-0 h-2.5 w-1.5 rounded-sm confetti-piece"
+                    style={{
+                        left: piece.left,
+                        backgroundColor: piece.color,
+                        animationDelay: piece.delay,
+                        animationDuration: piece.duration,
+                        rotate: piece.rotate,
+                    }}
+                />
+            ))}
+            <style jsx>{`
+                .confetti-piece {
+                    animation-name: fall;
+                    animation-timing-function: ease-out;
+                    animation-fill-mode: forwards;
+                }
+                @keyframes fall {
+                    0% { transform: translateY(-20px) scale(1); opacity: 0; }
+                    12% { opacity: 1; }
+                    100% { transform: translateY(420px) scale(0.85); opacity: 0; }
+                }
+            `}</style>
+        </div>
+    );
 }
 
 function mergeExercises(base: ExerciseState[], incoming: ExerciseState[]) {
@@ -1641,6 +1686,25 @@ export default function TodayPage() {
         setShowComplete(false);
     }, [savedId, save, clearDraft]);
 
+    const startAnotherRoutine = useCallback(() => {
+        clearDraft();
+        setCompleted(false);
+        setShowComplete(false);
+        setNextDay(null);
+        setStreakDays(0);
+        setFinishSummary(null);
+        setSavedId(null);
+        setPlan(null);
+        setExercises([]);
+        setUiStep(1);
+        setFocusMode(false);
+        setFocusIndex(0);
+        setPlateTarget(null);
+        setKeypadTarget(null);
+        setRestTimerLeft(null);
+        setRestRunning(false);
+    }, [clearDraft]);
+
     useEffect(() => {
         if (!restRunning || restTimerLeft === null) return;
         const timer = window.setInterval(() => {
@@ -1746,11 +1810,14 @@ export default function TodayPage() {
     );
 
     if (completed) return (
-        <div className="max-w-lg mx-auto min-h-[70vh] flex flex-col justify-center px-5 py-10 text-center">
-            <div className="rounded-3xl border border-red-500/30 bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.24),_transparent_60%)] bg-zinc-950 p-6">
-                <p className="text-5xl">✅</p>
-                <h2 className="text-3xl font-bold text-white mt-2">Workout Completed</h2>
-                <p className="text-zinc-400 text-sm mt-1">Great work. Session closed and day advanced.</p>
+        <div className="relative max-w-lg mx-auto min-h-[70vh] flex flex-col justify-center px-5 py-10 text-center">
+            <CompletionConfetti />
+            <div className="relative rounded-3xl border border-red-500/30 bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.24),_transparent_60%)] bg-zinc-950 p-6">
+                <div className="mx-auto h-16 w-16 rounded-2xl border border-red-500/40 bg-red-500/15 flex items-center justify-center shadow-[0_0_35px_rgba(239,68,68,0.28)]">
+                    <WorkoutCompletedIcon className="h-8 w-8 text-red-200" />
+                </div>
+                <h2 className="text-3xl font-bold text-white mt-3">Terminado por hoy</h2>
+                <p className="text-zinc-400 text-sm mt-1">Sesion cerrada correctamente. Puedes descansar o empezar otra rutina.</p>
 
                 <div className="grid grid-cols-2 gap-3 mt-5 text-left">
                     <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3">
@@ -1771,9 +1838,17 @@ export default function TodayPage() {
                     </div>
                 </div>
 
-                <a href="/today" className="mt-6 inline-flex items-center justify-center w-full py-3 bg-red-600 text-white rounded-xl font-bold text-base">
-                    Back to Today
-                </a>
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                        onClick={startAnotherRoutine}
+                        className="inline-flex items-center justify-center w-full py-3 bg-red-600 text-white rounded-xl font-bold text-base"
+                    >
+                        Empezar otra rutina
+                    </button>
+                    <a href="/today" className="inline-flex items-center justify-center w-full py-3 border border-zinc-700 text-zinc-200 rounded-xl font-semibold text-base">
+                        Volver a Today
+                    </a>
+                </div>
             </div>
         </div>
     );
