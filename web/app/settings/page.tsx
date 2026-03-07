@@ -15,6 +15,7 @@ import {
   type WorkoutDetail,
 } from "@/lib/api";
 import { FlameIcon } from "@/components/icons";
+import ThemeToggle from "@/components/theme-toggle";
 
 const WEEKDAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -1723,11 +1724,14 @@ export default function SettingsPage() {
   ] as const;
 
   return (
-    <div className="max-w-2xl mx-auto overflow-x-hidden">
+    <div className="settings-page max-w-2xl mx-auto overflow-x-hidden">
       <div className="mb-5 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.16),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(239,68,68,0.12)]">
         <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">GymOS</p>
         <h1 className="text-2xl font-bold tracking-tight">Historial</h1>
         <p className="text-sm text-zinc-500 mt-1">Calendario, rachas y detalle en una vista</p>
+        <div className="mt-3 flex justify-end">
+          <ThemeToggle />
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -1735,7 +1739,7 @@ export default function SettingsPage() {
           <button
             key={item.key}
             onClick={() => setTab(item.key)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
+            className={`settings-secondary-chip px-3 py-1.5 rounded-full text-xs font-semibold border ${
               tab === item.key
                 ? "bg-red-600/25 text-red-200 border-red-500/40"
                 : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50"

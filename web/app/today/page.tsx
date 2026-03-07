@@ -550,8 +550,8 @@ function AddExerciseModal({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl">
+        <div className="today-modal-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="today-modal-panel bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
                     <h3 className="font-semibold text-white">Add Exercise</h3>
                     <button onClick={onClose} className="text-zinc-500 hover:text-white text-2xl w-10 h-10 flex items-center justify-center">✕</button>
@@ -719,8 +719,8 @@ function CreateTemplateModal({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm">
-            <div className="bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="today-modal-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm">
+            <div className="today-modal-panel bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-gradient-to-r from-zinc-900 to-zinc-950">
                     <div>
                         <h3 className="font-semibold text-white">Crear Template</h3>
@@ -868,8 +868,8 @@ function SwapModal({ exerciseName, onClose, onSwap }: {
     const [loading, setLoading] = useState(true);
     useEffect(() => { api.getAlternatives(exerciseName).then(setAlts).finally(() => setLoading(false)); }, [exerciseName]);
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl max-h-[80vh] flex flex-col">
+        <div className="today-modal-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="today-modal-panel bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl max-h-[80vh] flex flex-col">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 flex-shrink-0">
                     <h3 className="font-semibold text-white truncate pr-4">Swap: {exerciseName}</h3>
                     <button onClick={onClose} className="text-zinc-500 text-2xl w-10 h-10 flex items-center justify-center flex-shrink-0">✕</button>
@@ -917,8 +917,8 @@ function CompleteModal({ summary, onConfirm, onClose }: {
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="today-modal-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="today-modal-panel bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
                 <div className="px-6 py-5 border-b border-zinc-800">
                     <h3 className="font-bold text-white text-xl">Finish Workout</h3>
                     <p className="text-sm text-zinc-500 mt-1">Review your session and confirm completion</p>
@@ -1974,7 +1974,7 @@ export default function TodayPage() {
     );
 
     return (
-        <div className="max-w-6xl mx-auto pb-36 sm:pb-8 overflow-x-hidden">
+        <div className="today-page max-w-6xl mx-auto pb-36 sm:pb-8 overflow-x-hidden">
             {plateTarget && (
                 <PlateCalculatorModal
                     shortBarWeight={shortBarWeight}
@@ -2048,14 +2048,14 @@ export default function TodayPage() {
                     <div className="grid grid-cols-2 gap-2 text-xs">
                         <button
                             onClick={() => setUiStep(1)}
-                            className={`py-1.5 rounded-md border ${uiStep === 1 ? "border-red-500/40 text-red-200 bg-red-600/15" : "border-zinc-800 text-zinc-500"}`}
+                            className={`today-secondary-chip py-1.5 rounded-md border ${uiStep === 1 ? "border-red-500/40 text-red-200 bg-red-600/15" : "border-zinc-800 text-zinc-500"}`}
                         >
                             Choose
                         </button>
                         <button
                             onClick={() => setUiStep(2)}
                             disabled={!plan}
-                            className={`py-1.5 rounded-md border ${uiStep === 2 ? "border-red-500/40 text-red-200 bg-red-600/15" : "border-zinc-800 text-zinc-500"} disabled:opacity-40`}
+                            className={`today-secondary-chip py-1.5 rounded-md border ${uiStep === 2 ? "border-red-500/40 text-red-200 bg-red-600/15" : "border-zinc-800 text-zinc-500"} disabled:opacity-40`}
                         >
                             Train
                         </button>
@@ -2132,19 +2132,19 @@ export default function TodayPage() {
                             >
                                 {generating ? "Generating..." : plan ? "Regenerate" : "Generate"}
                             </button>
-                            <button
-                                onClick={() => setUiStep(2)}
-                                disabled={!plan}
-                                className="py-3 border border-zinc-700 text-zinc-200 font-semibold rounded-xl hover:border-zinc-500 disabled:opacity-40 transition-colors"
-                            >
-                                Continue
-                            </button>
-                            <button
-                                onClick={() => setCreatingTemplate(true)}
-                                className="py-3 border border-zinc-700 text-zinc-300 font-semibold rounded-xl hover:border-zinc-500 transition-colors"
-                            >
-                                New Template
-                            </button>
+                                <button
+                                    onClick={() => setUiStep(2)}
+                                    disabled={!plan}
+                                    className="today-secondary-btn py-3 border border-zinc-700 text-zinc-200 font-semibold rounded-xl hover:border-zinc-500 disabled:opacity-40 transition-colors"
+                                >
+                                    Continue
+                                </button>
+                                <button
+                                    onClick={() => setCreatingTemplate(true)}
+                                    className="today-secondary-btn py-3 border border-zinc-700 text-zinc-300 font-semibold rounded-xl hover:border-zinc-500 transition-colors"
+                                >
+                                    New Template
+                                </button>
                         </div>
                     </div>
                 </div>
@@ -2161,12 +2161,12 @@ export default function TodayPage() {
                             </div>
                             <div className="mt-2 flex items-center gap-2">
                                 <div className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-xs ${workoutTimerRunning
-                                    ? "border-red-500/35 bg-red-500/10 text-red-100"
+                                    ? "today-live-timer border-red-300/80 bg-red-700 text-white"
                                     : "border-zinc-700 bg-zinc-900/70 text-zinc-300"
                                     }`}>
-                                    <span className={workoutTimerRunning ? "text-red-200/80" : "text-zinc-500"}>Duration</span>
-                                    <span className={`font-mono ${workoutTimerRunning ? "text-red-100" : "text-zinc-200"}`}>{workoutDurationLabel}</span>
-                                    <span className={`h-1.5 w-1.5 rounded-full ${workoutTimerRunning ? "bg-red-300" : "bg-zinc-500"}`} />
+                                    <span className={workoutTimerRunning ? "text-red-100" : "text-zinc-500"}>Duration</span>
+                                    <span className={`font-mono font-semibold ${workoutTimerRunning ? "text-white" : "text-zinc-200"}`}>{workoutDurationLabel}</span>
+                                    <span className={`h-1.5 w-1.5 rounded-full ${workoutTimerRunning ? "bg-white" : "bg-zinc-500"}`} />
                                 </div>
                                 <button
                                     onClick={() => {
@@ -2177,7 +2177,7 @@ export default function TodayPage() {
                                         }
                                     }}
                                     className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors ${workoutTimerRunning
-                                        ? "border-red-500/40 bg-red-500/20 text-red-100 hover:bg-red-500/30"
+                                        ? "today-live-timer-btn border-red-300/80 bg-red-700 text-white hover:bg-red-800"
                                         : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500"
                                         }`}
                                 >
@@ -2198,8 +2198,8 @@ export default function TodayPage() {
                             <div className="mt-3 grid grid-cols-2 gap-2">
                                 <button
                                     onClick={() => setFocusMode((v) => !v)}
-                                    className={`py-2 rounded-lg text-xs font-semibold border ${focusMode
-                                        ? "border-red-500/40 bg-red-600/15 text-red-200"
+                                    className={`today-secondary-chip py-2 rounded-lg text-xs font-semibold border ${focusMode
+                                        ? "today-focus-active border-red-300/80 bg-red-700 text-white"
                                         : "border-zinc-700 text-zinc-400"
                                         }`}
                                 >
@@ -2211,7 +2211,7 @@ export default function TodayPage() {
                                         setFocusIndex(0);
                                     }}
                                     disabled={exercises.length === 0}
-                                    className="py-2 rounded-lg text-xs font-semibold border border-zinc-700 text-zinc-400 disabled:opacity-40"
+                                    className="today-secondary-chip py-2 rounded-lg text-xs font-semibold border border-zinc-700 text-zinc-400 disabled:opacity-40"
                                 >
                                     Start First Exercise
                                 </button>
@@ -2222,7 +2222,7 @@ export default function TodayPage() {
                                     <button
                                         onClick={() => setFocusIndex((i) => Math.max(0, i - 1))}
                                         disabled={focusIndex === 0}
-                                        className="px-2 py-1 rounded border border-zinc-700 disabled:opacity-30"
+                                        className="today-secondary-nav px-2 py-1 rounded border border-zinc-700 disabled:opacity-30"
                                     >
                                         Prev
                                     </button>
@@ -2230,7 +2230,7 @@ export default function TodayPage() {
                                     <button
                                         onClick={() => setFocusIndex((i) => Math.min(exercises.length - 1, i + 1))}
                                         disabled={focusIndex >= exercises.length - 1}
-                                        className="px-2 py-1 rounded border border-zinc-700 disabled:opacity-30"
+                                        className="today-secondary-nav px-2 py-1 rounded border border-zinc-700 disabled:opacity-30"
                                     >
                                         Next
                                     </button>
@@ -2271,7 +2271,7 @@ export default function TodayPage() {
                         <div className="hidden sm:grid sm:grid-cols-3 gap-2">
                             <button
                                 onClick={() => setShowAddExercise(true)}
-                                className="py-3 border border-zinc-700 text-zinc-300 font-semibold rounded-xl"
+                                className="today-secondary-btn py-3 border border-zinc-700 text-zinc-300 font-semibold rounded-xl"
                             >
                                 Add Exercise
                             </button>
@@ -2294,7 +2294,7 @@ export default function TodayPage() {
                         {exercises.length === 0 && (
                             <div className="text-center py-16 text-zinc-600 rounded-2xl border border-zinc-800 bg-zinc-950">
                                 <p className="text-lg mb-3">No exercises yet</p>
-                                <button onClick={() => setShowAddExercise(true)} className="px-6 py-3 border border-zinc-700 rounded-xl text-zinc-400 touch-manipulation">Add Exercise</button>
+                                <button onClick={() => setShowAddExercise(true)} className="today-secondary-btn px-6 py-3 border border-zinc-700 rounded-xl text-zinc-400 touch-manipulation">Add Exercise</button>
                             </div>
                         )}
                         {visibleExerciseItems.map(({ ex, index: i }) => (
@@ -2330,7 +2330,7 @@ export default function TodayPage() {
                     <div className="grid grid-cols-3 gap-2">
                         <button
                             onClick={() => setShowAddExercise(true)}
-                            className="py-3 rounded-xl border border-zinc-700 text-zinc-200 text-sm font-semibold"
+                            className="today-secondary-btn py-3 rounded-xl border border-zinc-700 text-zinc-200 text-sm font-semibold"
                         >
                             Add
                         </button>

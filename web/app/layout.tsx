@@ -11,6 +11,7 @@ import {
 } from "@/components/icons";
 import PwaRegister from "./pwa-register";
 import AuthGuard from "./auth-guard";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -66,8 +67,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var t=localStorage.getItem('gymos:theme');var th=t==='light'?'light':'dark';var e=document.documentElement;e.classList.remove('dark','light');e.classList.add(th);var m=document.querySelector('meta[name=\\\"theme-color\\\"]');if(m){m.setAttribute('content',th==='dark'?'#09090b':'#fafafa');}}catch(_){document.documentElement.classList.add('dark');}})();",
+          }}
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
@@ -80,52 +87,54 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="font-[Inter] antialiased bg-zinc-950 text-zinc-100 min-h-screen">
-        <PwaRegister />
-        {/* ── Desktop top nav (hidden on mobile) ── */}
-        <nav className="hidden sm:block fixed top-0 left-0 right-0 z-50 bg-zinc-950/85 backdrop-blur-xl border-b border-zinc-800/60">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center h-16 gap-6">
-            <span className="inline-flex items-center gap-3" aria-label="GymOS">
-              <BrandIcon className="h-6 w-6" />
-              <img src="/logo-wordmark.svg" alt="GymOS" className="h-6 w-auto" />
-            </span>
-            <ul className="flex gap-1">
-              {topNavLinks.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:text-zinc-100 hover:bg-red-500/10 transition-all duration-200"
-                  >
-                    <link.icon className="h-4 w-4" />
-                    {link.label}
-                  </Link>
-                </li>
+        <ThemeProvider>
+          <PwaRegister />
+          {/* ── Desktop top nav (hidden on mobile) ── */}
+          <nav className="hidden sm:block fixed top-0 left-0 right-0 z-50 bg-zinc-950/85 backdrop-blur-xl border-b border-zinc-800/60">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center h-16 gap-6">
+              <span className="inline-flex items-center gap-3" aria-label="GymOS">
+                <BrandIcon className="h-6 w-6" />
+                <img src="/logo-wordmark.svg" alt="GymOS" className="h-6 w-auto" />
+              </span>
+              <ul className="flex gap-1">
+                {topNavLinks.map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:text-zinc-100 hover:bg-red-500/10 transition-all duration-200"
+                    >
+                      <link.icon className="h-4 w-4" />
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </nav>
+
+          {/* ── Main content ── */}
+          {/* mobile: pt-4 pb-24 (space for bottom nav); desktop: pt-24 pb-12 */}
+          <main className="max-w-2xl sm:max-w-7xl mx-auto px-4 sm:px-6 pt-4 sm:pt-24 pb-28 sm:pb-12">
+            <AuthGuard>{children}</AuthGuard>
+          </main>
+
+          {/* ── Mobile bottom tab bar (hidden on desktop) ── */}
+          <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-800/60"
+            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+            <div className="flex">
+              {bottomTabs.map((tab) => (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  className="flex-1 min-w-0 flex flex-col items-center justify-center py-2 gap-1 text-zinc-500 active:text-red-400 touch-manipulation"
+                >
+                  <tab.icon className="h-5 w-5" />
+                  <span className="text-[9px] font-semibold tracking-wide truncate max-w-full px-0.5">{tab.label}</span>
+                </Link>
               ))}
-            </ul>
-          </div>
-        </nav>
-
-        {/* ── Main content ── */}
-        {/* mobile: pt-4 pb-24 (space for bottom nav); desktop: pt-24 pb-12 */}
-        <main className="max-w-2xl sm:max-w-7xl mx-auto px-4 sm:px-6 pt-4 sm:pt-24 pb-28 sm:pb-12">
-          <AuthGuard>{children}</AuthGuard>
-        </main>
-
-        {/* ── Mobile bottom tab bar (hidden on desktop) ── */}
-        <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-800/60"
-          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-          <div className="flex">
-            {bottomTabs.map((tab) => (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                className="flex-1 min-w-0 flex flex-col items-center justify-center py-2 gap-1 text-zinc-500 active:text-red-400 touch-manipulation"
-              >
-                <tab.icon className="h-5 w-5" />
-                <span className="text-[9px] font-semibold tracking-wide truncate max-w-full px-0.5">{tab.label}</span>
-              </Link>
-            ))}
-          </div>
-        </nav>
+            </div>
+          </nav>
+        </ThemeProvider>
       </body>
     </html>
   );

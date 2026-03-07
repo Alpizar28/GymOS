@@ -87,9 +87,9 @@ export function WeightKeypadSheet({
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
   return (
-    <div className="fixed inset-0 z-[55] bg-black/25 flex items-end" onClick={onClose}>
+    <div className="today-keypad-overlay fixed inset-0 z-[55] bg-black/25 flex items-end" onClick={onClose}>
       <div
-        className="w-full rounded-t-3xl border-t border-zinc-700 bg-[#12121a]/96 p-3 pb-[calc(12px+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-6 fade-in duration-200"
+        className="today-keypad-panel w-full rounded-t-3xl border-t border-zinc-700 bg-[#12121a]/96 p-3 pb-[calc(12px+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-6 fade-in duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3 px-1">
@@ -136,7 +136,7 @@ export function WeightKeypadSheet({
                 key={key}
                 type="button"
                 onClick={() => appendToken(key)}
-                className="h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-white text-2xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-red-500/20 active:border-red-400"
+                className="today-keypad-key h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-white text-2xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-red-500/20 active:border-red-400"
               >
                 {key}
               </button>
@@ -145,14 +145,14 @@ export function WeightKeypadSheet({
               type="button"
               onClick={() => appendToken(".")}
               disabled={mode === "count"}
-              className="h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-white text-2xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-red-500/20 active:border-red-400 disabled:opacity-30 disabled:active:scale-100 disabled:active:bg-zinc-900 disabled:active:border-zinc-700"
+              className="today-keypad-key h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-white text-2xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-red-500/20 active:border-red-400 disabled:opacity-30 disabled:active:scale-100 disabled:active:bg-zinc-900 disabled:active:border-zinc-700"
             >
               .
             </button>
             <button
               type="button"
               onClick={() => appendToken("0")}
-              className="h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-white text-2xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-red-500/20 active:border-red-400"
+              className="today-keypad-key h-14 rounded-xl border border-zinc-700 bg-zinc-900 text-white text-2xl font-semibold transition-transform duration-100 active:scale-[0.98] active:bg-red-500/20 active:border-red-400"
             >
               0
             </button>

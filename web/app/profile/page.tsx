@@ -13,6 +13,7 @@ import {
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { LibraryIcon, ProfileIcon, ShieldIcon, StatsIcon } from "@/components/icons";
+import ThemeToggle from "@/components/theme-toggle";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -915,7 +916,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="profile-page max-w-2xl mx-auto">
       {/* Header */}
       <div className="mb-5 rounded-2xl border border-zinc-700/50 bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.16),_transparent_55%)] bg-zinc-900/80 p-5 shadow-[0_0_40px_rgba(239,68,68,0.12)]">
         <div className="flex items-start justify-between gap-3">
@@ -927,10 +928,13 @@ export default function ProfilePage() {
           <button
             type="button"
             onClick={() => void handleSignOut()}
-            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:border-red-500/60 hover:text-red-300"
+            className="profile-secondary-btn rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:border-red-500/60 hover:text-red-300"
           >
             Cerrar sesion
           </button>
+        </div>
+        <div className="mt-3 flex justify-end">
+          <ThemeToggle />
         </div>
       </div>
 
@@ -942,7 +946,7 @@ export default function ProfilePage() {
           <button
             key={s.id}
             onClick={() => setActive(s.id)}
-            className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
+            className={`profile-secondary-chip flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
               active === s.id
                 ? "bg-red-600/25 text-red-200 border-red-500/40 shadow-[0_0_12px_rgba(239,68,68,0.2)]"
                 : "bg-zinc-800/60 text-zinc-500 border-zinc-700/50 hover:text-zinc-300"

@@ -59,3 +59,308 @@ input[type="reset"] {
     font-size: 16px;
   }
 }
+
+html.light,
+html.light body {
+  background: #f4f4f5;
+  color: #18181b;
+}
+
+html.light .bg-zinc-950,
+html.light .bg-zinc-950\/95,
+html.light .bg-zinc-950\/90,
+html.light .bg-zinc-950\/85,
+html.light .bg-zinc-950\/80,
+html.light .bg-zinc-950\/70,
+html.light .bg-zinc-950\/60,
+html.light .bg-zinc-900,
+html.light .bg-zinc-900\/95,
+html.light .bg-zinc-900\/90,
+html.light .bg-zinc-900\/85,
+html.light .bg-zinc-900\/80,
+html.light .bg-zinc-900\/70,
+html.light .bg-zinc-900\/60,
+html.light .bg-zinc-900\/50,
+html.light .bg-zinc-900\/40 {
+  background-color: #ffffff !important;
+}
+
+html.light .bg-zinc-800,
+html.light .bg-zinc-800\/60,
+html.light .bg-zinc-800\/50,
+html.light .bg-zinc-800\/40 {
+  background-color: #f4f4f5 !important;
+}
+
+html.light .text-zinc-100,
+html.light .text-zinc-200 {
+  color: #111827 !important;
+}
+
+html.light .text-zinc-300 {
+  color: #1f2937 !important;
+}
+
+html.light .text-zinc-400 {
+  color: #374151 !important;
+}
+
+html.light .text-zinc-500 {
+  color: #52525b !important;
+}
+
+html.light .text-zinc-600 {
+  color: #71717a !important;
+}
+
+html.light .text-zinc-700,
+html.light .text-zinc-800,
+html.light .text-zinc-900 {
+  color: #27272a !important;
+}
+
+html.light .border-zinc-900,
+html.light .border-zinc-800,
+html.light .border-zinc-800\/60,
+html.light .border-zinc-800\/50,
+html.light .border-zinc-800\/40,
+html.light .border-zinc-700,
+html.light .border-zinc-700\/60,
+html.light .border-zinc-700\/50,
+html.light .border-zinc-700\/40 {
+  border-color: #d4d4d8 !important;
+}
+
+html.light .ring-zinc-900,
+html.light .ring-zinc-800,
+html.light .ring-zinc-700 {
+  --tw-ring-color: rgba(212, 212, 216, 0.8) !important;
+}
+
+html.light input,
+html.light textarea,
+html.light select {
+  background-color: #ffffff;
+  color: #18181b;
+}
+
+html.light .text-white {
+  color: #111827 !important;
+}
+
+html.light .placeholder-zinc-700::placeholder,
+html.light .placeholder-zinc-600::placeholder,
+html.light .placeholder-zinc-500::placeholder {
+  color: #71717a !important;
+}
+
+html.light .text-red-200 {
+  color: #b91c1c !important;
+}
+
+html.light .text-red-300,
+html.light .text-red-400 {
+  color: #dc2626 !important;
+}
+
+html.light .bg-red-500,
+html.light .bg-red-600,
+html.light [class*="from-red-"][class*="to-red-"] {
+  color: #ffffff !important;
+}
+
+html.light [class*="from-zinc-"][class*="to-zinc-"] {
+  background-image: linear-gradient(to right, #ffffff, #f4f4f5) !important;
+}
+
+html.light .bg-black\/70,
+html.light .bg-black\/60 {
+  background-color: rgba(0, 0, 0, 0.45) !important;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #a1a1aa;
+}
+
+html.light .today-modal-overlay,
+html.light .today-keypad-overlay,
+html.light .today-plate-overlay {
+  background-color: rgba(15, 23, 42, 0.35) !important;
+}
+
+html.light .today-modal-panel,
+html.light .today-keypad-panel,
+html.light .today-plate-panel {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light .today-modal-panel .bg-zinc-950,
+html.light .today-modal-panel .bg-zinc-950\/70,
+html.light .today-modal-panel .bg-zinc-950\/60,
+html.light .today-modal-panel .bg-zinc-900,
+html.light .today-modal-panel .bg-zinc-900\/70,
+html.light .today-modal-panel .bg-zinc-900\/60,
+html.light .today-keypad-panel .bg-zinc-900,
+html.light .today-keypad-panel .bg-zinc-900\/80,
+html.light .today-keypad-panel .bg-zinc-800,
+html.light .today-plate-panel .bg-zinc-900,
+html.light .today-plate-panel .bg-zinc-900\/70,
+html.light .today-plate-panel [class*="bg-[#1"],
+html.light .today-plate-panel [class*="bg-[#121"] {
+  background-color: #f8fafc !important;
+}
+
+html.light .today-modal-panel .text-zinc-500,
+html.light .today-keypad-panel .text-zinc-500,
+html.light .today-plate-panel .text-zinc-500 {
+  color: #475569 !important;
+}
+
+html.light .today-modal-panel .text-zinc-400,
+html.light .today-keypad-panel .text-zinc-400,
+html.light .today-plate-panel .text-zinc-400 {
+  color: #334155 !important;
+}
+
+html.light .today-modal-panel .text-white,
+html.light .today-keypad-panel .text-white,
+html.light .today-plate-panel .text-white {
+  color: #0f172a !important;
+}
+
+html.light .today-modal-panel .border-zinc-800,
+html.light .today-modal-panel .border-zinc-700,
+html.light .today-modal-panel .border-zinc-700\/30,
+html.light .today-keypad-panel .border-zinc-700,
+html.light .today-keypad-panel .border-zinc-600,
+html.light .today-plate-panel .border-zinc-800,
+html.light .today-plate-panel .border-zinc-700,
+html.light .today-plate-panel .border-zinc-600 {
+  border-color: #cbd5e1 !important;
+}
+
+html.light .today-modal-panel input,
+html.light .today-modal-panel select,
+html.light .today-modal-panel textarea,
+html.light .today-plate-panel input {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light .today-keypad-key {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html.light .today-keypad-panel .bg-red-500\/20,
+html.light .today-keypad-panel .bg-red-500\/14,
+html.light .today-keypad-panel .bg-red-500\/18,
+html.light .today-plate-panel .bg-red-500\/20,
+html.light .today-plate-panel .bg-red-500\/14,
+html.light .today-plate-panel .bg-red-500\/18 {
+  background-color: rgba(239, 68, 68, 0.14) !important;
+}
+
+html.light .today-page button[class*="bg-zinc-"],
+html.light .today-page a[class*="bg-zinc-"] {
+  color: #0f172a !important;
+}
+
+html.light .today-page button[class*="border-zinc-"][class*="text-zinc-"],
+html.light .today-page a[class*="border-zinc-"][class*="text-zinc-"] {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+html.light .today-page button:disabled:not([class*="bg-red"]),
+html.light .today-page a[aria-disabled="true"]:not([class*="bg-red"]) {
+  opacity: 1 !important;
+  background-color: #e5e7eb !important;
+  border-color: #d1d5db !important;
+  color: #94a3b8 !important;
+}
+
+html.light .today-page button:disabled[class*="bg-red"] {
+  opacity: 1 !important;
+  background-color: #f87171 !important;
+  border-color: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+html.light .today-page button[class*="active:bg-zinc-700"]:active {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .today-page button[class*="active:bg-red-900/30"]:active {
+  background-color: rgba(239, 68, 68, 0.14) !important;
+  color: #b91c1c !important;
+}
+
+@media (hover: hover) {
+  html.light .today-page button[class*="hover:border-zinc-500"]:hover,
+  html.light .today-page a[class*="hover:border-zinc-500"]:hover {
+    border-color: #94a3b8 !important;
+  }
+
+  html.light .today-page button[class*="hover:bg-red-500"]:hover {
+    background-color: #dc2626 !important;
+  }
+}
+
+html.light .today-live-timer,
+html.light .today-live-timer-btn,
+html.light .today-focus-active {
+  background-color: #b91c1c !important;
+  border-color: #fca5a5 !important;
+  color: #ffffff !important;
+}
+
+html.light .today-live-timer span,
+html.light .today-live-timer .text-red-100,
+html.light .today-live-timer .text-white {
+  color: #ffffff !important;
+}
+
+.today-page .today-secondary-btn,
+.today-page .today-secondary-chip,
+.today-page .today-secondary-nav {
+  letter-spacing: 0.01em;
+}
+
+.profile-page .profile-secondary-btn,
+.profile-page .profile-secondary-chip,
+.settings-page .settings-secondary-chip {
+  letter-spacing: 0.01em;
+}
+
+@media (max-width: 640px) {
+  .today-page .today-secondary-btn {
+    font-size: 0.875rem;
+    line-height: 1.2rem;
+    font-weight: 600;
+  }
+
+  .today-page .today-secondary-chip,
+  .today-page .today-secondary-nav {
+    font-size: 0.8125rem;
+    line-height: 1.15rem;
+    font-weight: 600;
+  }
+
+  .profile-page .profile-secondary-btn,
+  .settings-page .settings-secondary-chip {
+    font-size: 0.875rem;
+    line-height: 1.2rem;
+    font-weight: 600;
+  }
+
+  .profile-page .profile-secondary-chip {
+    font-size: 0.8125rem;
+    line-height: 1.15rem;
+    font-weight: 600;
+  }
+}
