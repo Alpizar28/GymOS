@@ -1046,8 +1046,8 @@ function SetCard({ exerciseIndex, index, actual, lastData, weightUnit, onChange,
     onOpenFieldKeypad: (field: KeypadField) => void;
     activeField: KeypadField | null;
 }) {
-    const SWIPE_THRESHOLD = 72;
-    const SWIPE_LIMIT = 120;
+    const SWIPE_THRESHOLD = 145;
+    const SWIPE_LIMIT = 210;
     const upd = (f: Partial<ActualSet>) => onChange({ ...actual, ...f });
     const isEditingThisSet = activeField !== null;
     const setType = normalizeSetType(actual.set_type);
@@ -1065,7 +1065,7 @@ function SetCard({ exerciseIndex, index, actual, lastData, weightUnit, onChange,
     const [isDragging, setIsDragging] = useState(false);
     const [flashTone, setFlashTone] = useState<"complete" | "delete" | null>(null);
     const [lockedHintVisible, setLockedHintVisible] = useState(false);
-    const swipeStartRef = useRef<{ id: number; x: number; y: number } | null>(null);
+    const swipeStartRef = useRef<{ id: number; x: number; y: number; axis: "undecided" | "horizontal" | "vertical" } | null>(null);
     const flashTimeoutRef = useRef<number | null>(null);
     const lockedHintTimeoutRef = useRef<number | null>(null);
     const cardRef = useRef<HTMLDivElement | null>(null);
@@ -1160,8 +1160,14 @@ function SetCard({ exerciseIndex, index, actual, lastData, weightUnit, onChange,
     const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         if (event.pointerType === "mouse" && event.button !== 0) return;
         const target = event.target as HTMLElement;
-        if (target.closest("input,select,button,textarea")) return;
-        swipeStartRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+        if (target.closest('[data-no-swipe="true"]')) return;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        swipeStartRef.current = {
+            id: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            axis: "undecided",
+        };
         setMenuOpen(false);
         setTypeMenuOpen(false);
         setIsDragging(true);
@@ -1172,15 +1178,28 @@ function SetCard({ exerciseIndex, index, actual, lastData, weightUnit, onChange,
         if (!start || start.id !== event.pointerId) return;
         const dx = event.clientX - start.x;
         const dy = event.clientY - start.y;
-        if (Math.abs(dy) > Math.abs(dx) + 6) {
+
+        if (start.axis === "undecided") {
+            if (Math.abs(dx) >= 10 && Math.abs(dx) > Math.abs(dy)) {
+                swipeStartRef.current = { ...start, axis: "horizontal" };
+            } else if (Math.abs(dy) >= 10 && Math.abs(dy) > Math.abs(dx)) {
+                swipeStartRef.current = { ...start, axis: "vertical" };
+            }
+        }
+
+        if (swipeStartRef.current?.axis === "vertical") {
             setTranslateX(0);
             return;
         }
+
         const clamped = Math.max(-SWIPE_LIMIT, Math.min(SWIPE_LIMIT, dx));
         setTranslateX(clamped);
     };
 
-    const finishSwipe = () => {
+    const finishSwipe = (event?: React.PointerEvent<HTMLDivElement>) => {
+        if (event && event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+        }
         if (translateX <= -SWIPE_THRESHOLD) {
             triggerFlash("complete");
             toggleComplete();
@@ -1193,14 +1212,36 @@ function SetCard({ exerciseIndex, index, actual, lastData, weightUnit, onChange,
         swipeStartRef.current = null;
     };
 
+    const swipeStrength = Math.min(Math.abs(translateX) / SWIPE_THRESHOLD, 1);
+    const showDeleteHint = translateX > 14;
+    const showCompleteHint = translateX < -14;
+
     return (
         <div ref={cardRef} className={`relative overflow-visible rounded-lg ${isAnyMenuOpen ? "z-40" : "z-0"}`}>
             <div className="absolute inset-0 pointer-events-none flex items-center justify-between px-3">
-                <div className={`text-[11px] font-semibold uppercase tracking-wide transition-opacity ${translateX >= 28 ? "opacity-100 text-red-300" : "opacity-0 text-zinc-600"}`}>
-                    Delete
+                <div className={`transition-all duration-200 ${showDeleteHint ? "opacity-100" : "opacity-0"}`}>
+                    <div
+                        className="h-8 w-8 rounded-full border border-rose-500/70 bg-rose-500/15 flex items-center justify-center"
+                        style={{
+                            transform: `scale(${0.9 + swipeStrength * 0.25})`,
+                            boxShadow: swipeStrength > 0.9 ? "0 0 0 2px rgba(244,63,94,0.25)" : "none",
+                        }}
+                    >
+                        <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                            <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="text-rose-300" />
+                        </svg>
+                    </div>
                 </div>
-                <div className={`text-[11px] font-semibold uppercase tracking-wide transition-opacity ${translateX <= -28 ? "opacity-100 text-red-200" : "opacity-0 text-zinc-600"}`}>
-                    {actual.completed ? "Undo" : "Complete"}
+                <div className={`transition-all duration-200 ${showCompleteHint ? "opacity-100" : "opacity-0"}`}>
+                    <div
+                        className="h-8 w-8 rounded-full border border-emerald-500/70 bg-emerald-500/20 flex items-center justify-center"
+                        style={{
+                            transform: `scale(${0.9 + swipeStrength * 0.25})`,
+                            boxShadow: swipeStrength > 0.9 ? "0 0 0 2px rgba(16,185,129,0.25)" : "none",
+                        }}
+                    >
+                        <span className="text-emerald-300 text-base font-extrabold leading-none">✓</span>
+                    </div>
                 </div>
             </div>
             {lockedHintVisible ? (
@@ -1211,11 +1252,11 @@ function SetCard({ exerciseIndex, index, actual, lastData, weightUnit, onChange,
 
             <div
                 className={`relative bg-zinc-900/60 border transition-all ${isEditingThisSet ? "border-red-500/70 ring-1 ring-red-500/40" : "border-zinc-800"} ${flashTone === "complete" ? "bg-red-600/25" : flashTone === "delete" ? "bg-red-900/35" : ""}`}
-                style={{ transform: `translateX(${translateX}px)`, transition: isDragging ? "none" : "transform 140ms ease-out" }}
+                style={{ transform: `translateX(${translateX}px)`, transition: isDragging ? "none" : "transform 240ms ease-out", touchAction: "pan-y" }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
-                onPointerUp={finishSwipe}
-                onPointerCancel={finishSwipe}
+                onPointerUp={(e) => finishSwipe(e)}
+                onPointerCancel={(e) => finishSwipe(e)}
             >
                 {/* Top row */}
                 <div className="px-2.5 pt-2 pb-1 min-h-[18px]">
@@ -1239,11 +1280,11 @@ function SetCard({ exerciseIndex, index, actual, lastData, weightUnit, onChange,
 
                 {menuOpen ? (
                     <div className={`absolute z-50 rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl p-1 flex items-center gap-1 ${menuOpensUp ? "bottom-10" : "top-9"} ${menuAlign === "right" ? "right-2.5" : "left-2.5"}`}>
-                        <button type="button" onClick={() => { onCopyAbove(); setMenuOpen(false); }} disabled={index === 0} className="h-7 px-2 rounded-md text-[11px] text-zinc-300 bg-zinc-800/70 disabled:opacity-30">⧉</button>
-                        <button type="button" onClick={() => { onMoveUp(); setMenuOpen(false); }} disabled={!canMoveUp} className="h-7 px-2 rounded-md text-[11px] text-zinc-300 bg-zinc-800/70 disabled:opacity-30">↑</button>
-                        <button type="button" onClick={() => { onMoveDown(); setMenuOpen(false); }} disabled={!canMoveDown} className="h-7 px-2 rounded-md text-[11px] text-zinc-300 bg-zinc-800/70 disabled:opacity-30">↓</button>
-                        <button type="button" onClick={() => { triggerFlash("complete"); toggleComplete(); setMenuOpen(false); }} className="h-7 px-2 rounded-md text-[11px] text-red-200 bg-zinc-800/70">{actual.completed ? "Undo" : "Done"}</button>
-                        <button type="button" onClick={() => { triggerFlash("delete"); onRemove(); setMenuOpen(false); }} className="h-7 px-2 rounded-md text-[11px] text-red-300 bg-zinc-800/70">Del</button>
+                        <button data-no-swipe="true" type="button" onClick={() => { onCopyAbove(); setMenuOpen(false); }} disabled={index === 0} className="h-7 px-2 rounded-md text-[11px] text-zinc-300 bg-zinc-800/70 disabled:opacity-30">⧉</button>
+                        <button data-no-swipe="true" type="button" onClick={() => { onMoveUp(); setMenuOpen(false); }} disabled={!canMoveUp} className="h-7 px-2 rounded-md text-[11px] text-zinc-300 bg-zinc-800/70 disabled:opacity-30">↑</button>
+                        <button data-no-swipe="true" type="button" onClick={() => { onMoveDown(); setMenuOpen(false); }} disabled={!canMoveDown} className="h-7 px-2 rounded-md text-[11px] text-zinc-300 bg-zinc-800/70 disabled:opacity-30">↓</button>
+                        <button data-no-swipe="true" type="button" onClick={() => { triggerFlash("complete"); toggleComplete(); setMenuOpen(false); }} className="h-7 px-2 rounded-md text-[11px] text-red-200 bg-zinc-800/70">{actual.completed ? "Undo" : "Done"}</button>
+                        <button data-no-swipe="true" type="button" onClick={() => { triggerFlash("delete"); onRemove(); setMenuOpen(false); }} className="h-7 px-2 rounded-md text-[11px] text-red-300 bg-zinc-800/70">Del</button>
                     </div>
                 ) : null}
 
@@ -1251,6 +1292,7 @@ function SetCard({ exerciseIndex, index, actual, lastData, weightUnit, onChange,
                     <div className={`absolute z-50 rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl p-1 min-w-[130px] ${typeMenuOpensUp ? "bottom-10" : "top-9"} ${typeMenuAlign === "left" ? "left-2.5" : "right-2.5"}`}>
                         {SET_TYPE_MENU_OPTIONS.map((option) => (
                             <button
+                                data-no-swipe="true"
                                 key={option.value}
                                 type="button"
                                 onClick={() => {
@@ -1273,6 +1315,7 @@ function SetCard({ exerciseIndex, index, actual, lastData, weightUnit, onChange,
                 <div className="grid grid-cols-[minmax(0,0.65fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_34px] gap-1.5 px-2.5 pb-2 pt-0 items-center">
                     <div className="h-full">
                         <button
+                            data-no-swipe="true"
                             ref={typeButtonRef}
                             type="button"
                             onClick={() => {
@@ -1389,6 +1432,7 @@ function SetCard({ exerciseIndex, index, actual, lastData, weightUnit, onChange,
                     </div>
                     <div className="flex justify-end">
                         <button
+                            data-no-swipe="true"
                             ref={menuButtonRef}
                             type="button"
                             onClick={() => {
@@ -1551,6 +1595,7 @@ export default function TodayPage() {
     const [restDefaultSeconds, setRestDefaultSeconds] = useState(120);
     const [workoutElapsedSeconds, setWorkoutElapsedSeconds] = useState(0);
     const [workoutTimerRunning, setWorkoutTimerRunning] = useState(false);
+    const [resetTimerConfirmArmed, setResetTimerConfirmArmed] = useState(false);
     const [shortBarWeight, setShortBarWeight] = useState(35);
     const [keypadTarget, setKeypadTarget] = useState<KeypadTarget | null>(null);
     const [plateTarget, setPlateTarget] = useState<{ exerciseIdx: number; setIdx: number } | null>(null);
@@ -1561,8 +1606,7 @@ export default function TodayPage() {
     const draftReadyRef = useRef(false);
     const workoutElapsedRef = useRef(0);
     const workoutTimerRunningRef = useRef(false);
-    const [lastDraftSaveAt, setLastDraftSaveAt] = useState<number | null>(null);
-    const [restoredDraft, setRestoredDraft] = useState(false);
+    const resetTimerConfirmTimeoutRef = useRef<number | null>(null);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
@@ -1581,6 +1625,14 @@ export default function TodayPage() {
             undoTimeoutRef.current = null;
         }, 5000);
     }, [clearUndoTimeout]);
+
+    const clearResetTimerConfirm = useCallback(() => {
+        if (resetTimerConfirmTimeoutRef.current !== null) {
+            window.clearTimeout(resetTimerConfirmTimeoutRef.current);
+            resetTimerConfirmTimeoutRef.current = null;
+        }
+        setResetTimerConfirmArmed(false);
+    }, []);
 
     const applyUndo = useCallback(() => {
         if (!undoAction) return;
@@ -1601,6 +1653,14 @@ export default function TodayPage() {
     useEffect(() => {
         exerciseUnitsRef.current = exerciseUnits;
     }, [exerciseUnits]);
+
+    useEffect(() => {
+        return () => {
+            if (resetTimerConfirmTimeoutRef.current !== null) {
+                window.clearTimeout(resetTimerConfirmTimeoutRef.current);
+            }
+        };
+    }, []);
 
     const buildExerciseStateFromPlan = useCallback((data: TodayPlan): ExerciseState[] => (
         data.exercises.map((ex) => ({
@@ -1655,7 +1715,6 @@ export default function TodayPage() {
             })),
         };
         window.localStorage.setItem(draftKey(dayName), JSON.stringify(draft));
-        setLastDraftSaveAt(draft.savedAt);
     }, []);
 
     const clearDraft = useCallback((dayName?: string) => {
@@ -1731,12 +1790,9 @@ export default function TodayPage() {
             merged = mergeExercises(merged, localDraft.exercises, true);
             recoveredWorkoutId = localDraft.savedId ?? recoveredWorkoutId;
             nextExerciseUnits = localDraft.exerciseUnits ?? {};
-            setRestoredDraft(true);
             if (showRestoreToast) {
                 showToast("Borrador restaurado");
             }
-        } else {
-            setRestoredDraft(false);
         }
 
         setPlan(data);
@@ -2107,6 +2163,7 @@ export default function TodayPage() {
 
     const startAnotherRoutine = useCallback(() => {
         clearDraft();
+        clearResetTimerConfirm();
         setCompleted(false);
         setShowComplete(false);
         setNextDay(null);
@@ -2125,7 +2182,7 @@ export default function TodayPage() {
         setKeypadTarget(null);
         setRestTimerLeft(null);
         setRestRunning(false);
-    }, [clearDraft]);
+    }, [clearDraft, clearResetTimerConfirm]);
 
     useEffect(() => {
         if (!restRunning || restTimerLeft === null) return;
@@ -2501,7 +2558,6 @@ export default function TodayPage() {
                             <p className="text-sm text-zinc-300 font-semibold">{formatDayName(plan.day_name)}</p>
                             <div className="flex items-center justify-between mt-1 text-xs text-zinc-500">
                                 <span>{completedSets}/{totalSets} sets</span>
-                                <span>{plan.estimated_duration_min} min est.</span>
                             </div>
                             <div className="mt-2 flex items-center gap-2">
                                 <div className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-xs ${workoutTimerRunning
@@ -2527,6 +2583,33 @@ export default function TodayPage() {
                                 >
                                     {workoutTimerRunning ? "Pause" : "Resume"}
                                 </button>
+                                <button
+                                    onClick={() => {
+                                        if (!resetTimerConfirmArmed) {
+                                            setResetTimerConfirmArmed(true);
+                                            if (resetTimerConfirmTimeoutRef.current !== null) {
+                                                window.clearTimeout(resetTimerConfirmTimeoutRef.current);
+                                            }
+                                            resetTimerConfirmTimeoutRef.current = window.setTimeout(() => {
+                                                setResetTimerConfirmArmed(false);
+                                                resetTimerConfirmTimeoutRef.current = null;
+                                            }, 1500);
+                                            return;
+                                        }
+                                        clearResetTimerConfirm();
+                                        setWorkoutElapsedSeconds(0);
+                                        setWorkoutTimerRunning(false);
+                                        if (plan && draftReadyRef.current) {
+                                            writeDraftNow(plan.day_name, exercises, exerciseUnitsRef.current, savedId, 0, false);
+                                        }
+                                    }}
+                                    className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors ${resetTimerConfirmArmed
+                                        ? "border-red-400/80 bg-red-700 text-white hover:bg-red-800"
+                                        : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500"
+                                        }`}
+                                >
+                                    {resetTimerConfirmArmed ? "Confirm" : "Reset"}
+                                </button>
                             </div>
                             <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden mt-3">
                                 <div
@@ -2534,11 +2617,6 @@ export default function TodayPage() {
                                     style={{ width: `${totalSets > 0 ? (completedSets / totalSets) * 100 : 0}%` }}
                                 />
                             </div>
-                            <p className="text-xs text-zinc-600 mt-2">
-                                {restoredDraft ? "Draft restored" : "Draft active"}
-                                {lastDraftSaveAt ? ` · ${new Date(lastDraftSaveAt).toLocaleTimeString()}` : ""}
-                            </p>
-
                             <div className="mt-3 grid grid-cols-2 gap-2">
                                 <button
                                     onClick={() => setFocusMode((v) => !v)}
