@@ -56,12 +56,10 @@ function PlateStack({ plates, side }: { plates: number[]; side: "left" | "right"
 }
 
 export function PlateCalculatorModal({
-  initialWeight,
   shortBarWeight,
   onClose,
   onSave,
 }: {
-  initialWeight: number;
   shortBarWeight: number;
   onClose: () => void;
   onSave: (weight: number) => void;
@@ -89,8 +87,8 @@ export function PlateCalculatorModal({
   const platesTotal = platesPerSideTotal * 2;
 
   const total = useMemo(
-    () => roundToNearestHalf(initialWeight + barWeight + platesTotal),
-    [initialWeight, barWeight, platesTotal]
+    () => roundToNearestHalf(barWeight + platesTotal),
+    [barWeight, platesTotal]
   );
 
   const visualPerSide = useMemo(() => {
@@ -138,14 +136,14 @@ export function PlateCalculatorModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/25 flex items-end sm:items-center justify-center p-2 sm:p-3">
-      <div className="w-full max-w-lg rounded-2xl border border-zinc-700 bg-[#1c1c24]/98 shadow-2xl animate-in slide-in-from-bottom-4 fade-in duration-200 max-h-[82vh] overflow-hidden flex flex-col">
+      <div className="w-full max-w-lg rounded-2xl border border-zinc-700 bg-[#1c1c24]/98 shadow-2xl animate-in slide-in-from-bottom-4 fade-in duration-200 max-h-[76vh] overflow-hidden flex flex-col">
         <div className="flex items-start justify-between gap-3 px-3 pt-3 pb-2 sm:px-4 sm:pt-4 sm:pb-3 border-b border-zinc-800 bg-[#1c1c24]/98 sticky top-0 z-10">
           <button onClick={clear} className="text-sm font-semibold text-red-400">
             Clear
           </button>
           <div className="text-center">
             <p className="text-sm sm:text-base font-semibold text-white">Plate Calculator</p>
-            <p className="text-xs text-zinc-400 mt-0.5">Initial Weight: {formatWeight(initialWeight)} lbs</p>
+            <p className="text-xs text-zinc-400 mt-0.5">Starts at Standard Bar (45 lbs)</p>
           </div>
           <button onClick={() => onSave(total)} className="text-sm font-semibold text-red-300">
             Save
@@ -156,7 +154,7 @@ export function PlateCalculatorModal({
           <div className="mt-3 rounded-2xl border border-zinc-700 bg-[#17171f] p-3">
             <p className="text-center text-3xl sm:text-4xl font-bold text-white tabular-nums">{formatWeight(total)} lbs</p>
             <p className="text-center text-xs text-zinc-400 mt-1">
-              Bar {formatWeight(barWeight)} + Plates {formatWeight(platesTotal)} + Initial {formatWeight(initialWeight)}
+              Bar {formatWeight(barWeight)} + Plates {formatWeight(platesTotal)}
             </p>
 
             <div className="mt-3 flex items-center justify-center gap-1">
@@ -258,11 +256,11 @@ export function PlateCalculatorModal({
 
         </div>
 
-        <div className="border-t border-zinc-800 bg-[#1c1c24]/98 px-3 py-2.5 pb-[calc(10px+env(safe-area-inset-bottom))] sm:px-4">
+        <div className="border-t border-zinc-800 bg-[#1c1c24]/98 px-3 py-3 pb-[calc(20px+env(safe-area-inset-bottom))] sm:px-4">
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-3 rounded-xl border border-zinc-600 bg-zinc-900 text-zinc-100 text-sm font-semibold shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+            className="w-full py-3.5 rounded-xl border border-zinc-500 bg-zinc-900 text-zinc-50 text-sm font-semibold shadow-[0_10px_30px_rgba(0,0,0,0.42)]"
           >
             Close
           </button>

@@ -41,17 +41,18 @@ Este documento define mejoras de alto impacto y bajo riesgo para elevar diseno, 
 - Menos taps por set.
 - Mejor ritmo de sesion y menos distracciones.
 
-### A2. Autofocus secuencial
-**Problema**: completar set requiere moverse manualmente entre campos y sets.
+### A2. Flujo de entrada numerica mobile-first
+**Problema**: el teclado nativo era lento para registrar pesos y hacia friccion en pleno entrenamiento.
 
 **Estado**: `COMPLETADO`
 
 **Mejora**
-- Al marcar set como completado, mover foco al siguiente set (o siguiente ejercicio si no hay mas sets).
-- En mobile, abrir teclado solo cuando el campo esperado no esta completo.
+- Teclado personalizado para `lbs` con accesos rapidos y apertura de Plate Calculator.
+- Teclado personalizado para `reps` y `rir` con botones `+1/-1`.
+- Edicion en vivo del input activo sin salto automatico de foco.
 
 **Impacto esperado**
-- Flujo mas continuo tipo app nativa.
+- Menos taps y menos errores de digitacion en mobile.
 
 ### A3. Undo de acciones destructivas
 **Problema**: borrar set/ejercicio por error cuesta tiempo y causa frustracion.
@@ -65,6 +66,32 @@ Este documento define mejoras de alto impacto y bajo riesgo para elevar diseno, 
 
 **Impacto esperado**
 - Menos perdida accidental de progreso.
+
+### A4. Cierre real de sesion (Finish)
+**Problema**: finalizar sesion no transmitia claramente que el entrenamiento habia cerrado.
+
+**Estado**: `COMPLETADO`
+
+**Mejora**
+- Modal de resumen antes de finalizar (ejercicios, sets y volumen).
+- Confirmacion final con fatiga y avance de dia.
+- Pantalla final con racha de dias y resumen de sesion.
+
+**Impacto esperado**
+- Mayor sensacion de logro y menor ambiguedad al terminar.
+
+### A5. Selector de tipo de set en Today
+**Problema**: al agregar sets no se podia elegir claramente entre warmup/approach/effective/drop.
+
+**Estado**: `COMPLETADO`
+
+**Mejora**
+- Acciones rapidas `+W`, `+A`, `+E`, `+D` en cada ejercicio.
+- Persistencia de `set_type` en `today/log`.
+- Visual por tipo de set en tarjetas.
+
+**Impacto esperado**
+- Registro mas fiel al flujo real de entrenamiento.
 
 ---
 
@@ -149,6 +176,19 @@ Este documento define mejoras de alto impacto y bajo riesgo para elevar diseno, 
 - Opcion `Vacia` para mantener flujo manual.
 - Al elegir bloque, la rutina se crea con ejercicios/sets base editables.
 
+### C3. Calculadora de discos + barra visual
+**Problema**: calcular carga total en barra era lento y propenso a error.
+
+**Estado**: `COMPLETADO`
+
+**Mejora**
+- Plate Calculator integrado al flujo de peso.
+- Visualizacion grafica de barra con discos por lado.
+- Soporte de barra corta configurable desde Perfil.
+
+**Impacto esperado**
+- Menor error de carga y mejor velocidad de logging.
+
 ---
 
 ## D. Consistencia visual y de feedback
@@ -211,6 +251,16 @@ Este documento define mejoras de alto impacto y bajo riesgo para elevar diseno, 
 - Today: se persiste borrador de sesion por dia.
 - Falta persistir seccion activa en Perfil.
 
+### E3. Warmups no obligatorios en todos los ejercicios
+**Estado**: `COMPLETADO`
+
+**Mejora**
+- Normalizacion de plan para limitar warmups automaticos a ejercicios principales.
+- Warmups siguen disponibles manualmente cuando el usuario los necesita.
+
+**Impacto esperado**
+- Planes mas limpios por defecto sin perder control manual.
+
 **Impacto esperado**
 - Menos repeticion de acciones al navegar.
 
@@ -221,6 +271,7 @@ Este documento define mejoras de alto impacto y bajo riesgo para elevar diseno, 
 2. Jerarquia visual final de botones en todas las vistas
 3. Skeletons en Today/Historial/Routines/Perfil
 4. Persistir seccion activa en Perfil
+5. Pulido final de copy en modales y CTAs secundarios
 
 ---
 
@@ -256,3 +307,5 @@ Este documento define mejoras de alto impacto y bajo riesgo para elevar diseno, 
 - Tasa de uso de historial (visitas por semana).
 - Uso de duplicado de rutina.
 - Errores de borrado (cuantas veces se usa Undo).
+- Tiempo promedio hasta `Finish` confirmado.
+- Uso de Plate Calculator vs entrada manual de peso.

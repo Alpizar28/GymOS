@@ -41,6 +41,25 @@
 - App: loads and responds after deploy.
 - Remaining untracked artifacts are non-blocking (`logo/`, some scripts/supabase docs).
 
+## Post-Incident Product Updates (after stabilization)
+
+- Added branded icon/wordmark assets across app shell and auth flows.
+- Added profile sign-out in header area.
+- Added custom numeric keypad for `weight`, `reps`, and `rir` (mobile-first).
+- Added gym-style plate calculator with short-bar profile setting.
+- Added finish-session summary + streak feedback on completion.
+- Added set-type picker in Today (`warmup`, `approach`, `effective`, `drop`).
+- Limited automatic warmups in generated plans to avoid warmups on every exercise by default.
+
+## Follow-up Checklist
+
+1. Verify `/today` logging flow on mobile after deploy:
+   - weight/reps/rir keypad
+   - plate calculator
+   - finish summary and streak
+2. Verify generated plans do not over-assign warmups on accessory exercises.
+3. Verify set types added in Today persist to workout details/history.
+
 ## Operational Checklist (for next deploys)
 
 1. Ensure frontend contract changes and API client updates are committed together:

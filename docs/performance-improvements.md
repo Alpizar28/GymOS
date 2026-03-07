@@ -10,6 +10,13 @@ Enfoca latencia percibida, estabilidad bajo carga y costo operativo.
 - Evitar timeouts intermitentes por dependencias externas.
 - Mejorar capacidad de diagnóstico en producción.
 
+## Estado actual (Mar 2026)
+
+- `COMPLETADO`: timeout acotado para JWKS/auth en backend para reducir bloqueos y 504.
+- `COMPLETADO`: hardening de build frontend para evitar fallos por desalineacion de contratos.
+- `COMPLETADO`: flujo de `Finish` con autosave previo para reducir inconsistencias de cierre.
+- `EN PROGRESO`: UX mobile-first de entrada numerica (keypad custom + calculadora).
+
 ## KPIs objetivo
 
 - Frontend TTFB p95: < 600ms.
@@ -26,6 +33,7 @@ Enfoca latencia percibida, estabilidad bajo carga y costo operativo.
 2. **Timeouts y retry controlado en llamadas externas**
    - Conservar timeout corto en JWKS/Supabase.
    - Añadir retry simple con backoff para errores transitorios.
+   - Estado: timeout JWKS implementado, retry pendiente.
 
 3. **Indices SQL para consultas calientes**
    - Revisar rutas con `order_by(date desc)` y filtros por `user_id`.
@@ -61,6 +69,7 @@ Enfoca latencia percibida, estabilidad bajo carga y costo operativo.
 3. **Optimización visual**
    - Comprimir imágenes grandes y usar tamaños fijos de render.
    - Mantener logos/íconos livianos y cacheables.
+   - Mantener modales de entrada numerica y calculadora usables en pantallas chicas.
 
 ## Infraestructura
 
@@ -101,3 +110,4 @@ Enfoca latencia percibida, estabilidad bajo carga y costo operativo.
 - Deploys sin regresión de tiempo de respuesta.
 - Menos incidencias de timeout percibidas por usuarios.
 - Diagnóstico de incidentes en minutos, no horas.
+- Flujo de logging en Today estable en mobile sin bloqueos de teclado nativo.

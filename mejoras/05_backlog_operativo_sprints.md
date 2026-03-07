@@ -20,6 +20,11 @@ Este documento traduce el roadmap en backlog ejecutable con epicas, tickets, dep
   - Seleccion y edicion rapida de `training_type` en rutinas
   - Backfill historico (`POST /api/history/backfill-training-type`)
   - Stats de clasificacion (`GET /api/history/training-type-stats`)
+  - Teclado numerico custom en Today y Routines para `weight/reps/rir`
+  - Plate calculator mobile-first con barra visual y short-bar configurable
+  - Finish de sesion con resumen y racha de dias
+  - Selector de tipo de set en Today (`+W`, `+A`, `+E`, `+D`)
+  - Limitador de warmups automaticos en generacion de planes
 - Pendiente para cierre formal:
   - HIS-09 QA manual documentado con evidencia final
 

@@ -1782,7 +1782,6 @@ export default function TodayPage() {
         <div className="max-w-6xl mx-auto pb-36 sm:pb-8 overflow-x-hidden">
             {plateTarget && (
                 <PlateCalculatorModal
-                    initialWeight={exercises[plateTarget.exerciseIdx]?.sets[plateTarget.setIdx]?.actual_weight ?? 0}
                     shortBarWeight={shortBarWeight}
                     onClose={closePlateCalculator}
                     onSave={savePlateWeight}

@@ -393,7 +393,6 @@ export default function RoutineDetailPage() {
       )}
       {plateTarget && (
         <PlateCalculatorModal
-          initialWeight={draft.exercises[plateTarget.exIdx]?.sets[plateTarget.setIdx]?.target_weight_lbs ?? 0}
           shortBarWeight={shortBarWeight}
           onClose={closePlateCalculator}
           onSave={savePlateWeight}
