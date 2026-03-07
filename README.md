@@ -28,8 +28,16 @@ GymOS is designed to unify that lifecycle with a clear UX and a robust backend.
 - **Routine progression flow**: analyze anchors per saved routine (last 5 sessions) and apply weight/reps/set updates without regenerating plans.
 - **Unified Historial**: calendar + streaks + selected-day drill-down in one view.
 - **Perfil hub**: personal data, exercise library, protections, and expanded stats.
+- **Weight unit system (lb/kg)**: global preference, onboarding selection, per-exercise override in active session, and plate calculator toggle.
 - **PWA-ready frontend**: installable app shell with offline fallback.
 - **Coolify-friendly proxying**: resilient API proxy with timeout handling.
+
+### Weight Units (Canonical Data Rule)
+
+- UI supports both `lb` and `kg`.
+- Backend and persisted workout/routine weights remain canonical in **pounds (`*_lbs`)**.
+- Conversions happen in the frontend before submit and after fetch.
+- This avoids mixed-unit records and keeps progression logic deterministic.
 
 ---
 

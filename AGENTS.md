@@ -147,6 +147,7 @@ Frontend conventions:
 - Keep progression deterministic; do not introduce LLM decisions in progression logic.
 - Preserve compatibility with proxy handler at `web/app/api/[...path]/route.ts`.
 - Maintain auth-aware, per-user isolation semantics in all mutable entities.
+- Keep persisted weight values canonical in pounds (`*_lbs`) across backend/database; unit conversion belongs to UI layers.
 
 ## 14) Auth And Supabase Guardrails
 - Respect `AUTH_ENABLED` behavior and bearer token flow.

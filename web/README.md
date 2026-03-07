@@ -9,6 +9,13 @@ Frontend dashboard for GymOS built with Next.js 16 App Router.
 - Tailwind CSS
 - Supabase JS client (auth + storage)
 
+## UX highlights
+
+- Theme toggle with persisted preference (dark/light).
+- Weight units: global preference (`lb`/`kg`) with per-exercise override in active workout/routine editing.
+- Onboarding includes measurement system selection (`US (lb)` or `LATAM / Metrico (kg)`).
+- Plate calculator supports `lb`/`kg` display toggle while keeping saved values canonical in pounds.
+
 ## Local development
 
 From `web/`:

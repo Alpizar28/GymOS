@@ -32,6 +32,14 @@ GymOS ahora usa autenticación con Supabase y aislamiento por `user_id`.
 Las entidades clave (workouts, plans, settings, routines, athlete_state, anchor_targets)
 están particionadas por usuario y protegidas con políticas RLS en Supabase.
 
+### Sistema de Unidades (lb/kg)
+
+- GymOS soporta visualización en `lb` y `kg` en frontend.
+- La preferencia global vive en perfil (`weight_unit`) y se puede definir desde onboarding.
+- Existe override por ejercicio durante la sesion/edicion actual (no historico global por nombre).
+- Regla canónica: backend/DB persisten pesos en libras (`*_lbs`) para evitar mezcla de unidades.
+- Conversión de unidades se realiza en capa UI al mostrar/editar datos.
+
 ---
 
 ## 2. ARQUITECTURA GENERAL
