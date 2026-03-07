@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   api,
@@ -32,6 +32,46 @@ const ROUTINE_TYPE_OPTIONS = [
   { value: "legs", label: "Legs" },
   { value: "custom", label: "Custom" },
 ] as const;
+
+const ROUTINE_DRAFT_PREFIX = "gymos:routine-draft";
+
+type RoutineDraftStorage = {
+  version: 1;
+  routineId: number;
+  savedAt: number;
+  draft: RoutineDetail;
+  exerciseUnits: Record<string, WeightUnit>;
+  editMode: boolean;
+};
+
+function routineDraftKey(routineId: number) {
+  return `${ROUTINE_DRAFT_PREFIX}:${routineId}`;
+}
+
+function readRoutineDraft(routineId: number): RoutineDraftStorage | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(routineDraftKey(routineId));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as RoutineDraftStorage;
+    if (parsed.version !== 1 || parsed.routineId !== routineId || !parsed.draft) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeRoutineDraft(storage: RoutineDraftStorage) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(routineDraftKey(storage.routineId), JSON.stringify(storage));
+}
+
+function clearRoutineDraft(routineId: number) {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(routineDraftKey(routineId));
+}
 
 function normalizeSetType(setType: string) {
   if (setType === "normal") return "working";
@@ -105,6 +145,7 @@ export default function RoutineDetailPage() {
   const [exerciseUnits, setExerciseUnits] = useState<Record<string, WeightUnit>>({});
   const [replaceTargetIdx, setReplaceTargetIdx] = useState<number | null>(null);
   const [replaceExerciseName, setReplaceExerciseName] = useState("");
+  const routineDraftHydratedRef = useRef(false);
 
   function showToast(message: string) {
     setToast(message);
@@ -118,13 +159,22 @@ export default function RoutineDetailPage() {
         api.getRoutine(routineId),
         api.getExercises(),
       ]);
-      setDraft(detail);
+      const localDraft = readRoutineDraft(routineId);
+      if (localDraft) {
+        setDraft(localDraft.draft);
+        setExerciseUnits(localDraft.exerciseUnits ?? {});
+        setEditMode(localDraft.editMode ?? true);
+      } else {
+        setDraft(detail);
+        setExerciseUnits({});
+      }
       setLibrary(exercises);
       api
         .getPersonalProfile()
         .then((profile) => setShortBarWeight(profile.preferred_short_bar_lbs ?? 35))
         .catch(() => {});
     } finally {
+      routineDraftHydratedRef.current = true;
       setLoading(false);
     }
   }, [routineId]);
@@ -133,6 +183,20 @@ export default function RoutineDetailPage() {
     if (!Number.isFinite(routineId)) return;
     void load();
   }, [routineId, load]);
+
+  useEffect(() => {
+    if (!routineDraftHydratedRef.current) return;
+    if (!draft || !Number.isFinite(routineId)) return;
+    if (!editMode) return;
+    writeRoutineDraft({
+      version: 1,
+      routineId,
+      savedAt: Date.now(),
+      draft,
+      exerciseUnits,
+      editMode,
+    });
+  }, [draft, exerciseUnits, editMode, routineId]);
 
   const muscles = useMemo(() => draft?.muscles ?? [], [draft]);
 
@@ -371,6 +435,7 @@ export default function RoutineDetailPage() {
       const updated = await api.updateRoutine(routineId, payload);
       setDraft(updated);
       setEditMode(false);
+      clearRoutineDraft(routineId);
       showToast("Rutina guardada");
     } catch {
       showToast("No se pudo guardar");

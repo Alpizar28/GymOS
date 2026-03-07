@@ -26,6 +26,7 @@ import { displayFromLbs, formatWeight, lbsFromDisplay, type WeightUnit } from "@
 type ActualSet = SetLogEntry;
 
 interface ExerciseState {
+    draft_exercise_id: string;
     name: string;
     is_anchor: boolean;
     notes: string;
@@ -91,6 +92,13 @@ function draftKey(dayName: string, date = localDateISO()) {
 
 function normalizeName(name: string) {
     return name.trim().toLowerCase();
+}
+
+function createDraftExerciseId() {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+    }
+    return `ex-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 }
 
 function exerciseUnitKey(name: string) {
@@ -221,6 +229,14 @@ function CompletionConfetti() {
 }
 
 function mergeExercises(base: ExerciseState[], incoming: ExerciseState[], preserveIncomingOrder = false) {
+    const matchBaseExercise = (from: ExerciseState) => {
+        if (from.draft_exercise_id) {
+            const byId = base.find((cand) => cand.draft_exercise_id === from.draft_exercise_id);
+            if (byId) return byId;
+        }
+        return base.find((cand) => normalizeName(cand.name) === normalizeName(from.name));
+    };
+
     const mergeSetRows = (baseSets: ActualSet[], incomingSets: ActualSet[]) => {
         const max = Math.max(baseSets.length, incomingSets.length);
         const merged: ActualSet[] = [];
@@ -240,10 +256,11 @@ function mergeExercises(base: ExerciseState[], incoming: ExerciseState[], preser
 
     if (preserveIncomingOrder) {
         const mergedIncoming = incoming.map((from) => {
-            const baseEx = base.find((cand) => normalizeName(cand.name) === normalizeName(from.name));
+            const baseEx = matchBaseExercise(from);
             if (!baseEx) {
                 return {
                     ...from,
+                    draft_exercise_id: from.draft_exercise_id || createDraftExerciseId(),
                     sets: normalizeIndices(from.sets),
                     lastSession: null,
                 };
@@ -251,6 +268,7 @@ function mergeExercises(base: ExerciseState[], incoming: ExerciseState[], preser
 
             return {
                 ...baseEx,
+                draft_exercise_id: from.draft_exercise_id || baseEx.draft_exercise_id,
                 is_anchor: from.is_anchor,
                 notes: from.notes || baseEx.notes,
                 plannedSets: from.plannedSets.length > 0 ? from.plannedSets : baseEx.plannedSets,
@@ -270,7 +288,10 @@ function mergeExercises(base: ExerciseState[], incoming: ExerciseState[], preser
     const used = new Array(incoming.length).fill(false);
     const merged = base.map((baseEx) => {
         const matchIndex = incoming.findIndex(
-            (cand, i) => !used[i] && normalizeName(cand.name) === normalizeName(baseEx.name)
+            (cand, i) => !used[i] && (
+                (cand.draft_exercise_id && cand.draft_exercise_id === baseEx.draft_exercise_id) ||
+                normalizeName(cand.name) === normalizeName(baseEx.name)
+            )
         );
 
         if (matchIndex === -1) {
@@ -281,6 +302,7 @@ function mergeExercises(base: ExerciseState[], incoming: ExerciseState[], preser
         const from = incoming[matchIndex];
         return {
             ...baseEx,
+            draft_exercise_id: from.draft_exercise_id || baseEx.draft_exercise_id,
             is_anchor: from.is_anchor,
             notes: from.notes || baseEx.notes,
             plannedSets: from.plannedSets.length > 0 ? from.plannedSets : baseEx.plannedSets,
@@ -293,6 +315,7 @@ function mergeExercises(base: ExerciseState[], incoming: ExerciseState[], preser
         if (!used[i]) {
             merged.push({
                 ...incoming[i],
+                draft_exercise_id: incoming[i].draft_exercise_id || createDraftExerciseId(),
                 sets: normalizeIndices(incoming[i].sets),
                 lastSession: null,
             });
@@ -596,8 +619,8 @@ function AddExerciseModal({
     };
 
     return (
-        <div className="today-modal-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="today-modal-panel bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl">
+        <div className="today-modal-overlay fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="today-modal-panel bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl pb-[env(safe-area-inset-bottom)]">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
                     <h3 className="font-semibold text-white">Add Exercise</h3>
                     <button onClick={onClose} className="text-zinc-500 hover:text-white text-2xl w-10 h-10 flex items-center justify-center">✕</button>
@@ -765,8 +788,8 @@ function CreateTemplateModal({
     };
 
     return (
-        <div className="today-modal-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm">
-            <div className="today-modal-panel bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="today-modal-overlay fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm">
+            <div className="today-modal-panel bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl max-h-[90vh] flex flex-col pb-[env(safe-area-inset-bottom)]">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-gradient-to-r from-zinc-900 to-zinc-950">
                     <div>
                         <h3 className="font-semibold text-white">Crear Template</h3>
@@ -914,8 +937,8 @@ function ReplaceExerciseModal({ exerciseName, onClose, onReplace }: {
     const [loading, setLoading] = useState(true);
     useEffect(() => { api.getAlternatives(exerciseName).then(setAlts).finally(() => setLoading(false)); }, [exerciseName]);
     return (
-        <div className="today-modal-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="today-modal-panel bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl max-h-[80vh] flex flex-col">
+        <div className="today-modal-overlay fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="today-modal-panel bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl max-h-[80vh] flex flex-col pb-[env(safe-area-inset-bottom)]">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 flex-shrink-0">
                     <h3 className="font-semibold text-white truncate pr-4">Replace: {exerciseName}</h3>
                     <button onClick={onClose} className="text-zinc-500 text-2xl w-10 h-10 flex items-center justify-center flex-shrink-0">✕</button>
@@ -963,8 +986,8 @@ function CompleteModal({ summary, onConfirm, onClose }: {
     }
 
     return (
-        <div className="today-modal-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="today-modal-panel bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="today-modal-overlay fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="today-modal-panel bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto pb-[env(safe-area-inset-bottom)]">
                 <div className="px-6 py-5 border-b border-zinc-800">
                     <h3 className="font-bold text-white text-xl">Finish Workout</h3>
                     <p className="text-sm text-zinc-500 mt-1">Review your session and confirm completion</p>
@@ -1019,6 +1042,102 @@ function CompleteModal({ summary, onConfirm, onClose }: {
                         <button onClick={go} disabled={saving}
                             className="py-4 rounded-xl bg-gradient-to-r from-red-600 to-red-500 text-white font-bold active:opacity-80 disabled:opacity-50 touch-manipulation">
                             {saving ? "Finalizing..." : "Confirm & Complete"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function EditWorkoutTimerModal({
+    initialSeconds,
+    onClose,
+    onSave,
+}: {
+    initialSeconds: number;
+    onClose: () => void;
+    onSave: (seconds: number) => void;
+}) {
+    const base = Math.max(0, Math.min(initialSeconds, 23 * 3600 + 59 * 60 + 59));
+    const baseMinutes = Math.floor(base / 60);
+    const [hours, setHours] = useState(Math.floor(baseMinutes / 60));
+    const [minutes, setMinutes] = useState(baseMinutes % 60);
+    const preview = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+
+    const adjustHours = (delta: number) => {
+        setHours((prev) => Math.max(0, Math.min(23, prev + delta)));
+    };
+
+    const adjustMinutes = (delta: number) => {
+        setMinutes((prev) => {
+            const next = prev + delta;
+            if (next < 0) return 0;
+            if (next > 59) return 59;
+            return next;
+        });
+    };
+
+    return (
+        <div className="today-modal-overlay fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="today-modal-panel bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl pb-[env(safe-area-inset-bottom)]">
+                <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+                    <h3 className="font-semibold text-white">Editar tiempo</h3>
+                    <button onClick={onClose} className="text-zinc-500 text-2xl w-9 h-9 flex items-center justify-center">✕</button>
+                </div>
+                <div className="p-5 space-y-4">
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-center">
+                        <p className="text-[11px] uppercase tracking-wide text-zinc-500">Tiempo</p>
+                        <p className="text-2xl font-mono font-bold text-white mt-1">{preview}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-center">
+                            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Horas</p>
+                            <button
+                                type="button"
+                                onWheel={(e) => {
+                                    e.preventDefault();
+                                    adjustHours(e.deltaY > 0 ? -1 : 1);
+                                }}
+                                onClick={() => adjustHours(1)}
+                                className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-900 py-2.5 text-2xl font-mono font-bold text-white"
+                            >
+                                {String(hours).padStart(2, "0")}
+                            </button>
+                            <div className="mt-2 grid grid-cols-2 gap-1">
+                                <button type="button" onClick={() => adjustHours(-1)} className="rounded-md border border-zinc-700 bg-zinc-900 py-1 text-xs text-zinc-300">-</button>
+                                <button type="button" onClick={() => adjustHours(1)} className="rounded-md border border-zinc-700 bg-zinc-900 py-1 text-xs text-zinc-300">+</button>
+                            </div>
+                        </div>
+                        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-center">
+                            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Minutos</p>
+                            <button
+                                type="button"
+                                onWheel={(e) => {
+                                    e.preventDefault();
+                                    adjustMinutes(e.deltaY > 0 ? -1 : 1);
+                                }}
+                                onClick={() => adjustMinutes(1)}
+                                className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-900 py-2.5 text-2xl font-mono font-bold text-white"
+                            >
+                                {String(minutes).padStart(2, "0")}
+                            </button>
+                            <div className="mt-2 grid grid-cols-2 gap-1">
+                                <button type="button" onClick={() => adjustMinutes(-1)} className="rounded-md border border-zinc-700 bg-zinc-900 py-1 text-xs text-zinc-300">-</button>
+                                <button type="button" onClick={() => adjustMinutes(1)} className="rounded-md border border-zinc-700 bg-zinc-900 py-1 text-xs text-zinc-300">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <button onClick={onClose} className="py-2.5 rounded-lg bg-zinc-800 text-zinc-300 font-semibold">Cancelar</button>
+                        <button
+                            onClick={() => {
+                                onSave(hours * 3600 + minutes * 60);
+                            }}
+                            className="py-2.5 rounded-lg bg-red-600 text-white font-semibold"
+                        >
+                            Guardar
                         </button>
                     </div>
                 </div>
@@ -1456,12 +1575,13 @@ function SetCard({ exerciseIndex, index, actual, lastData, weightUnit, onChange,
 
 // ─── Exercise Accordion ──────────────────────────────────────────────────────
 
-function ExerciseAccordion({ exerciseIndex, state, weightUnit, onToggleWeightUnit, onToggle, onSetChange, onAddSet, onMoveSet, onRemoveSet, onCopyPreviousSet, onRemoveExercise, onSwap, onMoveUp, onMoveDown, onSetComplete, onOpenFieldKeypad, activeSetKeypadField }: {
+function ExerciseAccordion({ exerciseIndex, state, weightUnit, onToggleWeightUnit, onToggle, onToggleExerciseCompleted, onSetChange, onAddSet, onMoveSet, onRemoveSet, onCopyPreviousSet, onRemoveExercise, onSwap, onMoveUp, onMoveDown, onSetComplete, onOpenFieldKeypad, activeSetKeypadField }: {
     exerciseIndex: number;
     state: ExerciseState;
     weightUnit: WeightUnit;
     onToggleWeightUnit: () => void;
     onToggle: () => void;
+    onToggleExerciseCompleted: () => void;
     onSetChange: (si: number, u: ActualSet) => void;
     onAddSet: (setType: ActualSet["set_type"]) => void;
     onMoveSet: (setIndex: number, direction: -1 | 1) => void;
@@ -1475,14 +1595,165 @@ function ExerciseAccordion({ exerciseIndex, state, weightUnit, onToggleWeightUni
     onOpenFieldKeypad: (setIndex: number, field: KeypadField) => void;
     activeSetKeypadField: { setIdx: number; field: KeypadField } | null;
 }) {
+    const HEADER_SWIPE_THRESHOLD = 120;
+    const HEADER_SWIPE_LIMIT = 210;
     const { open, sets, lastSession } = state;
     const done = sets.filter((s) => s.completed).length;
     const total = sets.length;
     const allDone = done === total && total > 0;
+    const [headerTranslateX, setHeaderTranslateX] = useState(0);
+    const [headerDragging, setHeaderDragging] = useState(false);
+    const [deleteArmed, setDeleteArmed] = useState(false);
+    const headerSwipeRef = useRef<{ id: number; x: number; y: number; axis: "undecided" | "horizontal" | "vertical" } | null>(null);
+    const preventToggleRef = useRef(false);
+    const deleteArmTimeoutRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (deleteArmTimeoutRef.current !== null) {
+                window.clearTimeout(deleteArmTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    const armDelete = () => {
+        if (deleteArmTimeoutRef.current !== null) {
+            window.clearTimeout(deleteArmTimeoutRef.current);
+        }
+        setDeleteArmed(true);
+        deleteArmTimeoutRef.current = window.setTimeout(() => {
+            setDeleteArmed(false);
+            deleteArmTimeoutRef.current = null;
+        }, 1500);
+    };
+
+    const clearDeleteArm = () => {
+        if (deleteArmTimeoutRef.current !== null) {
+            window.clearTimeout(deleteArmTimeoutRef.current);
+            deleteArmTimeoutRef.current = null;
+        }
+        setDeleteArmed(false);
+    };
+
+    const headerSwipeStrength = Math.min(Math.abs(headerTranslateX) / HEADER_SWIPE_THRESHOLD, 1);
+    const showHeaderDelete = headerTranslateX > 14;
+    const showHeaderComplete = headerTranslateX < -14;
+
+    const handleHeaderPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+        if (open) return;
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        const target = event.target as HTMLElement;
+        if (target.closest('[data-no-header-swipe="true"]')) return;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        headerSwipeRef.current = {
+            id: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            axis: "undecided",
+        };
+        setHeaderDragging(true);
+    };
+
+    const handleHeaderPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+        if (open) return;
+        const start = headerSwipeRef.current;
+        if (!start || start.id !== event.pointerId) return;
+        const dx = event.clientX - start.x;
+        const dy = event.clientY - start.y;
+
+        if (start.axis === "undecided") {
+            if (Math.abs(dx) >= 10 && Math.abs(dx) > Math.abs(dy)) {
+                headerSwipeRef.current = { ...start, axis: "horizontal" };
+            } else if (Math.abs(dy) >= 10 && Math.abs(dy) > Math.abs(dx)) {
+                headerSwipeRef.current = { ...start, axis: "vertical" };
+            }
+        }
+
+        if (headerSwipeRef.current?.axis === "vertical") {
+            setHeaderTranslateX(0);
+            return;
+        }
+
+        const clamped = Math.max(-HEADER_SWIPE_LIMIT, Math.min(HEADER_SWIPE_LIMIT, dx));
+        if (Math.abs(clamped) > 8) preventToggleRef.current = true;
+        setHeaderTranslateX(clamped);
+    };
+
+    const finishHeaderSwipe = (event?: React.PointerEvent<HTMLButtonElement>) => {
+        if (!open && event && event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+
+        if (!open && headerTranslateX <= -HEADER_SWIPE_THRESHOLD) {
+            onToggleExerciseCompleted();
+            clearDeleteArm();
+        } else if (!open && headerTranslateX >= HEADER_SWIPE_THRESHOLD) {
+            if (deleteArmed) {
+                clearDeleteArm();
+                onRemoveExercise();
+            } else {
+                armDelete();
+            }
+        }
+
+        setHeaderDragging(false);
+        setHeaderTranslateX(0);
+        headerSwipeRef.current = null;
+        window.setTimeout(() => {
+            preventToggleRef.current = false;
+        }, 0);
+    };
 
     return (
         <div className={`rounded-xl border overflow-visible ${allDone ? "border-red-600/50 bg-red-950/10" : "border-zinc-700/50 bg-zinc-800/50"}`}>
-            <button onClick={onToggle} className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left touch-manipulation active:bg-zinc-700/20">
+            <div className="relative overflow-hidden rounded-t-xl">
+                {!open ? (
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-between px-3.5">
+                        <div className={`transition-all duration-150 ${showHeaderDelete ? "opacity-100" : "opacity-0"}`}>
+                            <div
+                                className="h-8 w-8 rounded-full border border-rose-500/70 bg-rose-500/15 flex items-center justify-center"
+                                style={{
+                                    transform: `scale(${0.9 + headerSwipeStrength * 0.25})`,
+                                    boxShadow: deleteArmed ? "0 0 0 2px rgba(244,63,94,0.25)" : "none",
+                                }}
+                            >
+                                <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                                    <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="text-rose-300" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div className={`transition-all duration-150 ${showHeaderComplete ? "opacity-100" : "opacity-0"}`}>
+                            <div
+                                className="h-8 w-8 rounded-full border border-emerald-500/70 bg-emerald-500/20 flex items-center justify-center"
+                                style={{
+                                    transform: `scale(${0.9 + headerSwipeStrength * 0.25})`,
+                                    boxShadow: headerSwipeStrength > 0.9 ? "0 0 0 2px rgba(16,185,129,0.25)" : "none",
+                                }}
+                            >
+                                <span className="text-emerald-300 text-base font-extrabold leading-none">✓</span>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {deleteArmed && !open ? (
+                    <div className="absolute top-1.5 right-2.5 z-20 pointer-events-none rounded-md border border-rose-500/45 bg-rose-950/90 px-2 py-1 text-[10px] font-semibold text-rose-100 shadow-lg">
+                        Desliza de nuevo para eliminar
+                    </div>
+                ) : null}
+
+            <button
+                onClick={() => {
+                    if (preventToggleRef.current) return;
+                    onToggle();
+                }}
+                onPointerDown={handleHeaderPointerDown}
+                onPointerMove={handleHeaderPointerMove}
+                onPointerUp={(e) => finishHeaderSwipe(e)}
+                onPointerCancel={(e) => finishHeaderSwipe(e)}
+                style={{ transform: `translateX(${headerTranslateX}px)`, transition: headerDragging ? "none" : "transform 220ms ease-out", touchAction: "pan-y" }}
+                className="relative w-full flex items-center gap-2.5 px-3.5 py-3 text-left touch-manipulation active:bg-zinc-700/20"
+            >
                 <span className="text-[10px] px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-500">{state.is_anchor ? "anchor" : "std"}</span>
                 <div className="flex-1 min-w-0">
                     <p className="font-semibold text-white text-sm truncate">{state.name}</p>
@@ -1502,6 +1773,7 @@ function ExerciseAccordion({ exerciseIndex, state, weightUnit, onToggleWeightUni
                     {done}/{total}
                 </div>
                 <span
+                    data-no-header-swipe="true"
                     onClick={(e) => {
                         e.stopPropagation();
                         onToggleWeightUnit();
@@ -1512,6 +1784,7 @@ function ExerciseAccordion({ exerciseIndex, state, weightUnit, onToggleWeightUni
                 </span>
                 <span className={`text-zinc-500 text-lg flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
             </button>
+            </div>
 
             {open && (
                 <div className="px-3.5 pb-3 space-y-2">
@@ -1596,6 +1869,7 @@ export default function TodayPage() {
     const [workoutElapsedSeconds, setWorkoutElapsedSeconds] = useState(0);
     const [workoutTimerRunning, setWorkoutTimerRunning] = useState(false);
     const [resetTimerConfirmArmed, setResetTimerConfirmArmed] = useState(false);
+    const [showEditWorkoutTimer, setShowEditWorkoutTimer] = useState(false);
     const [shortBarWeight, setShortBarWeight] = useState(35);
     const [keypadTarget, setKeypadTarget] = useState<KeypadTarget | null>(null);
     const [plateTarget, setPlateTarget] = useState<{ exerciseIdx: number; setIdx: number } | null>(null);
@@ -1664,6 +1938,7 @@ export default function TodayPage() {
 
     const buildExerciseStateFromPlan = useCallback((data: TodayPlan): ExerciseState[] => (
         data.exercises.map((ex) => ({
+            draft_exercise_id: createDraftExerciseId(),
             name: ex.name,
             is_anchor: ex.is_anchor,
             notes: ex.notes,
@@ -1747,6 +2022,7 @@ export default function TodayPage() {
             );
 
             return {
+                draft_exercise_id: baseEx?.draft_exercise_id || createDraftExerciseId(),
                 name: ex.name,
                 is_anchor: baseEx?.is_anchor ?? false,
                 notes: baseEx?.notes ?? "",
@@ -2050,6 +2326,16 @@ export default function TodayPage() {
             })
         );
 
+    const toggleExerciseCompleted = (exIdx: number) =>
+        setExercises((p) => p.map((e, i) => {
+            if (i !== exIdx) return e;
+            const hasUncompleted = e.sets.some((s) => !s.completed);
+            return {
+                ...e,
+                sets: e.sets.map((s) => ({ ...s, completed: hasUncompleted })),
+            };
+        }));
+
     const removeExercise = (idx: number) =>
         setExercises((p) => {
             const target = p[idx];
@@ -2063,6 +2349,7 @@ export default function TodayPage() {
         setExercises((p) => [
             ...p,
             {
+                draft_exercise_id: createDraftExerciseId(),
                 name: exercise.name,
                 is_anchor: exercise.is_anchor,
                 notes: "",
@@ -2130,6 +2417,16 @@ export default function TodayPage() {
         return null;
     }, [buildPayload, writeDraftNow, plan, exercises, workoutElapsedSeconds, workoutTimerRunning]);
 
+    const handleSaveWorkoutTimer = useCallback((seconds: number) => {
+        clearResetTimerConfirm();
+        setWorkoutElapsedSeconds(seconds);
+        if (plan && draftReadyRef.current) {
+            writeDraftNow(plan.day_name, exercises, exerciseUnitsRef.current, savedId, seconds, workoutTimerRunning);
+        }
+        setShowEditWorkoutTimer(false);
+        showToast("Tiempo actualizado");
+    }, [clearResetTimerConfirm, plan, exercises, savedId, workoutTimerRunning, writeDraftNow]);
+
     const openFinishModal = useCallback(() => {
         const summary = buildFinishSummary(exercises);
         if (summary.loggedSets === 0) {
@@ -2178,6 +2475,7 @@ export default function TodayPage() {
         setFocusIndex(0);
         setWorkoutElapsedSeconds(0);
         setWorkoutTimerRunning(false);
+        setShowEditWorkoutTimer(false);
         setPlateTarget(null);
         setKeypadTarget(null);
         setRestTimerLeft(null);
@@ -2410,6 +2708,13 @@ export default function TodayPage() {
                     onClose={() => setShowComplete(false)}
                 />
             )}
+            {showEditWorkoutTimer && (
+                <EditWorkoutTimerModal
+                    initialSeconds={workoutElapsedSeconds}
+                    onClose={() => setShowEditWorkoutTimer(false)}
+                    onSave={handleSaveWorkoutTimer}
+                />
+            )}
             {showAddExercise && <AddExerciseModal onAdd={addExercise} onClose={() => setShowAddExercise(false)} />}
             {creatingTemplate && (
                 <CreateTemplateModal
@@ -2585,6 +2890,15 @@ export default function TodayPage() {
                                 </button>
                                 <button
                                     onClick={() => {
+                                        clearResetTimerConfirm();
+                                        setShowEditWorkoutTimer(true);
+                                    }}
+                                    className="inline-flex items-center rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-xs font-semibold text-zinc-300 transition-colors hover:border-zinc-500"
+                                >
+                                    Editar
+                                </button>
+                                <button
+                                    onClick={() => {
                                         if (!resetTimerConfirmArmed) {
                                             setResetTimerConfirmArmed(true);
                                             if (resetTimerConfirmTimeoutRef.current !== null) {
@@ -2727,6 +3041,7 @@ export default function TodayPage() {
                                 weightUnit={resolveExerciseUnit(i)}
                                 onToggleWeightUnit={() => toggleExerciseUnit(i)}
                                 onToggle={() => handleToggle(i)}
+                                onToggleExerciseCompleted={() => toggleExerciseCompleted(i)}
                                 onSetChange={(si, u) => updateSet(i, si, u)}
                                 onAddSet={(setType) => addSet(i, setType)}
                                 onMoveSet={(si, direction) => moveSet(i, si, direction)}

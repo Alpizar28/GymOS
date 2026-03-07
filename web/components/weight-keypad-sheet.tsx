@@ -91,7 +91,7 @@ export function WeightKeypadSheet({
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
   return (
-    <div className="today-keypad-overlay fixed inset-0 z-[55] bg-black/25 flex items-end" onClick={onClose}>
+    <div className="today-keypad-overlay fixed inset-0 z-[80] bg-black/25 flex items-end" onClick={onClose}>
       <div
         className="today-keypad-panel w-full rounded-t-3xl border-t border-zinc-700 bg-[#12121a]/96 p-3 pb-[calc(12px+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-6 fade-in duration-200"
         onClick={(e) => e.stopPropagation()}
